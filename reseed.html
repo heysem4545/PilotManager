@@ -25,7 +25,11 @@ button:hover{filter:brightness(1.1)}
 <div class="card">
   <h1>Pilot<em>Manager</em></h1>
   <p>Seeds 129 properties with purchase dates and Jan–Apr 2026 data. Firebase must be empty before running.</p>
-  <button onclick="startSeed()" id="btn">▶ Start Seeding</button>
+  <div id="authWarn" style="display:none;background:#f5706a22;border:1px solid #f5706a44;border-radius:8px;padding:12px;font-size:13px;color:#f5706a;margin-bottom:12px">
+  ⚠️ You must be signed in! Click below to sign in with Google first.
+</div>
+<button onclick="signIn()" id="signinBtn" style="background:#4285f4;color:#fff;margin-bottom:10px">Sign in with Google first</button>
+<button onclick="startSeed()" id="btn">▶ Start Seeding (click after signing in)</button>
   <div class="progress" id="prog"><div class="progress-fill" id="fill"></div></div>
   <div class="log" id="log"></div>
 </div>
@@ -51,7 +55,24 @@ function log(msg,type='info'){
   el.scrollTop=el.scrollHeight;
 }
 
+async function signIn(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try{
+    await firebase.auth().signInWithPopup(provider);
+    document.getElementById('signinBtn').textContent = '✓ Signed in! Now click Start Seeding';
+    document.getElementById('signinBtn').style.background = '#c9f563';
+    document.getElementById('signinBtn').style.color = '#0d0d10';
+    document.getElementById('authWarn').style.display='none';
+  }catch(e){ alert('Sign in failed: '+e.message); }
+}
+
 async function startSeed(){
+  // Check auth first
+  const user = firebase.auth().currentUser;
+  if(!user){
+    document.getElementById('authWarn').style.display='block';
+    return;
+  }
   const btn=document.getElementById('btn');
   btn.textContent='Seeding...';
   btn.style.opacity='0.6';
