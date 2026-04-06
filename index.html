@@ -593,7 +593,7 @@ let activePayId = null;
 let editPropId = null;
 let currentFilter = 'all';
 let currentPage = 1;
-let sortField = 'addr';
+let sortField = 'rowIndex';
 let sortDir = 1;
 const PER = 12;
 
@@ -742,9 +742,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
 // ─────────────────────────────────────────────
 async function loadProperties(){
   try {
-    const snap=await db.collection('properties').orderBy('addr').get();
+    const snap=await db.collection('properties').get();
     console.log('Loaded properties:', snap.docs.length);
     properties=snap.docs.map(d=>({id:d.id,...d.data()}));
+    properties.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
     properties=properties.map(p=>({
       ...p,
       rent:p.rent||0,cmha:p.cmha||0,tenantPortion:p.tenantPortion||0,
