@@ -10,7 +10,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
 
 <style>
 :root {
@@ -161,6 +160,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .row-eviction td:first-child{color:var(--red)!important}
 .row-moving td:first-child{color:var(--blue)!important}
 .row-construction td:first-child{color:var(--purple)!important}
+
+/* ── MONTH SWITCHER ── */
+.month-bar{display:flex;align-items:center;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-wrap:wrap}
+.month-bar-label{font-size:10px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-right:4px}
+.mbtn{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
+.mbtn:hover{background:var(--surface3);color:var(--text)}
+.mbtn.active{background:var(--accent);color:#0d0d10;font-weight:600}
+.month-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;transition:color .12s}
+.month-nav:hover{color:var(--text)}
+.month-select{background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;cursor:pointer}
+
+/* ── INLINE EDIT ── */
+.editable{cursor:pointer;border-radius:4px;padding:2px 4px;transition:background .12s;display:inline-block;min-width:40px}
+.editable:hover{background:var(--surface3)}
+.inline-input{background:var(--surface2);border:1px solid var(--accent);border-radius:5px;padding:3px 7px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;width:80px}
+.inline-select{background:var(--surface2);border:1px solid var(--accent);border-radius:5px;padding:3px 7px;font-size:11px;font-family:var(--font);color:var(--text);outline:none;}
 
 /* ── PROPERTIES TABLE ── */
 .table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
@@ -431,6 +446,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
       <!-- PROPERTIES VIEW -->
       <div id="propsView" style="display:none">
         <div class="table-card">
+          <div class="month-bar" id="monthBar"></div>
           <div class="toolbar">
             <div class="search-box">
               <span class="search-icon">⌕</span>
@@ -443,13 +459,14 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
               <thead>
                 <tr>
                   <th onclick="sortBy('addr')">Address</th>
-                  <th onclick="sortBy('status')">Status</th>
-                  <th onclick="sortBy('rent')">Rent</th>
-                  <th>CMHA / Tenant</th>
+                  <th>Status</th>
+                  <th>CMHA Rent</th>
+                  <th>Tenant Rent</th>
+                  <th>CMHA Paid</th>
+                  <th>Tenant Paid</th>
                   <th onclick="sortBy('collected')">Collected</th>
-                  <th>Balance (CMHA / Tenant)</th>
+                  <th>Balance (CMHA/Tenant)</th>
                   <th>Rate</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody id="tableBody"></tbody>
@@ -580,6 +597,14 @@ let sortField = 'addr';
 let sortDir = 1;
 const PER = 12;
 
+// Month switcher
+const NOW = new Date();
+let activeYear = NOW.getFullYear();
+let activeMonth = NOW.getMonth(); // 0-based
+function monthKey(y,m){return `${y}-${String(m+1).padStart(2,'0')}`;}
+function activeKey(){return monthKey(activeYear,activeMonth);}
+let monthData = {}; // monthData[propertyId][monthKey] = {status,cmhaPaid,tenantPaid}
+
 const SC={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)'};
 const BC={RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction'};
 const BL={RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction'};
@@ -704,6 +729,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
 
   // Load data once, then show app and render
   await loadProperties();
+  await loadMonthData(activeKey());
   document.getElementById('loader').style.display='none';
   document.getElementById('loginPage').style.display='none';
   document.getElementById('registerPage').style.display='none';
@@ -734,6 +760,47 @@ async function loadProperties(){
 }
 
 // ─────────────────────────────────────────────
+// MONTH DATA (Firestore: monthlyData collection)
+// doc id = propertyId_monthKey, fields: status, cmhaPaid, tenantPaid
+// ─────────────────────────────────────────────
+async function loadMonthData(key){
+  try{
+    const snap = await db.collection('monthlyData').where('monthKey','==',key).get();
+    snap.docs.forEach(d=>{
+      const dat = d.data();
+      if(!monthData[dat.propertyId]) monthData[dat.propertyId]={};
+      monthData[dat.propertyId][key] = {status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,docId:d.id};
+    });
+  }catch(e){console.error('loadMonthData',e);}
+}
+
+async function saveMonthField(propertyId, field, value){
+  const key = activeKey();
+  if(!monthData[propertyId]) monthData[propertyId]={};
+  const existing = monthData[propertyId][key]||{};
+  const updated = {...existing, [field]:value, propertyId, monthKey:key};
+  if(existing.docId){
+    await db.collection('monthlyData').doc(existing.docId).update({[field]:value});
+    monthData[propertyId][key] = {...updated, docId:existing.docId};
+  } else {
+    const ref = await db.collection('monthlyData').add(updated);
+    monthData[propertyId][key] = {...updated, docId:ref.id};
+  }
+}
+
+function getMonthProp(p){
+  // Merge base property with current month's data
+  const key = activeKey();
+  const md = (monthData[p.id]||{})[key]||{};
+  const cmhaPaid = md.cmhaPaid!==undefined ? md.cmhaPaid : 0;
+  const tenantPaid = md.tenantPaid!==undefined ? md.tenantPaid : 0;
+  const status = md.status||'';
+  const collected = cmhaPaid + tenantPaid;
+  const balance = Math.max(0, p.rent - collected);
+  return {...p, cmhaPaid, tenantPaid, collected, balance, status: status||p.status};
+}
+
+// ─────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────
 function fmt(n){return '$'+Math.round(n).toLocaleString()}
@@ -748,21 +815,26 @@ function canEdit(){return currentUser&&(currentUser.role==='admin'||currentUser.
 // CALCULATIONS
 // ─────────────────────────────────────────────
 function calcTotals(){
+  const mProps=properties.map(p=>getMonthProp(p));
   const rent=properties.reduce((s,p)=>s+p.rent,0);
-  const coll=properties.reduce((s,p)=>s+p.collected,0);
-  const cmha=properties.reduce((s,p)=>s+p.cmhaPaid,0);
-  const tp=properties.reduce((s,p)=>s+p.tenantPaid,0);
-  const rented=properties.filter(p=>p.status==='RENTED').length;
-  const rentedProps=properties.filter(p=>p.status==='RENTED');
-  const realBal=Math.max(0,rentedProps.reduce((s,p)=>s+(p.cmha-p.cmhaPaid)+(p.tenantPortion-p.tenantPaid),0));
-  const cmhaBal=rentedProps.reduce((s,p)=>s+(p.cmha-p.cmhaPaid),0);
-  const tenantBal=rentedProps.reduce((s,p)=>s+(p.tenantPortion-p.tenantPaid),0);
-  const cmhaBehind=rentedProps.filter(p=>p.cmha-p.cmhaPaid>0).length;
-  const tenantBehind=rentedProps.filter(p=>p.tenantPortion-p.tenantPaid>0).length;
-  const vacantIncome=properties.filter(p=>p.status==='VACANT').reduce((s,p)=>s+p.rent,0);
-  const evictionIncome=properties.filter(p=>p.status==='EVICTION').reduce((s,p)=>s+p.rent,0);
-  const constructionIncome=properties.filter(p=>p.status==='CONSTRUCTION').reduce((s,p)=>s+p.rent,0);
-  const movingIncome=properties.filter(p=>p.status==='MOVING PROCESS').reduce((s,p)=>s+p.rent,0);
+  const coll=mProps.reduce((s,p)=>s+p.collected,0);
+  const cmha=mProps.reduce((s,p)=>s+p.cmhaPaid,0);
+  const tp=mProps.reduce((s,p)=>s+p.tenantPaid,0);
+  const rented=mProps.filter(p=>p.status==='RENTED').length;
+  const rentedProps=mProps.filter(p=>p.status==='RENTED');
+  const baseRented=properties.filter(p=>getMonthProp(p).status==='RENTED');
+  const realBal=Math.max(0,baseRented.reduce((s,p,i)=>{
+    const mp=rentedProps.find(x=>x.id===p.id)||getMonthProp(p);
+    return s+(p.cmha-mp.cmhaPaid)+(p.tenantPortion-mp.tenantPaid);
+  },0));
+  const cmhaBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+(p.cmha-mp.cmhaPaid);},0);
+  const tenantBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+(p.tenantPortion-mp.tenantPaid);},0);
+  const cmhaBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return p.cmha-mp.cmhaPaid>0;}).length;
+  const tenantBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return p.tenantPortion-mp.tenantPaid>0;}).length;
+  const vacantIncome=properties.filter(p=>getMonthProp(p).status==='VACANT').reduce((s,p)=>s+p.rent,0);
+  const evictionIncome=properties.filter(p=>getMonthProp(p).status==='EVICTION').reduce((s,p)=>s+p.rent,0);
+  const constructionIncome=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').reduce((s,p)=>s+p.rent,0);
+  const movingIncome=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').reduce((s,p)=>s+p.rent,0);
   const totalPotential=vacantIncome+evictionIncome+constructionIncome+movingIncome;
   return{rent,coll,cmha,tp,rented,realBal,cmhaBal,tenantBal,cmhaBehind,tenantBehind,
          vacantIncome,evictionIncome,constructionIncome,movingIncome,totalPotential};
@@ -772,13 +844,15 @@ function calcTotals(){
 // RENDER
 // ─────────────────────────────────────────────
 function renderMetrics(){
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mLabel=MNAMES[activeMonth]+' '+activeYear;
   const t=calcTotals();
   const collRate=pct(t.coll,t.rent);
   const occ=pct(t.rented,properties.length);
   document.getElementById('metricsGrid').innerHTML=`
-    <div class="mc g"><div class="mc-lbl">Expected rent</div><div class="mc-val g">${fmt(t.rent)}</div><div class="mc-sub">${properties.length} properties · Apr 2026</div></div>
+    <div class="mc g"><div class="mc-lbl">Expected rent</div><div class="mc-val g">${fmt(t.rent)}</div><div class="mc-sub">${properties.length} properties · ${mLabel}</div></div>
     <div class="mc g"><div class="mc-lbl">Total collected</div><div class="mc-val">${fmt(t.coll)}</div><div class="mc-pill up">↑ ${collRate}% rate</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)}</span><span class="ts">Tenant ${fmt(t.tp)}</span></div></div>
-    <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${properties.filter(p=>p.status==='RENTED'&&p.balance>0).length} rented behind</div><div class="mc-split"><span class="cs">CMHA ${fmt(Math.max(0,t.cmhaBal))}</span><span class="tr">Tenant ${fmt(Math.max(0,t.tenantBal))}</span></div></div>
+    <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${properties.filter(p=>getMonthProp(p).status==='RENTED'&&getMonthProp(p).balance>0).length} rented behind</div><div class="mc-split"><span class="cs">CMHA ${fmt(Math.max(0,t.cmhaBal))}</span><span class="tr">Tenant ${fmt(Math.max(0,t.tenantBal))}</span></div></div>
     <div class="mc b"><div class="mc-lbl">CMHA paid</div><div class="mc-val b">${fmt(t.cmha)}</div><div class="mc-sub">${pct(t.cmha,t.coll)}% of collections</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">Owed ${fmt(Math.max(0,t.cmhaBal))}</span><span class="cs" style="background:var(--red-dim);color:var(--red)">${t.cmhaBehind} behind</span></div></div>
     <div class="mc g"><div class="mc-lbl">Tenant paid</div><div class="mc-val">${fmt(t.tp)}</div><div class="mc-sub">${pct(t.tp,t.coll)}% of collections</div><div class="mc-split"><span class="ts" style="background:var(--red-dim);color:var(--red)">Owed ${fmt(Math.max(0,t.tenantBal))}</span><span class="ts" style="background:var(--red-dim);color:var(--red)">${t.tenantBehind} behind</span></div></div>
     <div class="mc a"><div class="mc-lbl">Occupancy</div><div class="mc-val a">${occ}%</div><div class="mc-sub">${t.rented} of ${properties.length} rented</div></div>
@@ -787,10 +861,10 @@ function renderMetrics(){
 
 function renderPotential(){
   const t=calcTotals();
-  const vN=properties.filter(p=>p.status==='VACANT').length;
-  const eN=properties.filter(p=>p.status==='EVICTION').length;
-  const cN=properties.filter(p=>p.status==='CONSTRUCTION').length;
-  const mN=properties.filter(p=>p.status==='MOVING PROCESS').length;
+  const vN=properties.filter(p=>getMonthProp(p).status==='VACANT').length;
+  const eN=properties.filter(p=>getMonthProp(p).status==='EVICTION').length;
+  const cN=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').length;
+  const mN=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').length;
   document.getElementById('potentialBanner').innerHTML=`
     <div class="potential-title">⚡ Potential income — if these units were rented</div>
     <div class="potential-grid">
@@ -805,7 +879,7 @@ function renderPotential(){
 function renderStatusBars(){
   const counts={};
   ['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].forEach(s=>counts[s]=0);
-  properties.forEach(p=>counts[p.status]=(counts[p.status]||0)+1);
+  properties.forEach(p=>{const mp=getMonthProp(p);counts[mp.status]=(counts[mp.status]||0)+1;});
   const max=Math.max(...Object.values(counts))||1;
   document.getElementById('statusBars').innerHTML=Object.entries(counts).map(([s,n])=>`
     <div class="bar-row"><span class="bar-label">${BL[s]||s}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/max*100)}%;background:${SC[s]}"></div></div><span class="bar-val" style="color:${SC[s]}">${n}</span></div>
@@ -836,7 +910,8 @@ function applyFilters(){currentPage=1;renderTable();}
 function filteredData(){
   const q=(document.getElementById('searchInput')||{value:''}).value.toLowerCase();
   return properties.filter(p=>{
-    const ms=currentFilter==='all'||p.status===currentFilter||(currentFilter==='balance'&&p.balance>0);
+    const mp=getMonthProp(p);
+    const ms=currentFilter==='all'||mp.status===currentFilter||(currentFilter==='balance'&&mp.balance>0);
     const mq=!q||p.addr.toLowerCase().includes(q)||(p.tenant||'').toLowerCase().includes(q);
     return ms&&mq;
   }).sort((a,b)=>{
@@ -847,32 +922,98 @@ function filteredData(){
 }
 function sortBy(f){if(sortField===f)sortDir*=-1;else{sortField=f;sortDir=1;}renderTable();}
 
+function renderMonthBar(){
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const today = new Date();
+  // Show 4 most recent months as buttons, rest in dropdown
+  let btns = '';
+  // Build last 4 months
+  const recent = [];
+  for(let i=3;i>=0;i--){
+    let m = today.getMonth()-i;
+    let y = today.getFullYear();
+    if(m<0){m+=12;y--;}
+    recent.push({m,y});
+  }
+  // Older months dropdown (up to 8 more)
+  let olderOpts = '';
+  for(let i=4;i<12;i++){
+    let m = today.getMonth()-i;
+    let y = today.getFullYear();
+    if(m<0){m+=12;y--;}
+    const k=monthKey(y,m);
+    const sel=(y===activeYear&&m===activeMonth);
+    olderOpts+=`<option value="${y}-${m}" ${sel?'selected':''}>${MNAMES[m]} ${y}</option>`;
+  }
+  btns = recent.map(({m,y})=>{
+    const active = (y===activeYear&&m===activeMonth);
+    return `<button class="mbtn ${active?'active':''}" onclick="switchMonth(${y},${m})">${MNAMES[m]} ${y}</button>`;
+  }).join('');
+  const olderActive = !recent.some(r=>r.y===activeYear&&r.m===activeMonth);
+  document.getElementById('monthBar').innerHTML=`
+    <span class="month-bar-label">Month:</span>
+    ${btns}
+    <select class="month-select" onchange="switchMonthFromSelect(this.value)" ${olderActive?'style="border-color:var(--accent)"':''}>
+      <option value="">Older months…</option>
+      ${olderOpts}
+    </select>
+    <span style="font-size:11px;color:var(--muted);margin-left:8px">Showing data for <strong style="color:var(--accent)">${MNAMES[activeMonth]} ${activeYear}</strong></span>
+  `;
+}
+
+async function switchMonth(y,m){
+  activeYear=y; activeMonth=m;
+  renderMonthBar();
+  // Load month data if not already loaded
+  const key=activeKey();
+  const alreadyLoaded = Object.values(monthData).some(pd=>pd[key]!==undefined);
+  if(!alreadyLoaded) await loadMonthData(key);
+  renderTable();
+  renderMetrics();
+  renderDonut();
+}
+
+function switchMonthFromSelect(val){
+  if(!val)return;
+  const [y,m]=val.split('-').map(Number);
+  switchMonth(y,m);
+}
+
 function renderTable(){
   const fd=filteredData();
   const pages=Math.max(1,Math.ceil(fd.length/PER));
   if(currentPage>pages)currentPage=pages;
   const slice=fd.slice((currentPage-1)*PER,currentPage*PER);
   document.getElementById('tblCount').textContent=`${fd.length} propert${fd.length===1?'y':'ies'}`;
+  const edit=canEdit();
   document.getElementById('tableBody').innerHTML=slice.map(p=>{
-    const rate=pct(p.collected,p.rent);
+    const mp=getMonthProp(p);
+    const rate=pct(mp.collected,p.rent);
     const rC=rate===100?'var(--accent)':rate>60?'var(--amber)':'var(--red)';
-    const cmhaSplit=`<div class="cmha-split">CMHA: ${fmt(p.cmha||0)} / T: ${fmt(p.tenantPortion||0)}</div>`;
-    const cmhaBalance=Math.max(0,(p.cmha||0)-(p.cmhaPaid||0));
-    const tenantBalance=Math.max(0,(p.tenantPortion||0)-(p.tenantPaid||0));
-    const balSplit=p.balance>0
-      ? `<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
-      : `<span style="color:var(--accent)">✓</span>`;
-    const editBtn=canEdit()?`<button class="btn btn-ghost btn-sm" onclick="openEdit('${p.id}')" style="margin-right:4px">Edit</button>`:'';
-    const payBtn=canEdit()&&p.status==='RENTED'?`<button class="btn btn-primary btn-sm" onclick="openPay('${p.id}')">Pay</button>`:'';
-    return `<tr>
+    const cmhaBalance=Math.max(0,p.cmha-mp.cmhaPaid);
+    const tenantBalance=Math.max(0,p.tenantPortion-mp.tenantPaid);
+    const balCell=mp.balance>0
+      ?`<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
+      :`<span style="color:var(--accent)">✓</span>`;
+    // Status cell
+    const statusCell=edit
+      ?`<span class="editable" onclick="inlineEditStatus('${p.id}',this)">${mp.status?`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`
+      :`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`;
+    // Editable number cells
+    const cmhaRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmha',this,'cmha')">${p.cmha>0?fmt(p.cmha):'<span class="m-muted">—</span>'}</span>`:fmt(p.cmha);
+    const tRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPortion',this,'tenantPortion')">${p.tenantPortion>0?fmt(p.tenantPortion):'<span class="m-muted">—</span>'}</span>`:fmt(p.tenantPortion);
+    const cmhaPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmhaPaid',this,'monthCmhaPaid')">${mp.cmhaPaid>0?fmt(mp.cmhaPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.cmhaPaid);
+    const tPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPaid',this,'monthTenantPaid')">${mp.tenantPaid>0?fmt(mp.tenantPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.tenantPaid);
+    return `<tr id="row-${p.id}">
       <td><div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
-      <td><span class="badge ${BC[p.status]||'b-vacant'}">${BL[p.status]||p.status}</span></td>
-      <td class="money">${p.rent>0?fmt(p.rent):'<span class="m-muted">—</span>'}</td>
-      <td>${cmhaSplit}</td>
-      <td class="money ${p.collected>0?'m-pos':''}">${fmtD(p.collected)}</td>
-      <td>${balSplit}</td>
+      <td id="cell-status-${p.id}">${statusCell}</td>
+      <td id="cell-cmha-${p.id}" class="money">${cmhaRentCell}</td>
+      <td id="cell-tenantPortion-${p.id}" class="money">${tRentCell}</td>
+      <td id="cell-cmhaPaid-${p.id}" class="money">${cmhaPaidCell}</td>
+      <td id="cell-tenantPaid-${p.id}" class="money">${tPaidCell}</td>
+      <td class="money ${mp.collected>0?'m-pos':''}">${fmtD(mp.collected)}</td>
+      <td>${balCell}</td>
       <td>${p.rent>0?`<span class="prog-track"><span class="prog-fill" style="width:${rate}%;background:${rC}"></span></span><span style="font-size:10px;font-family:var(--mono);color:${rC}">${rate}%</span>`:'<span class="m-muted">—</span>'}</td>
-      <td style="white-space:nowrap">${editBtn}${payBtn}</td>
     </tr>`;
   }).join('');
   let pag='';
@@ -885,6 +1026,72 @@ function renderTable(){
   document.getElementById('pagination').innerHTML=pag;
 }
 function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pages)return;currentPage=p;renderTable();}
+
+// ─────────────────────────────────────────────
+// INLINE EDITING
+// ─────────────────────────────────────────────
+function inlineEditStatus(propId, cell){
+  if(!canEdit())return;
+  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
+  const mp=getMonthProp(properties.find(x=>x.id===propId));
+  const sel=document.createElement('select');
+  sel.className='inline-select';
+  statuses.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s; o.textContent=BL[s]||s;
+    if(mp.status===s)o.selected=true;
+    sel.appendChild(o);
+  });
+  cell.innerHTML='';
+  cell.appendChild(sel);
+  sel.focus();
+  const save=async()=>{
+    const val=sel.value;
+    await saveMonthField(propId,'status',val);
+    renderTable();
+    renderMetrics();
+    renderDonut();
+    toast('Status saved');
+  };
+  sel.onchange=save;
+  sel.onblur=save;
+}
+
+function inlineEditNum(propId, baseField, cell, fieldType){
+  if(!canEdit())return;
+  const p=properties.find(x=>x.id===propId);
+  const mp=getMonthProp(p);
+  const isMonthField = fieldType==='monthCmhaPaid'||fieldType==='monthTenantPaid';
+  const currentVal = isMonthField
+    ? (fieldType==='monthCmhaPaid'?mp.cmhaPaid:mp.tenantPaid)
+    : p[baseField]||0;
+  const inp=document.createElement('input');
+  inp.type='number'; inp.className='inline-input';
+  inp.value=currentVal||''; inp.placeholder='0';
+  inp.min='0';
+  cell.innerHTML='';
+  cell.appendChild(inp);
+  inp.focus(); inp.select();
+  const save=async()=>{
+    const val=parseFloat(inp.value)||0;
+    if(isMonthField){
+      const monthField = fieldType==='monthCmhaPaid'?'cmhaPaid':'tenantPaid';
+      await saveMonthField(propId, monthField, val);
+    } else {
+      // Save to base property
+      await saveProperty({[baseField]:val}, propId);
+      // Update local properties array
+      const idx=properties.findIndex(x=>x.id===propId);
+      if(idx>=0) properties[idx]={...properties[idx],[baseField]:val};
+    }
+    renderTable();
+    renderMetrics();
+    renderDonut();
+    toast('Saved ✓');
+  };
+  inp.onblur=save;
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=currentVal;inp.blur();}};
+}
 
 function switchMonthlyView(mode,btn){
   monthlyMode=mode;
@@ -1102,6 +1309,7 @@ function showView(v){
     renderDonut();
   }
   if(v==='properties'){
+    renderMonthBar();
     renderFilterTabs();
     renderTable();
   }
@@ -1124,23 +1332,10 @@ function refreshAll(){
 }
 
 function initApp(){
-  document.getElementById('viewSub').textContent='Cleveland, OH · '+new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('viewSub').textContent='Cleveland, OH · '+MNAMES[activeMonth]+' '+activeYear;
   currentView='dashboard';
   showView('dashboard');
-
-  // DEBUG: catch anything hiding dashView
-  const observer = new MutationObserver((mutations)=>{
-    mutations.forEach(m=>{
-      if(m.attributeName==='style'){
-        const el = document.getElementById('dashView');
-        if(el && el.style.display==='none'){
-          console.error('dashView was hidden! Stack:', new Error().stack);
-        }
-      }
-    });
-  });
-  const dashEl = document.getElementById('dashView');
-  if(dashEl) observer.observe(dashEl, {attributes:true});
 }
 </script>
 </body>
