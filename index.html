@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 
 <style>
 :root {
@@ -446,7 +447,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
                   <th onclick="sortBy('rent')">Rent</th>
                   <th>CMHA / Tenant</th>
                   <th onclick="sortBy('collected')">Collected</th>
-                  <th onclick="sortBy('balance')">Balance</th>
+                  <th>Balance (CMHA / Tenant)</th>
                   <th>Rate</th>
                   <th></th>
                 </tr>
@@ -855,7 +856,12 @@ function renderTable(){
   document.getElementById('tableBody').innerHTML=slice.map(p=>{
     const rate=pct(p.collected,p.rent);
     const rC=rate===100?'var(--accent)':rate>60?'var(--amber)':'var(--red)';
-    const cmhaSplit=p.cmha>0?`<div class="cmha-split">CMHA: ${fmt(p.cmha)} / T: ${fmt(p.tenantPortion)}</div>`:'<div class="cmha-split" style="color:var(--muted)">Tenant only</div>';
+    const cmhaSplit=`<div class="cmha-split">CMHA: ${fmt(p.cmha||0)} / T: ${fmt(p.tenantPortion||0)}</div>`;
+    const cmhaBalance=Math.max(0,(p.cmha||0)-(p.cmhaPaid||0));
+    const tenantBalance=Math.max(0,(p.tenantPortion||0)-(p.tenantPaid||0));
+    const balSplit=p.balance>0
+      ? `<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
+      : `<span style="color:var(--accent)">✓</span>`;
     const editBtn=canEdit()?`<button class="btn btn-ghost btn-sm" onclick="openEdit('${p.id}')" style="margin-right:4px">Edit</button>`:'';
     const payBtn=canEdit()&&p.status==='RENTED'?`<button class="btn btn-primary btn-sm" onclick="openPay('${p.id}')">Pay</button>`:'';
     return `<tr>
@@ -864,7 +870,7 @@ function renderTable(){
       <td class="money">${p.rent>0?fmt(p.rent):'<span class="m-muted">—</span>'}</td>
       <td>${cmhaSplit}</td>
       <td class="money ${p.collected>0?'m-pos':''}">${fmtD(p.collected)}</td>
-      <td class="money ${p.balance>0?'m-neg':'m-muted'}">${p.balance>0?fmt(p.balance):'<span style="color:var(--accent)">✓</span>'}</td>
+      <td>${balSplit}</td>
       <td>${p.rent>0?`<span class="prog-track"><span class="prog-fill" style="width:${rate}%;background:${rC}"></span></span><span style="font-size:10px;font-family:var(--mono);color:${rC}">${rate}%</span>`:'<span class="m-muted">—</span>'}</td>
       <td style="white-space:nowrap">${editBtn}${payBtn}</td>
     </tr>`;
