@@ -1850,13 +1850,17 @@ function refreshAll(){
 function initApp(){
   const MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('viewSub').textContent='Cleveland, OH · '+MNAMES[activeMonth]+' '+activeYear;
-  // Hide all views first
-  ['dashboard','properties','monthly','team','tasks','meetings','legal','maintenance','notices','leads','available','utility','tenants','inspections'].forEach(v=>{
-    const el=document.getElementById(v+'View');
-    if(el) el.style.display='none';
-  });
   currentView='dashboard';
-  showView('dashboard');
+  // Show only dashboard
+  document.getElementById('dashView').style.display='block';
+  document.getElementById('propsView').style.display='none';
+  document.getElementById('monthlyView').style.display='none';
+  document.getElementById('teamView').style.display='none';
+  document.getElementById('tasksView').style.display='none';
+  renderMetrics();
+  renderPotential();
+  renderStatusBars();
+  renderDonut();
 }
 </script>
 </body>
