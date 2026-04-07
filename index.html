@@ -519,7 +519,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
       </div>
 
       <!-- DASHBOARD VIEW -->
-      <div id="dashView">
+      <div id="dashView" style="display:none">
         <div class="metrics" id="metricsGrid"></div>
         <div class="potential-banner" id="potentialBanner"></div>
         <div class="overview-row">
@@ -1546,9 +1546,10 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayName=DNAMES[new Date(tmYear,tmMonth,day).getDay()];
   
-  // Fill to at least 5 rows
+  // Fill to at least 8 rows + 1 empty
+  const minRows = Math.max(8, dayTasks.length+2);
   const rows=[];
-  for(let i=0;i<Math.max(5,dayTasks.length+1);i++){
+  for(let i=0;i<minRows;i++){
     const t=dayTasks[i]||{diff:'',task:'',status:'notstarted'};
     rows.push({...t,rowIdx:i});
   }
@@ -1582,12 +1583,13 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     </div>`;
   }).join('');
 
-  return `<div class="tm-day ${isToday?'today':''}">
+  return `<div class="tm-day ${isToday?'today':''}" id="tmday-${day}">
     <div class="tm-day-head">
       <span class="tm-day-name">${dayName}</span>
       <span class="tm-day-num ${isToday?'today-num':''}">${day}</span>
     </div>
-    <div class="tm-day-body">${rowsHtml}</div>
+    <div class="tm-day-body" id="tmbody-${day}">${rowsHtml}</div>
+    ${readonly?'':'<div class="tm-add-row" onclick="tmAddRow('+day+')">+ Add row</div>'}
   </div>`;
 }
 
@@ -1598,11 +1600,70 @@ function onTmDiff(day,rowIdx,sel){
 }
 function onTmTask(day,rowIdx,inp){
   saveTask(day,rowIdx,'task',inp.value);
+  tmRefreshStats();
 }
 function onTmStatus(day,rowIdx,sel){
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
   saveTask(day,rowIdx,'status',sel.value);
+  tmRefreshStats();
+}
+
+function tmAddRow(day){
+  const body=document.getElementById('tmbody-'+day);
+  const rows=body.querySelectorAll('.tm-task-row');
+  const newIdx=rows.length;
+  const div=document.createElement('div');
+  div.className='tm-task-row';
+  div.innerHTML=`
+    <select class="tm-diff-sel diff-none" onchange="onTmDiff(${day},${newIdx},this)" style="cursor:pointer">
+      <option value="">Difficulty</option>
+      <option value="easy">🟢 Easy (1pt)</option>
+      <option value="medium">🟡 Medium (2pt)</option>
+      <option value="hard">🔴 Hard (3pt)</option>
+    </select>
+    <div style="display:flex;align-items:center;gap:3px;min-width:0">
+      <input class="tm-task-input" value="" placeholder="Add task..." 
+        onblur="onTmTask(${day},${newIdx},this)" onkeydown="if(event.key==='Enter')this.blur()">
+    </div>
+    <select class="tm-status-sel status-notstarted" onchange="onTmStatus(${day},${newIdx},this)">
+      <option value="notstarted" selected>Not Started</option>
+      <option value="progressing">Progressing</option>
+      <option value="done">✓ Done</option>
+    </select>`;
+  body.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function tmRefreshStats(){
+  // Recalculate stats from current DOM state
+  const key=tmActiveKey();
+  const cacheKey=key+(tmTab==='own'?'-own':tmTab==='group'?'':'-'+tmAdminUser);
+  const tasks=taskCache[cacheKey]||{};
+  // Also read from current DOM for real-time accuracy
+  const allRows=document.querySelectorAll('.tm-task-row');
+  let total=0,done=0,pts=0;
+  allRows.forEach(row=>{
+    const inp=row.querySelector('.tm-task-input');
+    const diff=row.querySelector('.tm-diff-sel');
+    const status=row.querySelector('.tm-status-sel');
+    if(!inp||!inp.value.trim())return;
+    total++;
+    const p=DIFF_PTS[diff?.value]||1;
+    if(status?.value==='done'){done++;pts+=p;}
+  });
+  const pct=total>0?Math.round(done/total*100):0;
+  const circ=2*Math.PI*18;
+  const dash=circ*pct/100;
+  // Update circle
+  const circles=document.querySelectorAll('.tm-stat-circle circle:last-child');
+  circles.forEach(c=>c.setAttribute('stroke-dasharray',`${dash} ${circ}`));
+  const pctEls=document.querySelectorAll('.tm-stat-circle-inner');
+  pctEls.forEach(e=>e.textContent=pct+'%');
+  const valEls=document.querySelectorAll('.tm-stat-val');
+  valEls.forEach(e=>e.textContent=`${done}/${total} tasks`);
+  const ptsEls=document.querySelectorAll('.tm-stat-pts');
+  ptsEls.forEach(e=>e.textContent=`⚡ ${pts} pts earned`);
 }
 
 async function renderTasksView(){
