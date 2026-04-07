@@ -59,7 +59,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
 /* ── APP LAYOUT ── */
 .app{display:grid;grid-template-columns:215px 1fr;min-height:100vh}
-.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;padding-bottom:120px}
 .logo{font-size:16px;font-weight:600;letter-spacing:-.02em;padding:4px 8px 18px;border-bottom:1px solid var(--border);margin-bottom:6px}
 .logo em{font-style:normal;color:var(--accent)}
 .nav-label{font-size:10px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:14px 8px 4px}
@@ -69,7 +69,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
 .nav-item.active svg{opacity:1}
 .nav-item.disabled{opacity:.35;pointer-events:none}
-.sidebar-bottom{margin-top:auto;padding-top:14px;border-top:1px solid var(--border)}
+.sidebar-bottom{position:sticky;bottom:0;background:var(--surface);padding-top:14px;border-top:1px solid var(--border);margin-top:auto}
 .user-row{display:flex;align-items:center;gap:9px;padding:6px 8px}
 .u-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .u-name{font-size:12px;font-weight:500}
