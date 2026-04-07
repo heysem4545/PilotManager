@@ -1829,6 +1829,7 @@ function showView(v){
     renderDonut();
   }
   if(v==='properties'){
+    document.getElementById('dashView').style.display='none';
     renderMonthBar();
     renderFilterTabs();
     if(properties.length===0){
