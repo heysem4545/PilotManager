@@ -1782,11 +1782,15 @@ let currentView = 'dashboard';
 function showView(v){
   currentView = v;
 
+  // Explicitly hide/show all views
   const allViews = ['dashboard','properties','monthly','team','tasks','meetings','legal','maintenance','notices','leads','available','utility','tenants','inspections'];
   allViews.forEach(view => {
     const el = document.getElementById(view+'View');
-    if(el) el.style.display = v===view ? 'block' : 'none';
+    if(el) el.style.display = 'none';
   });
+  // Now show only the active view
+  const active = document.getElementById(v+'View');
+  if(active) active.style.display = 'block';
 
   // Update nav
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
