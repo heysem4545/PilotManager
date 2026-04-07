@@ -265,7 +265,81 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .toast.show{transform:translateY(0);opacity:1}
 .toast-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px}
 
-/* ── ACCESS DENIED ── */
+/* ── TASK MANAGEMENT ── */
+.tm-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;width:fit-content}
+.tm-tab{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:var(--font);transition:all .15s;position:relative}
+.tm-tab.active{background:var(--accent);color:#0d0d10;font-weight:600}
+.tm-tab:hover:not(.active){background:var(--surface2);color:var(--text)}
+
+.tm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.tm-month-nav{display:flex;align-items:center;gap:10px}
+.tm-month-btn{background:none;border:1px solid var(--border2);border-radius:8px;color:var(--muted);cursor:pointer;font-size:16px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.tm-month-btn:hover{background:var(--surface2);color:var(--text)}
+.tm-month-label{font-size:16px;font-weight:600;letter-spacing:-.02em;min-width:140px;text-align:center}
+
+.tm-stats{display:flex;align-items:center;gap:12px}
+.tm-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.tm-stat-circle{position:relative;width:44px;height:44px;flex-shrink:0}
+.tm-stat-circle svg{transform:rotate(-90deg)}
+.tm-stat-circle-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:var(--mono)}
+.tm-stat-info{display:flex;flex-direction:column;gap:2px}
+.tm-stat-label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.07em}
+.tm-stat-val{font-size:13px;font-weight:600;font-family:var(--mono)}
+.tm-stat-pts{font-size:10px;color:var(--amber);font-weight:500}
+
+.tm-grid{display:flex;flex-direction:column;gap:2px}
+.tm-week{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.tm-day{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .15s}
+.tm-day:hover{border-color:var(--border2)}
+.tm-day.today{border-color:var(--accent);border-width:2px}
+.tm-day-head{padding:10px 12px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tm-day-name{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.tm-day-num{font-size:18px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.tm-day-num.today-num{color:var(--accent)}
+.tm-day-body{padding:6px}
+.tm-task-row{display:grid;grid-template-columns:80px 1fr 90px;gap:4px;margin-bottom:3px;align-items:center}
+.tm-diff-sel{background:transparent;border:none;font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer;padding:3px 4px;border-radius:5px;outline:none;width:100%}
+.diff-easy{color:#4ade80;background:rgba(74,222,128,0.1)}
+.diff-medium{color:var(--amber);background:rgba(245,201,106,0.1)}
+.diff-hard{color:var(--red);background:rgba(245,112,106,0.1)}
+.diff-none{color:var(--muted2);background:transparent}
+.tm-task-input{background:transparent;border:none;font-size:11px;color:var(--text);font-family:var(--font);outline:none;width:100%;padding:3px 4px;border-radius:5px;transition:background .12s}
+.tm-task-input:focus{background:var(--surface2)}
+.tm-task-input::placeholder{color:var(--muted2)}
+.tm-status-sel{background:transparent;border:none;font-size:10px;font-weight:500;font-family:var(--font);cursor:pointer;padding:3px 4px;border-radius:5px;outline:none;width:100%}
+.status-notstarted{color:var(--muted)}
+.status-progressing{color:var(--blue);background:var(--blue-dim)}
+.status-done{color:var(--accent);background:var(--accent-dim)}
+.tm-add-row{display:flex;align-items:center;gap:4px;padding:4px 6px;cursor:pointer;color:var(--muted2);font-size:10px;border-radius:5px;transition:all .12s;margin-top:2px}
+.tm-add-row:hover{background:var(--surface2);color:var(--muted)}
+
+/* Admin user tabs */
+.tm-user-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.tm-user-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:var(--font);transition:all .12s}
+.tm-user-tab.active{color:#0d0d10;font-weight:600;border-color:transparent}
+.tm-user-tab:hover:not(.active){background:var(--surface2);color:var(--text)}
+
+/* Leaderboard */
+.tm-leaderboard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px}
+.tm-lb-title{font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.tm-lb-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.tm-lb-row:last-child{border-bottom:none}
+.tm-lb-rank{font-size:18px;font-weight:700;color:var(--muted2);width:24px;text-align:center;font-family:var(--mono)}
+.tm-lb-rank.gold{color:#fbbf24}
+.tm-lb-rank.silver{color:#94a3b8}
+.tm-lb-rank.bronze{color:#b45309}
+.tm-lb-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.tm-lb-info{flex:1}
+.tm-lb-name{font-size:13px;font-weight:500}
+.tm-lb-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.tm-lb-pts{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--accent)}
+.tm-lb-bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;max-width:120px}
+.tm-lb-bar-fill{height:100%;border-radius:2px;transition:width .8s ease}
+
+/* User color dots */
+.u-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+@media(max-width:860px){.tm-week{grid-template-columns:repeat(2,1fr)}}
 .access-denied{text-align:center;padding:60px 20px;color:var(--muted)}
 .access-denied h2{font-size:16px;font-weight:500;color:var(--text);margin-bottom:8px}
 
@@ -1345,9 +1419,293 @@ async function submitPayment(){
   }catch(e){toast('Error: '+e.message);}
 }
 
+async function getUsers() {
+  const snap = await db.collection('users').get();
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+}
+
+async function updateUserRole(uid, role) {
+  await db.collection('users').doc(uid).update({ role });
+}
+
 // ─────────────────────────────────────────────
-// EXPORT
+// TASK MANAGEMENT
 // ─────────────────────────────────────────────
+const USER_COLORS = ['#c9f563','#6ab8f5','#f5c96a','#b56af5','#f5706a','#4ade80','#fb923c','#e879f9'];
+let tmTab = 'own'; // 'own', 'group', 'admin'
+let tmMonth = new Date().getMonth();
+let tmYear = new Date().getFullYear();
+let tmAdminUser = null; // uid of user being viewed in admin
+let taskCache = {}; // taskCache[key] = [{diff, task, status, user, color}]
+let teamUsersCache = [];
+
+function tmMonthKey(y,m){return `tm-${y}-${String(m+1).padStart(2,'0')}`;}
+function tmActiveKey(){return tmMonthKey(tmYear,tmMonth);}
+
+const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DIFF_LABELS={easy:'Easy',medium:'Medium',hard:'Hard'};
+const DIFF_PTS={easy:1,medium:2,hard:3};
+const STATUS_LABELS={notstarted:'Not Started',progressing:'Progressing',done:'Done'};
+
+function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+
+function userColor(uid){
+  const idx=[...uid].reduce((a,c)=>a+c.charCodeAt(0),0)%USER_COLORS.length;
+  return USER_COLORS[idx];
+}
+
+async function loadTasksForKey(key, uid=null){
+  const cacheKey = key+(uid?'-'+uid:'-own');
+  try{
+    let q = db.collection('tasks').where('monthKey','==',key);
+    if(uid) q = q.where('uid','==',uid);
+    else if(tmTab==='own') q = q.where('uid','==',currentUser.uid);
+    // group: no uid filter
+    const snap = await q.get();
+    const data = {};
+    snap.docs.forEach(d=>{
+      const t=d.data();
+      const dk=t.day;
+      if(!data[dk])data[dk]=[];
+      data[dk].push({id:d.id,...t});
+    });
+    taskCache[cacheKey]=data;
+    return data;
+  }catch(e){console.error('loadTasks',e);return {};}
+}
+
+async function saveTask(day, rowIdx, field, value, uid=null){
+  const key=tmActiveKey();
+  const targetUid = uid||currentUser.uid;
+  const isGroup = tmTab==='group';
+  try{
+    // Find existing task doc for this day+row+uid
+    let q = db.collection('tasks')
+      .where('monthKey','==',key)
+      .where('day','==',day)
+      .where('rowIdx','==',rowIdx);
+    if(!isGroup) q=q.where('uid','==',targetUid);
+    const snap = await q.get();
+    if(!snap.empty){
+      await snap.docs[0].ref.update({[field]:value, updatedAt:new Date()});
+    } else {
+      await db.collection('tasks').add({
+        monthKey:key, day, rowIdx,
+        uid: targetUid,
+        userName: currentUser.name,
+        userColor: userColor(targetUid),
+        isGroup: isGroup,
+        diff:'', task:'', status:'notstarted',
+        [field]:value,
+        createdAt:new Date(), updatedAt:new Date()
+      });
+    }
+  }catch(e){console.error('saveTask',e);}
+}
+
+function calcStats(tasks){
+  let total=0,done=0,pts=0,maxPts=0;
+  Object.values(tasks).forEach(rows=>{
+    rows.forEach(t=>{
+      if(!t.task)return;
+      total++;
+      const p=DIFF_PTS[t.diff]||1;
+      maxPts+=p;
+      if(t.status==='done'){done++;pts+=p;}
+    });
+  });
+  return{total,done,pts,maxPts};
+}
+
+function renderTmStats(tasks, label='This Month'){
+  const {total,done,pts,maxPts}=calcStats(tasks);
+  const pct=total>0?Math.round(done/total*100):0;
+  const circ=2*Math.PI*18;
+  const dash=circ*pct/100;
+  return `<div class="tm-stat">
+    <div class="tm-stat-circle">
+      <svg width="44" height="44" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" fill="none" stroke="var(--surface3)" stroke-width="4"/>
+        <circle cx="22" cy="22" r="18" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"
+          stroke-dasharray="${dash} ${circ}" style="transition:stroke-dasharray .8s ease"/>
+      </svg>
+      <div class="tm-stat-circle-inner" style="color:var(--accent)">${pct}%</div>
+    </div>
+    <div class="tm-stat-info">
+      <div class="tm-stat-label">${label}</div>
+      <div class="tm-stat-val">${done}/${total} tasks</div>
+      <div class="tm-stat-pts">⚡ ${pts} pts earned</div>
+    </div>
+  </div>`;
+}
+
+function renderTmDay(day, tasks, isGroup=false, readonly=false){
+  const today=new Date();
+  const isToday=today.getDate()===day&&today.getMonth()===tmMonth&&today.getFullYear()===tmYear;
+  const dayTasks=tasks[day]||[];
+  const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayName=DNAMES[new Date(tmYear,tmMonth,day).getDay()];
+  
+  // Fill to at least 5 rows
+  const rows=[];
+  for(let i=0;i<Math.max(5,dayTasks.length+1);i++){
+    const t=dayTasks[i]||{diff:'',task:'',status:'notstarted'};
+    rows.push({...t,rowIdx:i});
+  }
+
+  const rowsHtml=rows.map((t,i)=>{
+    const diffClass=t.diff?`diff-${t.diff}`:'diff-none';
+    const statusClass=`status-${t.status||'notstarted'}`;
+    const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
+    if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
+      <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
+      <span class="tm-task-input" style="font-size:11px;padding:3px 4px">${t.task||''}</span>
+      <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
+    </div>`;
+    return `<div class="tm-task-row">
+      <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
+        <option value="" ${!t.diff?'selected':''}>Difficulty</option>
+        <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
+        <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
+        <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:3px;min-width:0">
+        ${userDot}
+        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..." 
+          onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
+      <select class="tm-status-sel ${statusClass}" onchange="onTmStatus(${day},${i},this)">
+        <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
+        <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
+        <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
+      </select>
+    </div>`;
+  }).join('');
+
+  return `<div class="tm-day ${isToday?'today':''}">
+    <div class="tm-day-head">
+      <span class="tm-day-name">${dayName}</span>
+      <span class="tm-day-num ${isToday?'today-num':''}">${day}</span>
+    </div>
+    <div class="tm-day-body">${rowsHtml}</div>
+  </div>`;
+}
+
+function onTmDiff(day,rowIdx,sel){
+  const cl=sel.className.replace(/diff-\S+/g,'').trim();
+  sel.className=cl+' tm-diff-sel diff-'+(sel.value||'none');
+  if(sel.value) saveTask(day,rowIdx,'diff',sel.value);
+}
+function onTmTask(day,rowIdx,inp){
+  saveTask(day,rowIdx,'task',inp.value);
+}
+function onTmStatus(day,rowIdx,sel){
+  const cl=sel.className.replace(/status-\S+/g,'').trim();
+  sel.className=cl+' tm-status-sel status-'+sel.value;
+  saveTask(day,rowIdx,'status',sel.value);
+}
+
+async function renderTasksView(){
+  const el=document.getElementById('tasksView');
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+
+  const isAdmin=currentUser.role==='admin';
+  const tabs=[
+    {k:'own',l:'My Tasks'},
+    {k:'group',l:'Group Tasks'},
+    ...(isAdmin?[{k:'admin',l:'👑 Team Overview'}]:[])
+  ];
+
+  const key=tmActiveKey();
+  let tasks={};
+  let teamUsers=[];
+
+  if(tmTab==='admin'){
+    // Load all users
+    teamUsers=await getUsers();
+    teamUsersCache=teamUsers;
+    if(!tmAdminUser&&teamUsers.length) tmAdminUser=teamUsers[0].uid;
+    // Load tasks for selected user
+    tasks=await loadTasksForKey(key,tmAdminUser);
+  } else {
+    tasks=await loadTasksForKey(key);
+  }
+
+  const days=getDaysInMonth(tmYear,tmMonth);
+  const weeks=[];
+  for(let d=1;d<=days;d+=4) weeks.push([d,Math.min(d+3,days)]);
+
+  let html=`
+  <div class="tm-bar">${tabs.map(t=>`<button class="tm-tab ${t.k===tmTab?'active':''}" onclick="switchTmTab('${t.k}')">${t.l}</button>`).join('')}</div>
+  <div class="tm-header">
+    <div class="tm-month-nav">
+      <button class="tm-month-btn" onclick="tmNavMonth(-1)">‹</button>
+      <div class="tm-month-label">${MNAMES_FULL[tmMonth]} ${tmYear}</div>
+      <button class="tm-month-btn" onclick="tmNavMonth(1)">›</button>
+    </div>
+    <div class="tm-stats">${renderTmStats(tasks)}</div>
+  </div>`;
+
+  if(tmTab==='admin'){
+    // Leaderboard
+    const lbData=await Promise.all(teamUsers.map(async u=>{
+      const ut=await loadTasksForKey(key,u.uid);
+      return{...u,stats:calcStats(ut)};
+    }));
+    lbData.sort((a,b)=>b.stats.pts-a.stats.pts);
+    const maxPts=lbData[0]?.stats.pts||1;
+    const rankEmojis=['🥇','🥈','🥉'];
+    const rankClass=['gold','silver','bronze'];
+
+    html+=`<div class="tm-leaderboard">
+      <div class="tm-lb-title">⚡ Team Leaderboard — ${MNAMES_FULL[tmMonth]} ${tmYear}</div>
+      ${lbData.map((u,i)=>{
+        const col=userColor(u.uid);
+        const initials=u.name?u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?';
+        return `<div class="tm-lb-row">
+          <div class="tm-lb-rank ${rankClass[i]||''}">${rankEmojis[i]||i+1}</div>
+          <div class="tm-lb-avatar" style="background:${col}22;color:${col}">${initials}</div>
+          <div class="tm-lb-info">
+            <div class="tm-lb-name">${u.name}</div>
+            <div class="tm-lb-sub">${u.stats.done}/${u.stats.total} tasks completed</div>
+          </div>
+          <div class="tm-lb-bar"><div class="tm-lb-bar-fill" style="width:${maxPts>0?Math.round(u.stats.pts/maxPts*100):0}%;background:${col}"></div></div>
+          <div class="tm-lb-pts">${u.stats.pts}pts</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="tm-user-tabs">${teamUsers.map(u=>{
+      const col=userColor(u.uid);
+      return `<button class="tm-user-tab ${u.uid===tmAdminUser?'active':''}" 
+        style="${u.uid===tmAdminUser?`background:${col};`:''}"
+        onclick="switchTmAdminUser('${u.uid}')">${u.name}</button>`;
+    }).join('')}</div>`;
+  }
+
+  html+=`<div class="tm-grid">${weeks.map(([s,e])=>{
+    let weekHtml='<div class="tm-week">';
+    for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',tmTab==='admin'&&tmAdminUser!==currentUser.uid);
+    weekHtml+='</div>';
+    return weekHtml;
+  }).join('')}</div>`;
+
+  el.innerHTML=html;
+}
+
+async function switchTmTab(tab){
+  tmTab=tab;
+  await renderTasksView();
+}
+async function switchTmAdminUser(uid){
+  tmAdminUser=uid;
+  await renderTasksView();
+}
+async function tmNavMonth(dir){
+  tmMonth+=dir;
+  if(tmMonth<0){tmMonth=11;tmYear--;}
+  if(tmMonth>11){tmMonth=0;tmYear++;}
+  await renderTasksView();
+}
 function exportCSV(){
   const rows=[['Address','Status','Tenant','Rent','CMHA','Tenant Portion','CMHA Paid','Tenant Paid','Collected','Balance']];
   properties.forEach(p=>rows.push([`"${p.addr}"`,p.status,`"${p.tenant||''}"`,p.rent,p.cmha,p.tenantPortion,p.cmhaPaid,p.tenantPaid,p.collected,p.balance]));
@@ -1410,6 +1768,7 @@ function showView(v){
     renderTable();
   }
   if(v==='monthly') renderMonthly();
+  if(v==='tasks') renderTasksView();
   if(v==='team'){
     if(!currentUser||currentUser.role!=='admin'){
       document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
