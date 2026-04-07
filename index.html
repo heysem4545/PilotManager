@@ -792,17 +792,17 @@ async function saveMonthField(propertyId, field, value){
 function getMonthProp(p){
   const key = activeKey();
   const propMonthData = (monthData[p.id]||{})[key];
-  const hasData = propMonthData !== undefined;
-  // If no month-specific data exists, show blank slate (zero paid, no status)
-  // EXCEPT for the current real month where we fall back to base property values
   const isCurrentMonth = (activeYear===NOW.getFullYear() && activeMonth===NOW.getMonth());
   const md = propMonthData || {};
   const cmhaPaid = md.cmhaPaid !== undefined ? md.cmhaPaid : (isCurrentMonth ? (p.cmhaPaid||0) : 0);
   const tenantPaid = md.tenantPaid !== undefined ? md.tenantPaid : (isCurrentMonth ? (p.tenantPaid||0) : 0);
   const status = md.status || (isCurrentMonth ? p.status : '');
+  // Use monthly cmha/tenantPortion if available, fallback to base property
+  const cmha = md.cmha !== undefined && md.cmha > 0 ? md.cmha : p.cmha;
+  const tenantPortion = md.tenantPortion !== undefined && md.tenantPortion > 0 ? md.tenantPortion : p.tenantPortion;
   const collected = cmhaPaid + tenantPaid;
-  const balance = Math.max(0, p.rent - collected);
-  return {...p, cmhaPaid, tenantPaid, collected, balance, status: status||p.status};
+  const balance = Math.max(0, (cmha + tenantPortion) - collected);
+  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status: status||p.status};
 }
 
 // ─────────────────────────────────────────────
