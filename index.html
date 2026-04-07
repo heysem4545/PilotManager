@@ -816,6 +816,20 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 function canEdit(){return currentUser&&(currentUser.role==='admin'||currentUser.role==='editor');}
 
+async function saveProperty(data, id = null) {
+  if (id) {
+    await db.collection('properties').doc(id).update({ ...data, updatedAt: new Date() });
+    return id;
+  } else {
+    const ref = await db.collection('properties').add({ ...data, createdAt: new Date() });
+    return ref.id;
+  }
+}
+
+async function deleteProperty(id) {
+  await db.collection('properties').doc(id).delete();
+}
+
 // ─────────────────────────────────────────────
 // CALCULATIONS
 // ─────────────────────────────────────────────
