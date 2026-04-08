@@ -1061,26 +1061,30 @@ function sortBy(f){if(sortField===f)sortDir*=-1;else{sortField=f;sortDir=1;}rend
 function buildMonthBarHTML(){
   const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const today = new Date();
-  const recent = [];
-  for(let i=3;i>=0;i--){
-    let m = today.getMonth()-i;
-    let y = today.getFullYear();
-    if(m<0){m+=12;y--;}
-    recent.push({m,y});
+  const curMonth = today.getMonth();
+  const curYear = today.getFullYear();
+  // Buttons: Jan of current year through current month + 4 future months
+  const buttons = [];
+  for(let m=0;m<=Math.min(curMonth+4,11);m++){
+    buttons.push({m,y:curYear});
   }
+  // If current month + 4 overflows into next year
+  if(curMonth+4>11){
+    for(let m=0;m<=curMonth+4-12;m++){
+      buttons.push({m,y:curYear+1});
+    }
+  }
+  // Older months dropdown: previous year months not in buttons
   let olderOpts = '';
-  for(let i=4;i<12;i++){
-    let m = today.getMonth()-i;
-    let y = today.getFullYear();
-    if(m<0){m+=12;y--;}
-    const sel=(y===activeYear&&m===activeMonth);
-    olderOpts+=`<option value="${y}-${m}" ${sel?'selected':''}>${MNAMES[m]} ${y}</option>`;
+  for(let m=11;m>=0;m--){
+    const sel=(curYear-1===activeYear&&m===activeMonth);
+    olderOpts+=`<option value="${curYear-1}-${m}" ${sel?'selected':''}>${MNAMES[m]} ${curYear-1}</option>`;
   }
-  const btns = recent.map(({m,y})=>{
+  const btns = buttons.map(({m,y})=>{
     const active = (y===activeYear&&m===activeMonth);
-    return `<button class="mbtn ${active?'active':''}" onclick="switchMonth(${y},${m})">${MNAMES[m]} ${y}</button>`;
+    return `<button class="mbtn ${active?'active':''}" onclick="switchMonth(${y},${m})">${MNAMES[m]}</button>`;
   }).join('');
-  const olderActive = !recent.some(r=>r.y===activeYear&&r.m===activeMonth);
+  const olderActive = !buttons.some(r=>r.y===activeYear&&r.m===activeMonth);
   return `
     <span class="month-bar-label">Month:</span>
     ${btns}
