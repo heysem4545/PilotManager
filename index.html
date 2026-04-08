@@ -1554,6 +1554,19 @@ async function loadTasksForKey(key, uid=null){
   }catch(e){console.error('loadTasks',e);return {};}
 }
 
+async function loadGroupTasks(key){
+  try{
+    const snap=await db.collection('tasks').where('monthKey','==',key).where('isGroup','==',true).get();
+    const data={};
+    snap.docs.forEach(d=>{
+      const t=d.data();
+      if(!data[t.day])data[t.day]=[];
+      data[t.day].push({id:d.id,...t});
+    });
+    return data;
+  }catch(e){console.error('loadGroupTasks',e);return {};}
+}
+
 async function saveTask(day, rowIdx, field, value, uid=null){
   const key=tmActiveKey();
   const targetUid = uid||currentUser.uid;
@@ -1583,18 +1596,22 @@ async function saveTask(day, rowIdx, field, value, uid=null){
   }catch(e){console.error('saveTask',e);}
 }
 
-function calcStats(tasks){
-  let total=0,done=0,pts=0,maxPts=0;
+function calcStats(tasks, uid=null){
+  let total=0,done=0,pts=0,maxPts=0,taskCredits=0,doneCredits=0;
   Object.values(tasks).forEach(rows=>{
     rows.forEach(t=>{
       if(!t.task)return;
       total++;
       const p=DIFF_PTS[t.diff]||1;
       maxPts+=p;
-      if(t.status==='done'){done++;pts+=p;}
+      if(uid) taskCredits+=p;
+      if(t.status==='done'){
+        done++;pts+=p;
+        if(uid&&t.statusChangedBy===uid) doneCredits+=p;
+      }
     });
   });
-  return{total,done,pts,maxPts};
+  return{total,done,pts,maxPts,taskCredits,doneCredits};
 }
 
 function renderTmStats(tasks, label='This Month'){
@@ -1638,10 +1655,12 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     const diffClass=t.diff?`diff-${t.diff}`:'diff-none';
     const statusClass=`status-${t.status||'notstarted'}`;
     const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
+    const completerDot=isGroup&&t.statusChangedByColor?`<span class="u-dot" style="background:${t.statusChangedByColor}" title="${t.statusChangedByName||''}"></span>`:'';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
       <span class="tm-task-input" style="font-size:11px;padding:3px 4px">${t.task||''}</span>
       <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
+      ${completerDot}
     </div>`;
     return `<div class="tm-task-row">
       <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
@@ -1661,6 +1680,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
         <option value="remove">✕ Remove</option>
       </select>
+      ${completerDot}
       <button class="tm-remove-btn" onclick="tmRemoveTask(${day},${i})" title="Remove task" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 4px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">✕</button>
     </div>`;
   }).join('');
@@ -1689,6 +1709,18 @@ function onTmStatus(day,rowIdx,sel){
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
   saveTask(day,rowIdx,'status',sel.value);
+  // Store who changed the status
+  const key=tmActiveKey();
+  const isGroup=tmTab==='group';
+  let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('rowIdx','==',rowIdx);
+  if(!isGroup)q=q.where('uid','==',currentUser.uid);
+  q.get().then(snap=>{
+    if(!snap.empty) snap.docs[0].ref.update({
+      statusChangedBy:currentUser.uid,
+      statusChangedByName:currentUser.name,
+      statusChangedByColor:userColor(currentUser.uid)
+    });
+  });
   tmRefreshStats();
 }
 
@@ -1814,13 +1846,25 @@ async function renderTasksView(){
   </div>`;
 
   if(tmTab==='admin'){
-    // Leaderboard
+    // Leaderboard — load own tasks + group tasks for done credits
+    const groupTasks=await loadGroupTasks(key);
     const lbData=await Promise.all(teamUsers.map(async u=>{
       const ut=await loadTasksForKey(key,u.uid);
-      return{...u,stats:calcStats(ut)};
+      const stats=calcStats(ut,u.uid);
+      // Count done credits from group tasks (where this user marked done)
+      let groupDoneCredits=0;
+      Object.values(groupTasks).forEach(rows=>{
+        rows.forEach(t=>{
+          if(t.task&&t.status==='done'&&t.statusChangedBy===u.uid){
+            groupDoneCredits+=(DIFF_PTS[t.diff]||1);
+          }
+        });
+      });
+      stats.doneCredits+=groupDoneCredits;
+      return{...u,stats};
     }));
-    lbData.sort((a,b)=>b.stats.pts-a.stats.pts);
-    const maxPts=lbData[0]?.stats.pts||1;
+    lbData.sort((a,b)=>(b.stats.pts+b.stats.doneCredits)-(a.stats.pts+a.stats.doneCredits));
+    const maxPts=Math.max(1,...lbData.map(u=>u.stats.taskCredits+u.stats.doneCredits));
     const rankEmojis=['🥇','🥈','🥉'];
     const rankClass=['gold','silver','bronze'];
 
@@ -1829,15 +1873,16 @@ async function renderTasksView(){
       ${lbData.map((u,i)=>{
         const col=userColor(u.uid);
         const initials=u.name?u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?';
+        const totalPts=u.stats.taskCredits+u.stats.doneCredits;
         return `<div class="tm-lb-row">
           <div class="tm-lb-rank ${rankClass[i]||''}">${rankEmojis[i]||i+1}</div>
           <div class="tm-lb-avatar" style="background:${col}22;color:${col}">${initials}</div>
           <div class="tm-lb-info">
             <div class="tm-lb-name">${u.name}</div>
-            <div class="tm-lb-sub">${u.stats.done}/${u.stats.total} tasks completed</div>
+            <div class="tm-lb-sub">${u.stats.done}/${u.stats.total} tasks · <span style="color:var(--accent)">Task ${u.stats.taskCredits}pts</span> · <span style="color:var(--blue)">Done ${u.stats.doneCredits}pts</span></div>
           </div>
-          <div class="tm-lb-bar"><div class="tm-lb-bar-fill" style="width:${maxPts>0?Math.round(u.stats.pts/maxPts*100):0}%;background:${col}"></div></div>
-          <div class="tm-lb-pts">${u.stats.pts}pts</div>
+          <div class="tm-lb-bar"><div class="tm-lb-bar-fill" style="width:${maxPts>0?Math.round(totalPts/maxPts*100):0}%;background:${col}"></div></div>
+          <div class="tm-lb-pts">${totalPts}pts</div>
         </div>`;
       }).join('')}
     </div>
