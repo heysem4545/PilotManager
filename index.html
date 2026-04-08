@@ -1566,13 +1566,8 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       .where('rowIdx','==',rowIdx);
     if(!isGroup) q=q.where('uid','==',targetUid);
     const snap = await q.get();
-    const changerFields = field==='status' ? {
-      changerUid:currentUser.uid,
-      changerName:currentUser.name,
-      changerColor:userColor(currentUser.uid)
-    } : {};
     if(!snap.empty){
-      await snap.docs[0].ref.update({[field]:value, ...changerFields, updatedAt:new Date()});
+      await snap.docs[0].ref.update({[field]:value, updatedAt:new Date()});
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -1582,7 +1577,6 @@ async function saveTask(day, rowIdx, field, value, uid=null){
         isGroup: isGroup,
         diff:'', task:'', status:'notstarted',
         [field]:value,
-        ...changerFields,
         createdAt:new Date(), updatedAt:new Date()
       });
     }
@@ -1644,13 +1638,13 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     const diffClass=t.diff?`diff-${t.diff}`:'diff-none';
     const statusClass=`status-${t.status||'notstarted'}`;
     const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
-    const changerDot=isGroup&&t.changerColor?`<span class="u-dot" style="background:${t.changerColor}" title="${t.changerName||''}"></span>`:'';
-    if(isGroup&&t.task)console.log('renderTmDay debug day',day,'row',i,'changerColor:',t.changerColor,'changerName:',t.changerName);
+    const assignLabel=isGroup&&t.assignedName?t.assignedName:'';
+    const assignOpts=isGroup?teamUsersCache.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${u.name}</option>`).join(''):'';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
       <span class="tm-task-input" style="font-size:11px;padding:3px 4px">${t.task||''}</span>
+      ${isGroup?`<span style="font-size:10px;color:var(--muted);padding:2px 4px">${assignLabel||'Everyone'}</span>`:''}
       <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
-      ${changerDot}
     </div>`;
     return `<div class="tm-task-row">
       <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
@@ -1661,15 +1655,18 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       </select>
       <div style="display:flex;align-items:center;gap:3px;min-width:0">
         ${userDot}
-        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..." 
+        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..."
           onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
       </div>
+      ${isGroup?`<select class="tm-assign-sel" onchange="onTmAssign(${day},${i},this)" style="font-size:10px;padding:2px 3px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer;max-width:70px">
+        <option value="" ${!t.assignedUid?'selected':''}>Everyone</option>
+        ${assignOpts}
+      </select>`:''}
       <select class="tm-status-sel ${statusClass}" onchange="onTmStatus(${day},${i},this)">
         <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
       </select>
-      ${changerDot}
     </div>`;
   }).join('');
 
@@ -1692,13 +1689,29 @@ function onTmTask(day,rowIdx,inp){
   saveTask(day,rowIdx,'task',inp.value);
   tmRefreshStats();
 }
-async function onTmStatus(day,rowIdx,sel){
+function onTmStatus(day,rowIdx,sel){
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
-  await saveTask(day,rowIdx,'status',sel.value);
-  console.log('Status saved for day',day,'row',rowIdx,'value',sel.value,'changerColor',userColor(currentUser.uid),'changerName',currentUser.name);
-  // Re-render to show changer dot
-  await renderTasksView();
+  saveTask(day,rowIdx,'status',sel.value);
+  tmRefreshStats();
+}
+function onTmAssign(day,rowIdx,sel){
+  const uid=sel.value;
+  const user=teamUsersCache.find(u=>u.uid===uid);
+  const key=tmActiveKey();
+  const assignFields={assignedUid:uid||'',assignedName:user?user.name:''};
+  const isGroup=tmTab==='group';
+  let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('rowIdx','==',rowIdx);
+  if(!isGroup)q=q.where('uid','==',currentUser.uid);
+  q.get().then(snap=>{
+    if(!snap.empty) snap.docs[0].ref.update(assignFields);
+    else db.collection('tasks').add({
+      monthKey:key,day,rowIdx,uid:currentUser.uid,userName:currentUser.name,
+      userColor:userColor(currentUser.uid),isGroup:true,
+      diff:'',task:'',status:'notstarted',...assignFields,
+      createdAt:new Date(),updatedAt:new Date()
+    });
+  });
 }
 
 function tmAddRow(day){
@@ -1782,12 +1795,13 @@ async function renderTasksView(){
   let tasks={};
   let teamUsers=[];
 
-  if(tmTab==='admin'){
-    // Load all users
+  if(tmTab==='admin'||tmTab==='group'){
+    // Load all users for assign dropdown and admin view
     teamUsers=await getUsers();
     teamUsersCache=teamUsers;
+  }
+  if(tmTab==='admin'){
     if(!tmAdminUser&&teamUsers.length) tmAdminUser=teamUsers[0].uid;
-    // Load tasks for selected user
     tasks=await loadTasksForKey(key,tmAdminUser);
   } else {
     tasks=await loadTasksForKey(key);
