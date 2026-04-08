@@ -521,6 +521,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 
       <!-- DASHBOARD VIEW -->
       <div id="dashView">
+        <div class="month-bar" id="dashMonthBar"></div>
         <div class="metrics" id="metricsGrid"></div>
         <div class="potential-banner" id="potentialBanner"></div>
         <div class="overview-row">
@@ -1057,12 +1058,9 @@ function filteredData(){
 }
 function sortBy(f){if(sortField===f)sortDir*=-1;else{sortField=f;sortDir=1;}renderTable();}
 
-function renderMonthBar(){
+function buildMonthBarHTML(){
   const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const today = new Date();
-  // Show 4 most recent months as buttons, rest in dropdown
-  let btns = '';
-  // Build last 4 months
   const recent = [];
   for(let i=3;i>=0;i--){
     let m = today.getMonth()-i;
@@ -1070,22 +1068,20 @@ function renderMonthBar(){
     if(m<0){m+=12;y--;}
     recent.push({m,y});
   }
-  // Older months dropdown (up to 8 more)
   let olderOpts = '';
   for(let i=4;i<12;i++){
     let m = today.getMonth()-i;
     let y = today.getFullYear();
     if(m<0){m+=12;y--;}
-    const k=monthKey(y,m);
     const sel=(y===activeYear&&m===activeMonth);
     olderOpts+=`<option value="${y}-${m}" ${sel?'selected':''}>${MNAMES[m]} ${y}</option>`;
   }
-  btns = recent.map(({m,y})=>{
+  const btns = recent.map(({m,y})=>{
     const active = (y===activeYear&&m===activeMonth);
     return `<button class="mbtn ${active?'active':''}" onclick="switchMonth(${y},${m})">${MNAMES[m]} ${y}</button>`;
   }).join('');
   const olderActive = !recent.some(r=>r.y===activeYear&&r.m===activeMonth);
-  document.getElementById('monthBar').innerHTML=`
+  return `
     <span class="month-bar-label">Month:</span>
     ${btns}
     <select class="month-select" onchange="switchMonthFromSelect(this.value)" ${olderActive?'style="border-color:var(--accent)"':''}>
@@ -1094,6 +1090,11 @@ function renderMonthBar(){
     </select>
     <span style="font-size:11px;color:var(--muted);margin-left:8px">Showing data for <strong style="color:var(--accent)">${MNAMES[activeMonth]} ${activeYear}</strong></span>
   `;
+}
+function renderMonthBar(){
+  const html=buildMonthBarHTML();
+  document.getElementById('monthBar').innerHTML=html;
+  document.getElementById('dashMonthBar').innerHTML=html;
 }
 
 async function switchMonth(y,m){
@@ -1105,6 +1106,8 @@ async function switchMonth(y,m){
   if(!alreadyLoaded) await loadMonthData(key);
   renderTable();
   renderMetrics();
+  renderPotential();
+  renderStatusBars();
   renderDonut();
 }
 
@@ -1906,6 +1909,7 @@ function showView(v){
 
   // Render
   if(v==='dashboard'){
+    renderMonthBar();
     renderMetrics();
     renderPotential();
     renderStatusBars();
