@@ -205,6 +205,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .b-eviction{background:var(--red-dim);color:var(--red)}.b-eviction::before{background:var(--red)}
 .b-moving{background:var(--blue-dim);color:var(--blue)}.b-moving::before{background:var(--blue)}
 .b-construction{background:var(--purple-dim);color:var(--purple)}.b-construction::before{background:var(--purple)}
+.b-unknown{background:var(--surface3);color:var(--muted)}.b-unknown::before{background:var(--muted)}
 .money{font-family:var(--mono);font-size:12px}
 .m-pos{color:var(--accent)}.m-neg{color:var(--red)}.m-muted{color:var(--muted)}
 .prog-track{width:55px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
@@ -737,9 +738,9 @@ function monthKey(y,m){return `${y}-${String(m+1).padStart(2,'0')}`;}
 function activeKey(){return monthKey(activeYear,activeMonth);}
 let monthData = {}; // monthData[propertyId][monthKey] = {status,cmhaPaid,tenantPaid}
 
-const SC={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)'};
-const BC={RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction'};
-const BL={RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction'};
+const SC={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)',UNKNOWN:'var(--muted)'};
+const BC={RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction',UNKNOWN:'b-unknown'};
+const BL={RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction',UNKNOWN:'Unknown'};
 const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const CUR_MONTH=3;
 
@@ -1172,8 +1173,8 @@ function inlineEditStatus(propId, cell){
   if(existing)existing.remove();
   
   const mp=getMonthProp(properties.find(x=>x.id===propId));
-  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
-  const colors={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)'};
+  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','UNKNOWN'];
+  const colors={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)',UNKNOWN:'var(--muted)'};
   
   const popup=document.createElement('div');
   popup.id='statusPopup';
