@@ -1128,9 +1128,12 @@ function renderTable(){
     const cmhaBalance=Math.max(0,mp.cmha-mp.cmhaPaid);
     const tenantBalance=Math.max(0,mp.tenantPortion-mp.tenantPaid);
     if(p.addr&&p.addr.includes('1068 Addison'))console.log('1068 Addison balance debug:',{cmha:mp.cmha,tenantPortion:mp.tenantPortion,cmhaPaid:mp.cmhaPaid,tenantPaid:mp.tenantPaid,cmhaBalance,tenantBalance,balance:mp.balance});
+    const cmhaOver=Math.max(0,mp.cmhaPaid-mp.cmha);
+    const tenantOver=Math.max(0,mp.tenantPaid-mp.tenantPortion);
+    const totalOver=cmhaOver+tenantOver;
     const balCell=mp.balance>0
       ?`<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
-      :`<span style="color:var(--accent)">✓</span>`;
+      :totalOver>0?`<span style="color:var(--accent)">✓ +${fmt(totalOver)}</span>`:`<span style="color:var(--accent)">✓</span>`;
     // Status cell
     const statusCell=edit
       ?`<span class="editable" onclick="inlineEditStatus('${p.id}',this)">${mp.status?`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`
