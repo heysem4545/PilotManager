@@ -1167,35 +1167,50 @@ function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pa
 // ─────────────────────────────────────────────
 function inlineEditStatus(propId, cell){
   if(!canEdit())return;
+  // Remove any existing popup
+  const existing=document.getElementById('statusPopup');
+  if(existing)existing.remove();
+  
   const mp=getMonthProp(properties.find(x=>x.id===propId));
-  const opts=['','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
-  const optHtml=opts.map(s=>
-    `<option value="${s}" ${mp.status===s?'selected':''}>${s?BL[s]||s:'— Select —'}</option>`
-  ).join('');
-  const sel=document.createElement('select');
-  sel.className='inline-select';
-  sel.innerHTML=optHtml;
-  cell.innerHTML='';
-  cell.appendChild(sel);
-  sel.addEventListener('change', async function(){
-    const val=this.value;
-    if(!val) return;
-    await saveMonthField(propId,'status',val);
-    renderTable();
-    renderMetrics();
-    renderDonut();
-    toast('Status saved');
+  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
+  const colors={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)'};
+  
+  const popup=document.createElement('div');
+  popup.id='statusPopup';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:160px';
+  
+  const rect=cell.getBoundingClientRect();
+  popup.style.top=(rect.bottom+4)+'px';
+  popup.style.left=rect.left+'px';
+  
+  statuses.forEach(s=>{
+    const btn=document.createElement('button');
+    btn.textContent=BL[s]||s;
+    btn.style.cssText=`padding:8px 12px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:var(--font);text-align:left;background:${mp.status===s?'var(--surface3)':'transparent'};color:${colors[s]};transition:background .1s`;
+    btn.onmouseover=()=>btn.style.background='var(--surface3)';
+    btn.onmouseout=()=>btn.style.background=mp.status===s?'var(--surface3)':'transparent';
+    btn.onclick=async()=>{
+      popup.remove();
+      await saveMonthField(propId,'status',s);
+      renderTable();
+      renderMetrics();
+      renderDonut();
+      toast('Status saved');
+    };
+    popup.appendChild(btn);
   });
-}
-
-async function saveStatusInline(propId, sel){
-  const val=sel.value;
-  if(!val) return;
-  await saveMonthField(propId,'status',val);
-  renderTable();
-  renderMetrics();
-  renderDonut();
-  toast('Status saved');
+  
+  document.body.appendChild(popup);
+  
+  // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', function handler(e){
+      if(!popup.contains(e.target)){
+        popup.remove();
+        document.removeEventListener('click',handler);
+      }
+    });
+  },100);
 }
 
 function inlineEditNum(propId, baseField, cell, fieldType){
