@@ -868,7 +868,7 @@ async function loadProperties(){
       rent:p.rent||0,cmha:p.cmha||0,tenantPortion:p.tenantPortion||0,
       cmhaPaid:p.cmhaPaid||0,tenantPaid:p.tenantPaid||0,
       collected:(p.cmhaPaid||0)+(p.tenantPaid||0),
-      balance:Math.max(0,(p.rent||0)-(p.cmhaPaid||0)-(p.tenantPaid||0))
+      balance:Math.max(0,(p.cmha||0)-(p.cmhaPaid||0))+Math.max(0,(p.tenantPortion||0)-(p.tenantPaid||0))
     }));
     console.log('Properties array length:', properties.length);
   } catch(e) {
@@ -917,7 +917,7 @@ function getMonthProp(p){
   const cmha = md.cmha !== undefined ? md.cmha : 0;
   const tenantPortion = md.tenantPortion !== undefined ? md.tenantPortion : 0;
   const collected = cmhaPaid + tenantPaid;
-  const balance = Math.max(0, (cmha + tenantPortion) - collected);
+  const balance = Math.max(0, cmha - cmhaPaid) + Math.max(0, tenantPortion - tenantPaid);
   return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status};
 }
 
@@ -1125,8 +1125,8 @@ function renderTable(){
     const mp=getMonthProp(p);
     const rate=pct(mp.collected,p.rent);
     const rC=rate===100?'var(--accent)':rate>60?'var(--amber)':'var(--red)';
-    const cmhaBalance=Math.max(0,p.cmha-mp.cmhaPaid);
-    const tenantBalance=Math.max(0,p.tenantPortion-mp.tenantPaid);
+    const cmhaBalance=Math.max(0,mp.cmha-mp.cmhaPaid);
+    const tenantBalance=Math.max(0,mp.tenantPortion-mp.tenantPaid);
     const balCell=mp.balance>0
       ?`<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
       :`<span style="color:var(--accent)">✓</span>`;
@@ -1430,7 +1430,7 @@ async function saveProp(){
     tenantPaid:parseFloat(document.getElementById('f_tenantPaid').value)||0,
   };
   pData.collected=pData.cmhaPaid+pData.tenantPaid;
-  pData.balance=Math.max(0,pData.rent-pData.collected);
+  pData.balance=Math.max(0,pData.cmha-pData.cmhaPaid)+Math.max(0,pData.tenantPortion-pData.tenantPaid);
   try{
     await saveProperty(pData,editPropId);
     closeModal('addModal');
