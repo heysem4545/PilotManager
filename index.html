@@ -1659,9 +1659,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
         <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
-        <option value="remove">✕ Remove</option>
       </select>
-      <button class="tm-remove-btn" onclick="tmRemoveTask(${day},${i})" title="Remove task" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 4px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">✕</button>
     </div>`;
   }).join('');
 
@@ -1685,23 +1683,10 @@ function onTmTask(day,rowIdx,inp){
   tmRefreshStats();
 }
 function onTmStatus(day,rowIdx,sel){
-  if(sel.value==='remove'){tmRemoveTask(day,rowIdx);return;}
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
   saveTask(day,rowIdx,'status',sel.value);
   tmRefreshStats();
-}
-
-async function tmRemoveTask(day,rowIdx){
-  const key=tmActiveKey();
-  const isGroup=tmTab==='group';
-  try{
-    let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('rowIdx','==',rowIdx);
-    if(!isGroup)q=q.where('uid','==',currentUser.uid);
-    const snap=await q.get();
-    if(!snap.empty) await snap.docs[0].ref.delete();
-  }catch(e){console.error('tmRemoveTask',e);}
-  await renderTasksView();
 }
 
 function tmAddRow(day){
@@ -1732,9 +1717,7 @@ function tmAddRow(day){
         <option value="notstarted" selected>Not Started</option>
         <option value="progressing">Progressing</option>
         <option value="done">✓ Done</option>
-        <option value="remove">✕ Remove</option>
-      </select>
-      <button class="tm-remove-btn" onclick="tmRemoveTask(${d},${newIdx})" title="Remove task" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 4px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">✕</button>`;
+      </select>`;
     body.appendChild(div);
     if(d===day) focusInput=div.querySelector('input');
   }
