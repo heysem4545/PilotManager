@@ -1139,15 +1139,18 @@ function renderTable(){
       ?`<span class="editable" onclick="inlineEditStatus('${p.id}',this)">${mp.status?`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`
       :`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`;
     // Editable number cells
-    const cmhaRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmha',this,'monthCmha')">${mp.cmha>0?fmt(mp.cmha):'<span class="m-muted">—</span>'}</span>`:fmt(mp.cmha);
-    const tRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPortion',this,'monthTenantPortion')">${mp.tenantPortion>0?fmt(mp.tenantPortion):'<span class="m-muted">—</span>'}</span>`:fmt(mp.tenantPortion);
+    const missingRent=mp.status&&mp.cmha===0&&mp.tenantPortion===0;
+    const warnStyle=missingRent?'background:rgba(255,160,0,0.15);color:var(--amber);font-weight:600;font-size:10px':'';
+    const warnText=missingRent?'<span style="color:var(--amber);font-size:10px;font-weight:600">! Enter</span>':'<span class="m-muted">—</span>';
+    const cmhaRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmha',this,'monthCmha')">${mp.cmha>0?fmt(mp.cmha):warnText}</span>`:fmt(mp.cmha);
+    const tRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPortion',this,'monthTenantPortion')">${mp.tenantPortion>0?fmt(mp.tenantPortion):warnText}</span>`:fmt(mp.tenantPortion);
     const cmhaPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmhaPaid',this,'monthCmhaPaid')">${mp.cmhaPaid>0?fmt(mp.cmhaPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.cmhaPaid);
     const tPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPaid',this,'monthTenantPaid')">${mp.tenantPaid>0?fmt(mp.tenantPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.tenantPaid);
     return `<tr id="row-${p.id}">
       <td><div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
       <td id="cell-status-${p.id}">${statusCell}</td>
-      <td id="cell-cmha-${p.id}" class="money">${cmhaRentCell}</td>
-      <td id="cell-tenantPortion-${p.id}" class="money">${tRentCell}</td>
+      <td id="cell-cmha-${p.id}" class="money" ${warnStyle?`style="${warnStyle}"`:''}>${cmhaRentCell}</td>
+      <td id="cell-tenantPortion-${p.id}" class="money" ${warnStyle?`style="${warnStyle}"`:''}>${tRentCell}</td>
       <td id="cell-cmhaPaid-${p.id}" class="money">${cmhaPaidCell}</td>
       <td id="cell-tenantPaid-${p.id}" class="money">${tPaidCell}</td>
       <td class="money ${mp.collected>0?'m-pos':''}">${fmtD(mp.collected)}</td>
