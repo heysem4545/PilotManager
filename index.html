@@ -600,6 +600,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
             <div class="pagination" id="pagination"></div>
           </div>
         </div>
+        <div id="allBalancesView" style="display:none"></div>
       </div>
 
       <!-- TEAM VIEW (admin only) -->
@@ -728,6 +729,8 @@ let activePayId = null;
 let editPropId = null;
 let currentFilter = 'all';
 let filterSetByNav = false;
+let collectionViewMode = 'monthly'; // 'monthly' or 'allBalances'
+let allBalancesRange = 'last6';
 let currentPage = 1;
 let sortField = 'rowIndex';
 let sortDir = 1;
@@ -1040,7 +1043,11 @@ function renderDonut(){
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
   if(currentFilter==='balance'){
-    el.style.display='none';
+    el.style.display='';
+    el.innerHTML=`<div style="display:flex;align-items:center;gap:8px">
+      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
+      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">All Balances</button>
+    </div>`;
     return;
   }
   el.style.display='';
@@ -1048,8 +1055,126 @@ function renderFilterTabs(){
   el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
-function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderTable();}
+function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderCollectionView();}
 function applyFilters(){currentPage=1;renderTable();}
+
+function switchCollectionView(mode){
+  collectionViewMode=mode;
+  renderFilterTabs();
+  renderCollectionView();
+}
+
+function renderCollectionView(){
+  const tableCard=document.querySelector('#propsView .table-card');
+  const abView=document.getElementById('allBalancesView');
+  if(currentFilter==='balance'&&collectionViewMode==='allBalances'){
+    tableCard.style.display='none';
+    abView.style.display='block';
+    renderAllBalances();
+  } else {
+    tableCard.style.display='';
+    abView.style.display='none';
+    renderTable();
+  }
+}
+
+async function renderAllBalances(){
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now=new Date();
+  const curMonth=now.getMonth();
+  const curYear=now.getFullYear();
+
+  // Determine month range based on filter
+  let monthList=[];
+  if(allBalancesRange==='last2'){
+    for(let i=1;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}
+  } else if(allBalancesRange==='last6'){
+    for(let i=5;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}
+  } else if(allBalancesRange==='allyear'){
+    for(let m=0;m<=curMonth;m++) monthList.push({m,y:curYear});
+  } else {
+    for(let m=0;m<=11;m++) monthList.push({m,y:curYear});
+  }
+
+  // Load all needed month data
+  for(const {m,y} of monthList){
+    const key=monthKey(y,m);
+    const alreadyLoaded=Object.values(monthData).some(pd=>pd[key]!==undefined);
+    if(!alreadyLoaded) await loadMonthData(key);
+  }
+
+  // Build data: for each property, get balance per month
+  const rows=[];
+  properties.forEach(p=>{
+    let hasAnyBalance=false;
+    const balances=monthList.map(({m,y})=>{
+      const key=monthKey(y,m);
+      const md=(monthData[p.id]||{})[key]||{};
+      const cmha=md.cmha||0, cmhaPaid=md.cmhaPaid||0;
+      const tp=md.tenantPortion||0, tPaid=md.tenantPaid||0;
+      const cmhaBal=Math.max(0,cmha-cmhaPaid);
+      const tenantBal=Math.max(0,tp-tPaid);
+      if(cmhaBal>0||tenantBal>0) hasAnyBalance=true;
+      return {cmhaBal,tenantBal};
+    });
+    if(hasAnyBalance) rows.push({addr:p.addr,balances});
+  });
+
+  // Totals row
+  const totals=monthList.map((_,i)=>{
+    let cmhaT=0,tenantT=0;
+    rows.forEach(r=>{cmhaT+=r.balances[i].cmhaBal;tenantT+=r.balances[i].tenantBal;});
+    return{cmhaBal:cmhaT,tenantBal:tenantT};
+  });
+
+  const abEl=document.getElementById('allBalancesView');
+  abEl.innerHTML=`
+    <div class="table-card">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Range:</span>
+        <select style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer" onchange="allBalancesRange=this.value;renderAllBalances()">
+          <option value="last2" ${allBalancesRange==='last2'?'selected':''}>Last 2 months</option>
+          <option value="last6" ${allBalancesRange==='last6'?'selected':''}>Last 6 months</option>
+          <option value="allyear" ${allBalancesRange==='allyear'?'selected':''}>Year to date</option>
+          <option value="full" ${allBalancesRange==='full'?'selected':''}>Full year</option>
+        </select>
+        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" style="vertical-align:bottom;min-width:140px">Address</th>
+              ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
+              <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
+            </tr>
+            <tr>
+              ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
+              <th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r=>{
+              const rowTotalC=r.balances.reduce((s,b)=>s+b.cmhaBal,0);
+              const rowTotalT=r.balances.reduce((s,b)=>s+b.tenantBal,0);
+              return `<tr>
+                <td><div class="addr-main">${r.addr}</div></td>
+                ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
+                <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
+                <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:2px solid var(--border);font-weight:700">
+              <td>Total</td>
+              ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
+              <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
+              <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
 
 function filteredData(){
   const q=(document.getElementById('searchInput')||{value:''}).value.toLowerCase();
@@ -1968,7 +2093,7 @@ function showView(v){
     filterSetByNav=false;
     renderMonthBar();
     renderFilterTabs();
-    renderTable();
+    renderCollectionView();
   }
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
