@@ -409,7 +409,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
         <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
         Dashboard
       </button>
-      <button class="nav-item" id="nav-properties" onclick="setFilter('all');showView('properties')">
+      <button class="nav-item" id="nav-properties" onclick="showView('properties')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z"/></svg>
         All Properties
       </button>
@@ -1782,14 +1782,24 @@ let currentView = 'dashboard';
 function showView(v){
   currentView = v;
 
-  // Explicitly hide/show all views
-  const allViews = ['dashboard','properties','monthly','team','tasks','meetings','legal','maintenance','notices','leads','available','utility','tenants','inspections'];
-  allViews.forEach(view => {
-    const el = document.getElementById(view+'View');
+  // Map view names to their element IDs
+  const viewMap = {
+    dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
+    team:'teamView', tasks:'tasksView', meetings:'meetingsView',
+    legal:'legalView', maintenance:'maintenanceView', notices:'noticesView',
+    leads:'leadsView', available:'availableView', utility:'utilityView',
+    tenants:'tenantsView', inspections:'inspectionsView'
+  };
+
+  // Hide all views
+  Object.values(viewMap).forEach(id => {
+    const el = document.getElementById(id);
     if(el) el.style.display = 'none';
   });
-  // Now show only the active view
-  const active = document.getElementById(v+'View');
+
+  // Show active view
+  const activeId = viewMap[v];
+  const active = document.getElementById(activeId);
   if(active) active.style.display = 'block';
 
   // Update nav
@@ -1829,13 +1839,10 @@ function showView(v){
     renderDonut();
   }
   if(v==='properties'){
+    currentFilter='all';
     renderMonthBar();
     renderFilterTabs();
-    if(properties.length===0){
-      loadProperties().then(()=>loadMonthData(activeKey())).then(()=>renderTable());
-    } else {
-      renderTable();
-    }
+    renderTable();
   }
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
@@ -1849,7 +1856,12 @@ function showView(v){
 function setFilter(f){
   currentFilter=f;
   currentPage=1;
-  showView('properties');
+  if(currentView==='properties'){
+    renderFilterTabs();
+    renderTable();
+  } else {
+    showView('properties');
+  }
 }
 
 function refreshAll(){
