@@ -1566,8 +1566,13 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       .where('rowIdx','==',rowIdx);
     if(!isGroup) q=q.where('uid','==',targetUid);
     const snap = await q.get();
+    const changerFields = field==='status' ? {
+      changerUid:currentUser.uid,
+      changerName:currentUser.name,
+      changerColor:userColor(currentUser.uid)
+    } : {};
     if(!snap.empty){
-      await snap.docs[0].ref.update({[field]:value, updatedAt:new Date()});
+      await snap.docs[0].ref.update({[field]:value, ...changerFields, updatedAt:new Date()});
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -1577,6 +1582,7 @@ async function saveTask(day, rowIdx, field, value, uid=null){
         isGroup: isGroup,
         diff:'', task:'', status:'notstarted',
         [field]:value,
+        ...changerFields,
         createdAt:new Date(), updatedAt:new Date()
       });
     }
@@ -1638,10 +1644,12 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     const diffClass=t.diff?`diff-${t.diff}`:'diff-none';
     const statusClass=`status-${t.status||'notstarted'}`;
     const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
+    const changerDot=isGroup&&t.changerColor?`<span class="u-dot" style="background:${t.changerColor}" title="${t.changerName||''}"></span>`:'';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
       <span class="tm-task-input" style="font-size:11px;padding:3px 4px">${t.task||''}</span>
       <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
+      ${changerDot}
     </div>`;
     return `<div class="tm-task-row">
       <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
@@ -1660,6 +1668,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
       </select>
+      ${changerDot}
     </div>`;
   }).join('');
 
