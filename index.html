@@ -887,7 +887,7 @@ async function loadMonthData(key){
     snap.docs.forEach(d=>{
       const dat = d.data();
       if(!monthData[dat.propertyId]) monthData[dat.propertyId]={};
-      monthData[dat.propertyId][key] = {status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,docId:d.id};
+      monthData[dat.propertyId][key] = {status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,cmha:dat.cmha||0,tenantPortion:dat.tenantPortion||0,docId:d.id};
     });
   }catch(e){console.error('loadMonthData',e);}
 }
