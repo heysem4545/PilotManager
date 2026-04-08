@@ -435,7 +435,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
       <div class="nav-label">Finance</div>
       <button class="nav-item" onclick="setFilter('balance')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
-        Outstanding Balance
+        Collection
       </button>
       <button class="nav-item" onclick="showView('monthly')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 6h14M5 3v10M10 3v10"/></svg>
@@ -727,6 +727,7 @@ let properties = [];
 let activePayId = null;
 let editPropId = null;
 let currentFilter = 'all';
+let filterSetByNav = false;
 let currentPage = 1;
 let sortField = 'rowIndex';
 let sortDir = 1;
@@ -1037,8 +1038,14 @@ function renderDonut(){
 }
 
 function renderFilterTabs(){
+  const el=document.getElementById('filterTabs');
+  if(currentFilter==='balance'){
+    el.style.display='none';
+    return;
+  }
+  el.style.display='';
   const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented'},{k:'VACANT',l:'Vacant'},{k:'EVICTION',l:'Eviction'},{k:'CONSTRUCTION',l:'Construction'},{k:'balance',l:'Has Balance'}];
-  document.getElementById('filterTabs').innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
+  el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
 function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderTable();}
@@ -1957,7 +1964,8 @@ function showView(v){
     renderDonut();
   }
   if(v==='properties'){
-    currentFilter='all';
+    if(!filterSetByNav) currentFilter='all';
+    filterSetByNav=false;
     renderMonthBar();
     renderFilterTabs();
     renderTable();
@@ -1974,6 +1982,7 @@ function showView(v){
 function setFilter(f){
   currentFilter=f;
   currentPage=1;
+  filterSetByNav=true;
   if(currentView==='properties'){
     renderFilterTabs();
     renderTable();
