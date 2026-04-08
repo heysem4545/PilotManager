@@ -1579,8 +1579,13 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       .where('rowIdx','==',rowIdx);
     if(!isGroup) q=q.where('uid','==',targetUid);
     const snap = await q.get();
+    const statusFields = field==='status' ? {
+      statusChangedBy:currentUser.uid,
+      statusChangedByName:currentUser.name,
+      statusChangedByColor:userColor(currentUser.uid)
+    } : {};
     if(!snap.empty){
-      await snap.docs[0].ref.update({[field]:value, updatedAt:new Date()});
+      await snap.docs[0].ref.update({[field]:value, ...statusFields, updatedAt:new Date()});
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -1590,6 +1595,7 @@ async function saveTask(day, rowIdx, field, value, uid=null){
         isGroup: isGroup,
         diff:'', task:'', status:'notstarted',
         [field]:value,
+        ...statusFields,
         createdAt:new Date(), updatedAt:new Date()
       });
     }
@@ -1654,7 +1660,9 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const rowsHtml=rows.map((t,i)=>{
     const diffClass=t.diff?`diff-${t.diff}`:'diff-none';
     const statusClass=`status-${t.status||'notstarted'}`;
-    const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
+    const creatorColor=t.userColor||(isGroup?userColor(currentUser.uid):'');
+    const creatorName=t.userName||(isGroup?currentUser.name:'');
+    const userDot=isGroup&&creatorColor?`<span class="u-dot" style="background:${creatorColor}" title="${creatorName}"></span>`:'';
     const completerDot=isGroup&&t.statusChangedByColor?`<span class="u-dot" style="background:${t.statusChangedByColor}" title="${t.statusChangedByName||''}"></span>`:'';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
@@ -1709,18 +1717,6 @@ function onTmStatus(day,rowIdx,sel){
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
   saveTask(day,rowIdx,'status',sel.value);
-  // Store who changed the status
-  const key=tmActiveKey();
-  const isGroup=tmTab==='group';
-  let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('rowIdx','==',rowIdx);
-  if(!isGroup)q=q.where('uid','==',currentUser.uid);
-  q.get().then(snap=>{
-    if(!snap.empty) snap.docs[0].ref.update({
-      statusChangedBy:currentUser.uid,
-      statusChangedByName:currentUser.name,
-      statusChangedByColor:userColor(currentUser.uid)
-    });
-  });
   tmRefreshStats();
 }
 
@@ -1757,6 +1753,7 @@ function tmAddRow(day){
         <option value="hard">🔴 Hard (3pt)</option>
       </select>
       <div style="display:flex;align-items:center;gap:3px;min-width:0">
+        ${tmTab==='group'?`<span class="u-dot" style="background:${userColor(currentUser.uid)}" title="${currentUser.name}"></span>`:''}
         <input class="tm-task-input" value="" placeholder="Add task..."
           onblur="onTmTask(${d},${newIdx},this)" onkeydown="if(event.key==='Enter')this.blur()">
       </div>
