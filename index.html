@@ -952,7 +952,7 @@ async function deleteProperty(id) {
 // ─────────────────────────────────────────────
 function calcTotals(){
   const mProps=properties.map(p=>getMonthProp(p));
-  const rent=properties.reduce((s,p)=>s+p.rent,0);
+  const rent=properties.reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const coll=mProps.reduce((s,p)=>s+p.collected,0);
   const cmha=mProps.reduce((s,p)=>s+p.cmhaPaid,0);
   const tp=mProps.reduce((s,p)=>s+p.tenantPaid,0);
@@ -967,10 +967,10 @@ function calcTotals(){
   const tenantBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+Math.max(0,mp.tenantPortion-mp.tenantPaid);},0);
   const cmhaBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return mp.cmha-mp.cmhaPaid>0;}).length;
   const tenantBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return mp.tenantPortion-mp.tenantPaid>0;}).length;
-  const vacantIncome=properties.filter(p=>getMonthProp(p).status==='VACANT').reduce((s,p)=>s+p.rent,0);
-  const evictionIncome=properties.filter(p=>getMonthProp(p).status==='EVICTION').reduce((s,p)=>s+p.rent,0);
-  const constructionIncome=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').reduce((s,p)=>s+p.rent,0);
-  const movingIncome=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').reduce((s,p)=>s+p.rent,0);
+  const vacantIncome=properties.filter(p=>getMonthProp(p).status==='VACANT').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const evictionIncome=properties.filter(p=>getMonthProp(p).status==='EVICTION').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const constructionIncome=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const movingIncome=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const totalPotential=vacantIncome+evictionIncome+constructionIncome+movingIncome;
   return{rent,coll,cmha,tp,rented,realBal,cmhaBal,tenantBal,cmhaBehind,tenantBehind,
          vacantIncome,evictionIncome,constructionIncome,movingIncome,totalPotential};
