@@ -1185,20 +1185,15 @@ function inlineEditStatus(propId, cell){
   cell.innerHTML='';
   cell.appendChild(sel);
   sel.focus();
-  let saved=false;
-  const save=async()=>{
-    if(saved)return;
+  sel.onblur=async()=>{
     const val=sel.value;
-    if(!val){renderTable();return;} // cancelled
-    saved=true;
+    if(!val){renderTable();return;}
     await saveMonthField(propId,'status',val);
     renderTable();
     renderMetrics();
     renderDonut();
     toast('Status saved');
   };
-  sel.onchange=save;
-  sel.onblur=()=>setTimeout(save,100);
 }
 
 function inlineEditNum(propId, baseField, cell, fieldType){
