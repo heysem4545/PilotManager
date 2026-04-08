@@ -1127,6 +1127,7 @@ function renderTable(){
     const rC=rate===100?'var(--accent)':rate>60?'var(--amber)':'var(--red)';
     const cmhaBalance=Math.max(0,mp.cmha-mp.cmhaPaid);
     const tenantBalance=Math.max(0,mp.tenantPortion-mp.tenantPaid);
+    if(p.addr&&p.addr.includes('1068 Addison'))console.log('1068 Addison balance debug:',{cmha:mp.cmha,tenantPortion:mp.tenantPortion,cmhaPaid:mp.cmhaPaid,tenantPaid:mp.tenantPaid,cmhaBalance,tenantBalance,balance:mp.balance});
     const balCell=mp.balance>0
       ?`<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
       :`<span style="color:var(--accent)">✓</span>`;
