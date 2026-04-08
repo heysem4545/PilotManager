@@ -974,14 +974,14 @@ function calcTotals(){
   const rented=mProps.filter(p=>p.status==='RENTED').length;
   const rentedProps=mProps.filter(p=>p.status==='RENTED');
   const baseRented=properties.filter(p=>getMonthProp(p).status==='RENTED');
-  const realBal=Math.max(0,baseRented.reduce((s,p,i)=>{
-    const mp=rentedProps.find(x=>x.id===p.id)||getMonthProp(p);
-    return s+(p.cmha-mp.cmhaPaid)+(p.tenantPortion-mp.tenantPaid);
-  },0));
-  const cmhaBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+(p.cmha-mp.cmhaPaid);},0);
-  const tenantBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+(p.tenantPortion-mp.tenantPaid);},0);
-  const cmhaBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return p.cmha-mp.cmhaPaid>0;}).length;
-  const tenantBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return p.tenantPortion-mp.tenantPaid>0;}).length;
+  const realBal=baseRented.reduce((s,p)=>{
+    const mp=getMonthProp(p);
+    return s+Math.max(0,mp.cmha-mp.cmhaPaid)+Math.max(0,mp.tenantPortion-mp.tenantPaid);
+  },0);
+  const cmhaBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+Math.max(0,mp.cmha-mp.cmhaPaid);},0);
+  const tenantBal=baseRented.reduce((s,p)=>{const mp=getMonthProp(p);return s+Math.max(0,mp.tenantPortion-mp.tenantPaid);},0);
+  const cmhaBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return mp.cmha-mp.cmhaPaid>0;}).length;
+  const tenantBehind=baseRented.filter(p=>{const mp=getMonthProp(p);return mp.tenantPortion-mp.tenantPaid>0;}).length;
   const vacantIncome=properties.filter(p=>getMonthProp(p).status==='VACANT').reduce((s,p)=>s+p.rent,0);
   const evictionIncome=properties.filter(p=>getMonthProp(p).status==='EVICTION').reduce((s,p)=>s+p.rent,0);
   const constructionIncome=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').reduce((s,p)=>s+p.rent,0);
