@@ -1167,33 +1167,23 @@ function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pa
 // ─────────────────────────────────────────────
 function inlineEditStatus(propId, cell){
   if(!canEdit())return;
-  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
   const mp=getMonthProp(properties.find(x=>x.id===propId));
-  const sel=document.createElement('select');
-  sel.className='inline-select';
-  // Add blank option first to prevent auto-select
-  const blank=document.createElement('option');
-  blank.value=''; blank.textContent='— Select status —';
-  if(!mp.status) blank.selected=true;
-  sel.appendChild(blank);
-  statuses.forEach(s=>{
-    const o=document.createElement('option');
-    o.value=s; o.textContent=BL[s]||s;
-    if(mp.status===s)o.selected=true;
-    sel.appendChild(o);
-  });
-  cell.innerHTML='';
-  cell.appendChild(sel);
-  sel.focus();
-  sel.onblur=async()=>{
-    const val=sel.value;
-    if(!val){renderTable();return;}
-    await saveMonthField(propId,'status',val);
-    renderTable();
-    renderMetrics();
-    renderDonut();
-    toast('Status saved');
-  };
+  const opts=['','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'];
+  const optHtml=opts.map(s=>
+    `<option value="${s}" ${mp.status===s?'selected':''}>${s?BL[s]||s:'— Select —'}</option>`
+  ).join('');
+  cell.innerHTML=`<select class="inline-select" onchange="saveStatusInline('${propId}',this)">${optHtml}</select>`;
+  cell.querySelector('select').focus();
+}
+
+async function saveStatusInline(propId, sel){
+  const val=sel.value;
+  if(!val) return;
+  await saveMonthField(propId,'status',val);
+  renderTable();
+  renderMetrics();
+  renderDonut();
+  toast('Status saved');
 }
 
 function inlineEditNum(propId, baseField, cell, fieldType){
