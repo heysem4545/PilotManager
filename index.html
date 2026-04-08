@@ -1172,8 +1172,20 @@ function inlineEditStatus(propId, cell){
   const optHtml=opts.map(s=>
     `<option value="${s}" ${mp.status===s?'selected':''}>${s?BL[s]||s:'— Select —'}</option>`
   ).join('');
-  cell.innerHTML=`<select class="inline-select" onchange="saveStatusInline('${propId}',this)">${optHtml}</select>`;
-  cell.querySelector('select').focus();
+  const sel=document.createElement('select');
+  sel.className='inline-select';
+  sel.innerHTML=optHtml;
+  cell.innerHTML='';
+  cell.appendChild(sel);
+  sel.addEventListener('change', async function(){
+    const val=this.value;
+    if(!val) return;
+    await saveMonthField(propId,'status',val);
+    renderTable();
+    renderMetrics();
+    renderDonut();
+    toast('Status saved');
+  });
 }
 
 async function saveStatusInline(propId, sel){
