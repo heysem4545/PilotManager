@@ -1250,26 +1250,89 @@ function switchMonthlyView(mode,btn){
   btn.classList.add('active');
   renderMonthly();
 }
-function renderMonthly(){
-  const ds=monthlyMode==='balance'?monthlyBalance:monthlyUnits;
-  const isMoney=monthlyMode==='balance';
+async function renderMonthly(){
+  const el = document.getElementById('monthlyTable');
+  el.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--muted)">Loading...</td></tr>';
+
+  const MKEYS = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+  const isMoney = monthlyMode==='balance';
+
+  // For each month, calculate from properties + monthlyData
+  const monthStats = await Promise.all(MKEYS.map(async (key, mi) => {
+    // Load month data if not cached
+    const alreadyLoaded = Object.values(monthData).some(pd=>pd[key]!==undefined);
+    if(!alreadyLoaded) await loadMonthData(key);
+
+    // Save current active month, temporarily switch
+    const savedYear = activeYear, savedMonth = activeMonth;
+    activeYear = 2026; activeMonth = mi;
+
+    const counts = {RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
+    const balances = {RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
+
+    properties.forEach(p => {
+      const mp = getMonthProp(p);
+      const st = mp.status || 'VACANT';
+      if(counts[st]!==undefined) {
+        counts[st]++;
+        balances[st] += isMoney ? Math.max(0,(mp.cmha-mp.cmhaPaid)+(mp.tenantPortion-mp.tenantPaid)) : 1;
+      }
+    });
+
+    // Restore
+    activeYear = savedYear; activeMonth = savedMonth;
+
+    return {counts, balances};
+  }));
+
+  const CUR_M = new Date().getMonth();
+  const rows = isMoney ? [
+    {lbl:'Rented Balance', key:'RENTED', cls:'row-rented'},
+    {lbl:'Vacant Balance', key:'VACANT', cls:'row-vacant'},
+    {lbl:'Eviction Balance', key:'EVICTION', cls:'row-eviction'},
+    {lbl:'Moving Process', key:'MOVING PROCESS', cls:'row-moving'},
+    {lbl:'Construction', key:'CONSTRUCTION', cls:'row-construction'},
+  ] : [
+    {lbl:'Rented Units', key:'RENTED', cls:'row-rented'},
+    {lbl:'Vacant Units', key:'VACANT', cls:'row-vacant'},
+    {lbl:'Eviction Units', key:'EVICTION', cls:'row-eviction'},
+    {lbl:'Moving Units', key:'MOVING PROCESS', cls:'row-moving'},
+    {lbl:'Construction', key:'CONSTRUCTION', cls:'row-construction'},
+  ];
+
   let html=`<thead><tr><th>Category</th>`;
-  MONTHS.forEach((m,i)=>html+=`<th class="${i===CUR_MONTH?'cur':''}">${m}${i===CUR_MONTH?' ★':''}</th>`);
+  MONTHS.forEach((m,i)=>html+=`<th class="${i===CUR_M?'cur':''}">${m}${i===CUR_M?' ★':''}</th>`);
   html+=`<th class="yr">YTD</th></tr></thead><tbody>`;
-  Object.entries(ds).forEach(([lbl,vals])=>{
-    const isTotal=lbl.includes('Total');
-    const ytd=vals.reduce((s,v)=>s+v,0);
-    html+=`<tr class="${rowCls[lbl]||''}${isTotal?' row-total':''}"><td>${lbl}</td>`;
+
+  rows.forEach(({lbl,key,cls})=>{
+    const vals = monthStats.map(ms => isMoney ? (ms.balances[key]||0) : (ms.counts[key]||0));
+    const ytd = vals.reduce((s,v)=>s+v,0);
+    html+=`<tr class="${cls}"><td>${lbl}</td>`;
     vals.forEach((v,i)=>{
       const zero=v===0;
       const disp=zero?'—':isMoney?'$'+Math.round(v).toLocaleString():v;
-      html+=`<td class="${i===CUR_MONTH?'cur':''} ${zero?'zero':''}">${disp}</td>`;
+      html+=`<td class="${i===CUR_M?'cur':''} ${zero?'zero':''}">${disp}</td>`;
     });
     const ytdDisp=ytd===0?'—':isMoney?'$'+Math.round(ytd).toLocaleString():ytd;
     html+=`<td class="yr ${ytd===0?'zero':''}">${ytdDisp}</td></tr>`;
   });
+
+  // Total row
+  const totals = monthStats.map((ms,mi) => {
+    return isMoney
+      ? Object.values(ms.balances).reduce((s,v)=>s+v,0)
+      : properties.length;
+  });
+  const totalYtd = totals.reduce((s,v)=>s+v,0);
+  html+=`<tr class="row-total"><td>${isMoney?'Total Balance':'Total Units'}</td>`;
+  totals.forEach((v,i)=>{
+    const zero=v===0;
+    const disp=zero?'—':isMoney?'$'+Math.round(v).toLocaleString():v;
+    html+=`<td class="${i===CUR_M?'cur':''} ${zero?'zero':''}">${disp}</td>`;
+  });
+  html+=`<td class="yr">${isMoney?'$'+Math.round(totalYtd).toLocaleString():totalYtd}</td></tr>`;
   html+='</tbody>';
-  document.getElementById('monthlyTable').innerHTML=html;
+  el.innerHTML=html;
 }
 
 async function renderTeam(){
