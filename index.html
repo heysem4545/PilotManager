@@ -1171,6 +1171,11 @@ function inlineEditStatus(propId, cell){
   const mp=getMonthProp(properties.find(x=>x.id===propId));
   const sel=document.createElement('select');
   sel.className='inline-select';
+  // Add blank option first to prevent auto-select
+  const blank=document.createElement('option');
+  blank.value=''; blank.textContent='— Select status —';
+  if(!mp.status) blank.selected=true;
+  sel.appendChild(blank);
   statuses.forEach(s=>{
     const o=document.createElement('option');
     o.value=s; o.textContent=BL[s]||s;
@@ -1180,8 +1185,12 @@ function inlineEditStatus(propId, cell){
   cell.innerHTML='';
   cell.appendChild(sel);
   sel.focus();
+  let saved=false;
   const save=async()=>{
+    if(saved)return;
     const val=sel.value;
+    if(!val){renderTable();return;} // cancelled
+    saved=true;
     await saveMonthField(propId,'status',val);
     renderTable();
     renderMetrics();
@@ -1189,7 +1198,7 @@ function inlineEditStatus(propId, cell){
     toast('Status saved');
   };
   sel.onchange=save;
-  sel.onblur=save;
+  sel.onblur=()=>setTimeout(save,100);
 }
 
 function inlineEditNum(propId, baseField, cell, fieldType){
