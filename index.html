@@ -1135,8 +1135,8 @@ function renderTable(){
       ?`<span class="editable" onclick="inlineEditStatus('${p.id}',this)">${mp.status?`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`
       :`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`;
     // Editable number cells
-    const cmhaRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmha',this,'cmha')">${p.cmha>0?fmt(p.cmha):'<span class="m-muted">—</span>'}</span>`:fmt(p.cmha);
-    const tRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPortion',this,'tenantPortion')">${p.tenantPortion>0?fmt(p.tenantPortion):'<span class="m-muted">—</span>'}</span>`:fmt(p.tenantPortion);
+    const cmhaRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmha',this,'monthCmha')">${mp.cmha>0?fmt(mp.cmha):'<span class="m-muted">—</span>'}</span>`:fmt(mp.cmha);
+    const tRentCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPortion',this,'monthTenantPortion')">${mp.tenantPortion>0?fmt(mp.tenantPortion):'<span class="m-muted">—</span>'}</span>`:fmt(mp.tenantPortion);
     const cmhaPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmhaPaid',this,'monthCmhaPaid')">${mp.cmhaPaid>0?fmt(mp.cmhaPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.cmhaPaid);
     const tPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPaid',this,'monthTenantPaid')">${mp.tenantPaid>0?fmt(mp.tenantPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.tenantPaid);
     return `<tr id="row-${p.id}">
@@ -1217,9 +1217,9 @@ function inlineEditNum(propId, baseField, cell, fieldType){
   if(!canEdit())return;
   const p=properties.find(x=>x.id===propId);
   const mp=getMonthProp(p);
-  const isMonthField = fieldType==='monthCmhaPaid'||fieldType==='monthTenantPaid';
+  const isMonthField = ['monthCmhaPaid','monthTenantPaid','monthCmha','monthTenantPortion'].includes(fieldType);
   const currentVal = isMonthField
-    ? (fieldType==='monthCmhaPaid'?mp.cmhaPaid:mp.tenantPaid)
+    ? (fieldType==='monthCmhaPaid'?mp.cmhaPaid:fieldType==='monthTenantPaid'?mp.tenantPaid:fieldType==='monthCmha'?mp.cmha:mp.tenantPortion)
     : p[baseField]||0;
   const inp=document.createElement('input');
   inp.type='number'; inp.className='inline-input';
@@ -1231,12 +1231,10 @@ function inlineEditNum(propId, baseField, cell, fieldType){
   const save=async()=>{
     const val=parseFloat(inp.value)||0;
     if(isMonthField){
-      const monthField = fieldType==='monthCmhaPaid'?'cmhaPaid':'tenantPaid';
+      const monthField = fieldType==='monthCmhaPaid'?'cmhaPaid':fieldType==='monthTenantPaid'?'tenantPaid':fieldType==='monthCmha'?'cmha':'tenantPortion';
       await saveMonthField(propId, monthField, val);
     } else {
-      // Save to base property
       await saveProperty({[baseField]:val}, propId);
-      // Update local properties array
       const idx=properties.findIndex(x=>x.id===propId);
       if(idx>=0) properties[idx]={...properties[idx],[baseField]:val};
     }
