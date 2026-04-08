@@ -1690,29 +1690,38 @@ function onTmStatus(day,rowIdx,sel){
 }
 
 function tmAddRow(day){
-  const body=document.getElementById('tmbody-'+day);
-  const rows=body.querySelectorAll('.tm-task-row');
-  const newIdx=rows.length;
-  const div=document.createElement('div');
-  div.className='tm-task-row';
-  div.innerHTML=`
-    <select class="tm-diff-sel diff-none" onchange="onTmDiff(${day},${newIdx},this)" style="cursor:pointer">
-      <option value="">Difficulty</option>
-      <option value="easy">🟢 Easy (1pt)</option>
-      <option value="medium">🟡 Medium (2pt)</option>
-      <option value="hard">🔴 Hard (3pt)</option>
-    </select>
-    <div style="display:flex;align-items:center;gap:3px;min-width:0">
-      <input class="tm-task-input" value="" placeholder="Add task..." 
-        onblur="onTmTask(${day},${newIdx},this)" onkeydown="if(event.key==='Enter')this.blur()">
-    </div>
-    <select class="tm-status-sel status-notstarted" onchange="onTmStatus(${day},${newIdx},this)">
-      <option value="notstarted" selected>Not Started</option>
-      <option value="progressing">Progressing</option>
-      <option value="done">✓ Done</option>
-    </select>`;
-  body.appendChild(div);
-  div.querySelector('input').focus();
+  // Find the week group start (groups of 4: 1-4, 5-8, etc.)
+  const weekStart=Math.floor((day-1)/4)*4+1;
+  const daysInMonth=getDaysInMonth(tmYear,tmMonth);
+  const weekEnd=Math.min(weekStart+3,daysInMonth);
+  let focusInput=null;
+  for(let d=weekStart;d<=weekEnd;d++){
+    const body=document.getElementById('tmbody-'+d);
+    if(!body)continue;
+    const rows=body.querySelectorAll('.tm-task-row');
+    const newIdx=rows.length;
+    const div=document.createElement('div');
+    div.className='tm-task-row';
+    div.innerHTML=`
+      <select class="tm-diff-sel diff-none" onchange="onTmDiff(${d},${newIdx},this)" style="cursor:pointer">
+        <option value="">Difficulty</option>
+        <option value="easy">🟢 Easy (1pt)</option>
+        <option value="medium">🟡 Medium (2pt)</option>
+        <option value="hard">🔴 Hard (3pt)</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:3px;min-width:0">
+        <input class="tm-task-input" value="" placeholder="Add task..."
+          onblur="onTmTask(${d},${newIdx},this)" onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
+      <select class="tm-status-sel status-notstarted" onchange="onTmStatus(${d},${newIdx},this)">
+        <option value="notstarted" selected>Not Started</option>
+        <option value="progressing">Progressing</option>
+        <option value="done">✓ Done</option>
+      </select>`;
+    body.appendChild(div);
+    if(d===day) focusInput=div.querySelector('input');
+  }
+  if(focusInput) focusInput.focus();
 }
 
 function tmRefreshStats(){
