@@ -311,6 +311,37 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 tbody tr.to-legal td{background:rgba(245,112,106,0.10) !important;border-bottom-color:rgba(245,112,106,0.25)}
 tbody tr.to-legal:hover td{background:rgba(245,112,106,0.16) !important}
 tbody tr.to-legal td .addr-main{color:var(--red)}
+
+/* ── MAINTENANCE ── */
+.maint-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.maint-toolbar-left{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.maint-year-select{font-size:11px;padding:5px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-family:var(--font);outline:none}
+.maint-year-select:focus{border-color:var(--accent)}
+.maint-tbl{width:100%;border-collapse:collapse}
+.maint-tbl thead th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 10px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
+.maint-tbl thead th:first-child{text-align:left;padding-left:14px;min-width:170px}
+.maint-tbl tbody td{padding:0;border-bottom:1px solid var(--border);font-size:12px;text-align:center}
+.maint-tbl tbody td:first-child{padding:11px 14px;text-align:left;color:var(--text);font-weight:500}
+.maint-tbl tbody tr:hover td{background:rgba(255,255,255,.02)}
+.maint-cell{display:flex;align-items:center;justify-content:center;height:40px;cursor:pointer;font-family:var(--mono);font-size:13px;font-weight:600;transition:background .12s;color:var(--text);position:relative}
+.maint-cell.empty{color:var(--muted2);font-weight:400}
+.maint-cell:hover{background:var(--surface2)}
+.maint-cell.has-visits{color:var(--accent)}
+.maint-cell.has-visits:hover{background:var(--accent-dim)}
+.maint-cell.disabled{cursor:not-allowed;opacity:.55}
+.maint-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
+.maint-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
+
+/* Maintenance edit modal */
+.maint-visit-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:50vh;overflow-y:auto}
+.maint-visit-row{display:grid;grid-template-columns:130px 1fr 28px;gap:8px;align-items:start;padding:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px}
+.maint-visit-row select,.maint-visit-row input{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%}
+.maint-visit-row select:focus,.maint-visit-row input:focus{border-color:var(--accent)}
+.maint-visit-row .maint-visit-rm{background:none;border:1px solid var(--border2);color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;align-self:center}
+.maint-visit-row .maint-visit-rm:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
+.maint-add-visit{width:100%;padding:9px;border-radius:8px;border:1px dashed var(--border2);background:transparent;color:var(--muted);font-size:12px;font-family:var(--font);cursor:pointer;transition:all .12s;margin-bottom:6px}
+.maint-add-visit:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.maint-modal-empty{font-size:12px;color:var(--muted);text-align:center;padding:18px 0;font-style:italic}
 .ab-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:170px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
 .ab-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
 .ab-notes-cell.empty{color:var(--muted2);font-style:italic}
@@ -785,6 +816,62 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('notesModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="savePopupField()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE CELL EDIT MODAL -->
+<div class="overlay" id="maintModal" onclick="if(event.target===this)closeModal('maintModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="maintModalTitle">Maintenance visits</span>
+      <button class="modal-close" onclick="closeModal('maintModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="maintModalAddr"></div>
+    <div class="maint-visit-list" id="maintVisitList"></div>
+    <button class="maint-add-visit" onclick="addMaintVisitDraft()">+ Add visit</button>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('maintModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMaintVisits()">Save visits</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK ADD MAINTENANCE MODAL -->
+<div class="overlay" id="maintQuickModal" onclick="if(event.target===this)closeModal('maintQuickModal')">
+  <div class="modal">
+    <div class="modal-title">
+      Quick add maintenance
+      <button class="modal-close" onclick="closeModal('maintQuickModal')">×</button>
+    </div>
+    <div class="fg">
+      <label>Property</label>
+      <select id="mq_property"></select>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label>Month</label>
+        <select id="mq_month"></select>
+      </div>
+      <div class="fg">
+        <label>Type</label>
+        <select id="mq_type">
+          <option value="Plumbing">Plumbing</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Roofing">Roofing</option>
+          <option value="HVAC">HVAC</option>
+          <option value="General">General</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Notes (optional)</label>
+      <textarea id="mq_notes" rows="3" placeholder="Brief description of the work…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('maintQuickModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveQuickMaintenance()">Add visit</button>
     </div>
   </div>
 </div>
@@ -1685,6 +1772,239 @@ function toggleHistoryDetail(safeId){
   const open = row.style.display !== 'none';
   row.style.display = open ? 'none' : 'table-row';
   if(chev) chev.classList.toggle('open', !open);
+}
+
+// ─────────────────────────────────────────────
+// MAINTENANCE
+// Firestore: collection 'maintenance', one doc per visit:
+//   {propertyId, year, month, monthKey, type, notes, createdAt, createdBy}
+// ─────────────────────────────────────────────
+const MAINT_TYPES = ['Plumbing','Electrical','Roofing','HVAC','General','Other'];
+let maintenanceData = {}; // { propertyId: { 'YYYY-MM': [visit, ...] } }
+let maintenanceYear = new Date().getFullYear();
+let maintActiveProp = null;
+let maintActiveMonth = null;
+let maintDraft = []; // editable list inside the modal: [{id?, type, notes}]
+let maintOriginalIds = []; // ids that existed when the modal was opened
+
+async function loadMaintenanceForYear(year){
+  maintenanceData = {};
+  const startKey = `${year}-01`;
+  const endKey = `${year}-12`;
+  const snap = await db.collection('maintenance')
+    .where('monthKey','>=',startKey)
+    .where('monthKey','<=',endKey)
+    .get();
+  snap.docs.forEach(d=>{
+    const v = {id:d.id, ...d.data()};
+    if(!maintenanceData[v.propertyId]) maintenanceData[v.propertyId] = {};
+    if(!maintenanceData[v.propertyId][v.monthKey]) maintenanceData[v.propertyId][v.monthKey] = [];
+    maintenanceData[v.propertyId][v.monthKey].push(v);
+  });
+}
+
+function maintCellTitle(visits){
+  if(!visits || visits.length===0) return 'No visits — click to add';
+  const counts = {};
+  visits.forEach(v => { counts[v.type] = (counts[v.type]||0) + 1; });
+  return Object.entries(counts).map(([t,n])=>`${n} ${t}`).join(', ');
+}
+
+async function renderMaintenanceView(){
+  const el = document.getElementById('maintenanceView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+
+  try{
+    await loadMaintenanceForYear(maintenanceYear);
+  }catch(e){
+    console.error('loadMaintenanceForYear', e);
+    el.innerHTML = `<div class="table-card"><div class="maint-empty"><div class="maint-empty-title">Couldn't load maintenance</div>${escapeHtml(e.message)}</div></div>`;
+    return;
+  }
+
+  const MNAMES_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const editable = canEdit();
+  const sortedProps = [...properties].sort((a,b)=> (a.addr||'').localeCompare(b.addr||''));
+
+  const yearOpts = [];
+  const curYear = new Date().getFullYear();
+  for(let y = curYear+1; y >= curYear-3; y--){
+    yearOpts.push(`<option value="${y}" ${y===maintenanceYear?'selected':''}>${y}</option>`);
+  }
+
+  const totalVisits = Object.values(maintenanceData)
+    .flatMap(months => Object.values(months))
+    .reduce((s,arr) => s + arr.length, 0);
+
+  const headerRow = `<thead><tr>
+    <th>Property</th>
+    ${MNAMES_S.map(m=>`<th>${m}</th>`).join('')}
+    <th>Total</th>
+  </tr></thead>`;
+
+  const body = sortedProps.map(p=>{
+    const propMonths = maintenanceData[p.id] || {};
+    let propTotal = 0;
+    const cells = MNAMES_S.map((_,m)=>{
+      const key = `${maintenanceYear}-${String(m+1).padStart(2,'0')}`;
+      const visits = propMonths[key] || [];
+      propTotal += visits.length;
+      const has = visits.length > 0;
+      const cls = `maint-cell${has?' has-visits':' empty'}${editable?'':' disabled'}`;
+      const onclick = editable ? `onclick="openMaintenanceCell('${p.id}',${m})"` : '';
+      const title = maintCellTitle(visits).replace(/"/g,'&quot;');
+      return `<td><div class="${cls}" ${onclick} title="${title}">${has?visits.length:'—'}</div></td>`;
+    }).join('');
+    return `<tr>
+      <td>${escapeHtml(p.addr||'')}</td>
+      ${cells}
+      <td><div class="maint-cell ${propTotal>0?'has-visits':'empty'}" style="cursor:default">${propTotal>0?propTotal:'—'}</div></td>
+    </tr>`;
+  }).join('');
+
+  if(sortedProps.length===0){
+    el.innerHTML = `<div class="table-card"><div class="maint-empty"><div class="maint-empty-title">No properties</div>Add a property first.</div></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="maint-toolbar">
+        <div class="maint-toolbar-left">
+          <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Year:</span>
+          <select class="maint-year-select" onchange="changeMaintenanceYear(this.value)">${yearOpts.join('')}</select>
+          <span>${totalVisits} visit${totalVisits===1?'':'s'} in ${maintenanceYear}</span>
+        </div>
+        ${editable?`<button class="btn btn-primary btn-sm" onclick="openQuickMaintenance()">+ Add Maintenance</button>`:''}
+      </div>
+      <div class="tbl-wrap">
+        <table class="maint-tbl">${headerRow}<tbody>${body}</tbody></table>
+      </div>
+    </div>`;
+}
+
+async function changeMaintenanceYear(y){
+  maintenanceYear = parseInt(y, 10);
+  await renderMaintenanceView();
+}
+
+function openMaintenanceCell(propertyId, monthIdx){
+  if(!canEdit()) return;
+  const p = properties.find(x=>x.id===propertyId);
+  if(!p) return;
+  maintActiveProp = propertyId;
+  maintActiveMonth = monthIdx;
+  const key = `${maintenanceYear}-${String(monthIdx+1).padStart(2,'0')}`;
+  const existing = (maintenanceData[propertyId]||{})[key] || [];
+  maintDraft = existing.map(v=>({id:v.id, type:v.type||'General', notes:v.notes||''}));
+  maintOriginalIds = existing.map(v=>v.id);
+  const MNAMES_FULL3 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('maintModalTitle').textContent = `${MNAMES_FULL3[monthIdx]} ${maintenanceYear}`;
+  document.getElementById('maintModalAddr').textContent = p.addr || '';
+  renderMaintDraft();
+  document.getElementById('maintModal').classList.add('open');
+}
+
+function renderMaintDraft(){
+  const list = document.getElementById('maintVisitList');
+  if(maintDraft.length===0){
+    list.innerHTML = `<div class="maint-modal-empty">No visits yet. Click "+ Add visit" to start.</div>`;
+    return;
+  }
+  list.innerHTML = maintDraft.map((v,i)=>`
+    <div class="maint-visit-row">
+      <select onchange="maintDraft[${i}].type=this.value">
+        ${MAINT_TYPES.map(t=>`<option value="${t}" ${v.type===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <input type="text" placeholder="Notes (optional)" value="${escapeAttr(v.notes||'')}" oninput="maintDraft[${i}].notes=this.value">
+      <button class="maint-visit-rm" title="Remove visit" onclick="removeMaintVisitDraft(${i})">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function addMaintVisitDraft(){
+  maintDraft.push({type:'General', notes:''});
+  renderMaintDraft();
+}
+
+function removeMaintVisitDraft(i){
+  maintDraft.splice(i, 1);
+  renderMaintDraft();
+}
+
+async function saveMaintVisits(){
+  if(!canEdit() || maintActiveProp==null || maintActiveMonth==null) return;
+  const propertyId = maintActiveProp;
+  const month = maintActiveMonth;
+  const year = maintenanceYear;
+  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
+  try{
+    const draftIds = maintDraft.filter(v=>v.id).map(v=>v.id);
+    // Delete any originals that are no longer in the draft
+    const toDelete = maintOriginalIds.filter(id => !draftIds.includes(id));
+    for(const id of toDelete){
+      await db.collection('maintenance').doc(id).delete();
+    }
+    // Update or add each draft entry
+    for(const v of maintDraft){
+      const data = {
+        propertyId, year, month, monthKey,
+        type: v.type || 'General',
+        notes: v.notes || '',
+      };
+      if(v.id){
+        await db.collection('maintenance').doc(v.id).update({...data, updatedAt:new Date(), updatedBy:currentUser?.name||''});
+      } else {
+        await db.collection('maintenance').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
+      }
+    }
+    closeModal('maintModal');
+    toast('Maintenance saved');
+    maintActiveProp = null; maintActiveMonth = null; maintDraft = []; maintOriginalIds = [];
+    await renderMaintenanceView();
+  }catch(e){
+    console.error('saveMaintVisits', e);
+    toast('Error: '+e.message);
+  }
+}
+
+function openQuickMaintenance(){
+  if(!canEdit()) return;
+  const propSelect = document.getElementById('mq_property');
+  const monthSelect = document.getElementById('mq_month');
+  const sortedProps = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  propSelect.innerHTML = sortedProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr||'')}</option>`).join('');
+  const MNAMES_FULL4 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const curMonth = new Date().getMonth();
+  monthSelect.innerHTML = MNAMES_FULL4.map((n,i)=>`<option value="${i}" ${i===curMonth?'selected':''}>${n} ${maintenanceYear}</option>`).join('');
+  document.getElementById('mq_type').value = 'General';
+  document.getElementById('mq_notes').value = '';
+  document.getElementById('maintQuickModal').classList.add('open');
+}
+
+async function saveQuickMaintenance(){
+  if(!canEdit()) return;
+  const propertyId = document.getElementById('mq_property').value;
+  const month = parseInt(document.getElementById('mq_month').value, 10);
+  const type = document.getElementById('mq_type').value;
+  const notes = document.getElementById('mq_notes').value.trim();
+  if(!propertyId){ toast('Pick a property'); return; }
+  const year = maintenanceYear;
+  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
+  try{
+    await db.collection('maintenance').add({
+      propertyId, year, month, monthKey, type, notes,
+      createdAt:new Date(), createdBy:currentUser?.name||''
+    });
+    closeModal('maintQuickModal');
+    toast('Visit added');
+    await renderMaintenanceView();
+  }catch(e){
+    console.error('saveQuickMaintenance', e);
+    toast('Error: '+e.message);
+  }
 }
 
 // Called from the Legal Cases section's Remove button. Flips the property's
@@ -2948,7 +3268,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['meetings','maintenance','notices','leads','available','utility','tenants','inspections'];
+  const comingSoon = ['meetings','notices','leads','available','utility','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -2977,6 +3297,7 @@ function showView(v){
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
   if(v==='legal') renderLegalView();
+  if(v==='maintenance') renderMaintenanceView();
   if(v==='team'){
     if(!currentUser||currentUser.role!=='admin'){
       document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
