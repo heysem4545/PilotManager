@@ -308,6 +308,9 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .ab-check.legal:checked::after{border-color:#fff}
 .ab-check:disabled{opacity:.4;cursor:not-allowed}
 .ab-extra-th{font-size:9px;color:var(--muted);text-align:center;white-space:nowrap}
+tbody tr.to-legal td{background:rgba(245,112,106,0.10) !important;border-bottom-color:rgba(245,112,106,0.25)}
+tbody tr.to-legal:hover td{background:rgba(245,112,106,0.16) !important}
+tbody tr.to-legal td .addr-main{color:var(--red)}
 .ab-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:170px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
 .ab-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
 .ab-notes-cell.empty{color:var(--muted2);font-style:italic}
@@ -1246,7 +1249,6 @@ async function renderAllBalances(){
   // Build data: for each property, get balance per month
   const rows=[];
   properties.forEach(p=>{
-    if(p.toLegal) return; // moved to Legal Cases — hide from collections
     let hasAnyBalance=false;
     const balances=monthList.map(({m,y})=>{
       const key=monthKey(y,m);
@@ -1310,7 +1312,7 @@ async function renderAllBalances(){
               const rowTotalC=r.balances.reduce((s,b)=>s+b.cmhaBal,0);
               const rowTotalT=r.balances.reduce((s,b)=>s+b.tenantBal,0);
               const dis = editable?'':'disabled';
-              return `<tr>
+              return `<tr id="ab-row-${r.id}" class="${r.toLegal?'to-legal':''}">
                 <td><div class="addr-main">${r.addr}</div></td>
                 ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
@@ -1342,12 +1344,11 @@ async function abSaveField(id, field, value){
   try{
     await updatePropertyField(id, field, value);
     if(field==='toLegal'){
-      if(value) await moveToLegalCase(id);
-      else await removeFromLegalCase(id);
-      // Re-render so the row disappears (or reappears) in All Balances
-      if(currentView==='properties' && collectionViewMode==='allBalances') renderAllBalances();
+      // Just toggle the row highlight in place — no longer moves to Legal Cases.
+      const row = document.getElementById('ab-row-'+id);
+      if(row) row.classList.toggle('to-legal', !!value);
     }
-    toast(field==='toLegal' ? (value?'Moved to Legal Cases':'Removed from Legal Cases') : 'Saved');
+    toast(field==='toLegal' ? (value?'Marked for legal':'Unmarked') : 'Saved');
   }catch(e){ toast('Error: '+e.message); }
 }
 
