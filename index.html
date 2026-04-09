@@ -342,6 +342,27 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .maint-add-visit{width:100%;padding:9px;border-radius:8px;border:1px dashed var(--border2);background:transparent;color:var(--muted);font-size:12px;font-family:var(--font);cursor:pointer;transition:all .12s;margin-bottom:6px}
 .maint-add-visit:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
 .maint-modal-empty{font-size:12px;color:var(--muted);text-align:center;padding:18px 0;font-style:italic}
+
+/* Maintenance summary table */
+.maint-sum-card{margin-top:18px}
+.maint-sum-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.maint-sum-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.maint-sum-controls label{font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em}
+.maint-sum-range{font-size:11px;padding:5px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-family:var(--font);outline:none}
+.maint-sum-range:focus{border-color:var(--accent)}
+.maint-sum-date{font-size:11px;padding:5px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none}
+.maint-sum-date::-webkit-calendar-picker-indicator{filter:invert(.7) brightness(.8);cursor:pointer}
+.maint-sum-tbl{width:100%;border-collapse:collapse}
+.maint-sum-tbl thead th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 14px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
+.maint-sum-tbl thead th:first-child{text-align:left}
+.maint-sum-tbl tbody td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;text-align:right;font-family:var(--mono)}
+.maint-sum-tbl tbody td:first-child{text-align:left;color:var(--text);font-weight:500;font-family:var(--font)}
+.maint-sum-tbl tbody tr:last-child td{border-bottom:none}
+.maint-sum-tbl tbody tr:hover td{background:rgba(255,255,255,.02)}
+.maint-sum-tbl .ms-total{color:var(--accent);font-weight:600}
+.maint-sum-tbl .ms-zero{color:var(--muted2)}
+.maint-sum-tbl tr.zero-row td:first-child{color:var(--muted)}
+.maint-sum-range-label{font-size:11px;color:var(--muted)}
 .ab-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:170px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
 .ab-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
 .ab-notes-cell.empty{color:var(--muted2);font-style:italic}
@@ -1786,6 +1807,9 @@ let maintActiveProp = null;
 let maintActiveMonth = null;
 let maintDraft = []; // editable list inside the modal: [{id?, type, notes}]
 let maintOriginalIds = []; // ids that existed when the modal was opened
+let maintSummaryRange = 'last6';
+let maintSummaryStartKey = ''; // 'YYYY-MM' for custom mode
+let maintSummaryEndKey = '';
 
 async function loadMaintenanceForYear(year){
   maintenanceData = {};
@@ -1880,7 +1904,165 @@ async function renderMaintenanceView(){
       <div class="tbl-wrap">
         <table class="maint-tbl">${headerRow}<tbody>${body}</tbody></table>
       </div>
+    </div>
+    <div class="table-card maint-sum-card" id="maintSummaryWrap"></div>`;
+
+  await renderMaintenanceSummary();
+}
+
+function getMaintSummaryRangeKeys(){
+  if(maintSummaryRange==='custom'){
+    return {startKey: maintSummaryStartKey || '', endKey: maintSummaryEndKey || ''};
+  }
+  const months = maintSummaryRange==='last3' ? 3
+               : maintSummaryRange==='last12' ? 12
+               : 6;
+  const now = new Date();
+  const endY = now.getFullYear();
+  const endM = now.getMonth();
+  const start = new Date(endY, endM - (months-1), 1);
+  const startKey = `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`;
+  const endKey = `${endY}-${String(endM+1).padStart(2,'0')}`;
+  return {startKey, endKey};
+}
+
+function fmtMonthKey(k){
+  if(!k) return '';
+  const [y, m] = k.split('-');
+  if(!y || !m) return k;
+  const MNAMES_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const idx = parseInt(m,10)-1;
+  return `${MNAMES_S[idx]||m} ${y}`;
+}
+
+async function renderMaintenanceSummary(){
+  const wrap = document.getElementById('maintSummaryWrap');
+  if(!wrap) return;
+  const {startKey, endKey} = getMaintSummaryRangeKeys();
+
+  const isCustom = maintSummaryRange === 'custom';
+  const rangeLabel = startKey && endKey ? `${fmtMonthKey(startKey)} \u2014 ${fmtMonthKey(endKey)}` : 'Pick a date range';
+
+  const customControls = isCustom
+    ? `<input type="month" class="maint-sum-date" value="${startKey}" onchange="setMaintSummaryDate('start',this.value)">
+       <span style="color:var(--muted2)">to</span>
+       <input type="month" class="maint-sum-date" value="${endKey}" onchange="setMaintSummaryDate('end',this.value)">`
+    : '';
+
+  const toolbar = `
+    <div class="maint-sum-toolbar">
+      <div class="maint-sum-controls">
+        <label>Summary range</label>
+        <select class="maint-sum-range" onchange="setMaintSummaryRange(this.value)">
+          <option value="last3" ${maintSummaryRange==='last3'?'selected':''}>Last 3 months</option>
+          <option value="last6" ${maintSummaryRange==='last6'?'selected':''}>Last 6 months</option>
+          <option value="last12" ${maintSummaryRange==='last12'?'selected':''}>Last 12 months</option>
+          <option value="custom" ${maintSummaryRange==='custom'?'selected':''}>Custom range</option>
+        </select>
+        ${customControls}
+        <span class="maint-sum-range-label">${rangeLabel}</span>
+      </div>
     </div>`;
+
+  if(!startKey || !endKey){
+    wrap.innerHTML = toolbar + `<div class="maint-empty">Choose a start and end month to see the summary.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = toolbar + `<div style="display:flex;align-items:center;justify-content:center;padding:30px"><div class="loader"></div></div>`;
+
+  let docs = [];
+  try{
+    const snap = await db.collection('maintenance')
+      .where('monthKey','>=',startKey)
+      .where('monthKey','<=',endKey)
+      .get();
+    docs = snap.docs.map(d=>d.data());
+  }catch(e){
+    console.error('renderMaintenanceSummary', e);
+    wrap.innerHTML = toolbar + `<div class="maint-empty">${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  // Aggregate per property
+  const agg = {};
+  docs.forEach(v=>{
+    if(!agg[v.propertyId]) agg[v.propertyId] = {total:0, byType:{}};
+    agg[v.propertyId].total++;
+    const t = v.type || 'Other';
+    agg[v.propertyId].byType[t] = (agg[v.propertyId].byType[t]||0) + 1;
+  });
+
+  // Combine with all properties so zero-visit properties show too
+  const rows = properties.map(p => {
+    const a = agg[p.id] || {total:0, byType:{}};
+    return {id:p.id, addr:p.addr||'', total:a.total, byType:a.byType};
+  }).sort((x,y)=> y.total - x.total || (x.addr||'').localeCompare(y.addr||''));
+
+  const totalVisits = rows.reduce((s,r)=>s+r.total, 0);
+  const propsWithVisits = rows.filter(r=>r.total>0).length;
+  const propsZero = rows.filter(r=>r.total===0).length;
+
+  const body = rows.map(r => {
+    const isZero = r.total===0;
+    const cell = (n)=> n>0 ? `<td>${n}</td>` : `<td class="ms-zero">—</td>`;
+    return `<tr class="${isZero?'zero-row':''}">
+      <td>${escapeHtml(r.addr)}</td>
+      <td class="ms-total">${r.total>0?r.total:'<span class="ms-zero">0</span>'}</td>
+      ${cell(r.byType['Plumbing']||0)}
+      ${cell(r.byType['Electrical']||0)}
+      ${cell(r.byType['Roofing']||0)}
+      ${cell(r.byType['HVAC']||0)}
+      ${cell(r.byType['General']||0)}
+      ${cell(r.byType['Other']||0)}
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    ${toolbar}
+    <div class="maint-toolbar" style="border-bottom:1px solid var(--border);border-top:1px solid var(--border)">
+      <div class="maint-toolbar-left">
+        <span><strong style="color:var(--text)">${totalVisits}</strong> total visits</span>
+        <span>\u2022</span>
+        <span><strong style="color:var(--accent)">${propsWithVisits}</strong> active</span>
+        <span>\u2022</span>
+        <span><strong style="color:var(--muted)">${propsZero}</strong> never visited</span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="maint-sum-tbl">
+        <thead><tr>
+          <th>Property Address</th>
+          <th>Total Visits</th>
+          <th>Plumbing</th>
+          <th>Electrical</th>
+          <th>Roofing</th>
+          <th>HVAC</th>
+          <th>General</th>
+          <th>Other</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
+}
+
+async function setMaintSummaryRange(v){
+  maintSummaryRange = v;
+  if(v==='custom' && (!maintSummaryStartKey || !maintSummaryEndKey)){
+    // Pre-fill custom with the current last-6 window so the date pickers
+    // start somewhere sensible.
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth()-5, 1);
+    maintSummaryStartKey = `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`;
+    maintSummaryEndKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+  await renderMaintenanceSummary();
+}
+
+async function setMaintSummaryDate(which, val){
+  if(which==='start') maintSummaryStartKey = val;
+  else maintSummaryEndKey = val;
+  await renderMaintenanceSummary();
 }
 
 async function changeMaintenanceYear(y){
