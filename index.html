@@ -1237,7 +1237,8 @@ async function renderAllBalances(){
       return {cmhaBal,tenantBal};
     });
     if(hasAnyBalance) rows.push({id:p.id,addr:p.addr,balances,
-      notice30Date:p.notice30Date||'',notice3Date:p.notice3Date||'',
+      notice30Date:p.notice30Date||'',notice30Pic:!!p.notice30Pic,
+      notice3Date:p.notice3Date||'',notice3Pic:!!p.notice3Pic,
       vawa:!!p.vawa,collectionNotes:p.collectionNotes||'',toLegal:!!p.toLegal});
   });
 
@@ -1270,7 +1271,9 @@ async function renderAllBalances(){
               ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">30 Day Notice</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">PIC</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">3 Day Notice</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">PIC</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">VAWA</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Notes</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">To Legal</th>
@@ -1291,7 +1294,9 @@ async function renderAllBalances(){
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
                 <td><input type="date" class="ab-input ab-date" value="${r.notice30Date}" ${dis} onchange="abSaveField('${r.id}','notice30Date',this.value)"></td>
+                <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 30 day notice" ${r.notice30Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice30Pic',this.checked)"></td>
                 <td><input type="date" class="ab-input ab-date" value="${r.notice3Date}" ${dis} onchange="abSaveField('${r.id}','notice3Date',this.value)"></td>
+                <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 3 day notice" ${r.notice3Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice3Pic',this.checked)"></td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" ${r.vawa?'checked':''} ${dis} onchange="abSaveField('${r.id}','vawa',this.checked)"></td>
                 <td>${renderNotesCell(r.id, r.collectionNotes, editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check legal" ${r.toLegal?'checked':''} ${dis} onchange="abSaveField('${r.id}','toLegal',this.checked)"></td>
@@ -1302,7 +1307,7 @@ async function renderAllBalances(){
               ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
-              <td colspan="5"></td>
+              <td colspan="7"></td>
             </tr>
           </tbody>
         </table>
