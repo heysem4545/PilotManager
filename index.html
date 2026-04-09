@@ -365,6 +365,75 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .maint-sum-tbl .ms-zero{color:var(--muted2)}
 .maint-sum-tbl tr.zero-row td:first-child{color:var(--muted)}
 .maint-sum-range-label{font-size:11px;color:var(--muted)}
+
+/* ── TECHNICIAN ── */
+.tech-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.tech-toolbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tech-toolbar-left label{font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em}
+.tech-select{font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-family:var(--font);outline:none;min-width:170px}
+.tech-select:focus{border-color:var(--accent)}
+.tech-month-nav{display:flex;align-items:center;gap:8px}
+.tech-month-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1}
+.tech-month-btn:hover{background:var(--surface3);border-color:var(--muted2)}
+.tech-month-label{font-size:13px;font-weight:600;color:var(--text);min-width:130px;text-align:center}
+.tech-stats{font-size:11px;color:var(--muted);display:flex;gap:14px}
+.tech-stats strong{color:var(--text);font-weight:600}
+
+.tech-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);padding:1px;border-bottom:1px solid var(--border)}
+.tech-cal-head{background:var(--surface2);padding:8px 10px;font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center}
+.tech-cal-day{background:var(--surface);padding:8px 10px;min-height:96px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:background .12s;position:relative}
+.tech-cal-day:hover{background:var(--surface2)}
+.tech-cal-day.outside{background:var(--bg);opacity:.45;cursor:default}
+.tech-cal-day.outside:hover{background:var(--bg)}
+.tech-cal-day.today .tech-day-num{background:var(--accent);color:#0d0d10;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-weight:600}
+.tech-cal-day.disabled{cursor:not-allowed}
+.tech-day-num{font-size:11px;font-weight:500;color:var(--text)}
+.tech-day-stats{font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.5;margin-top:auto}
+.tech-day-stats .ds-row{display:flex;align-items:center;gap:4px}
+.tech-day-stats .ds-jobs{color:var(--accent);font-weight:600}
+.tech-day-stats .ds-dur{color:var(--text)}
+.tech-day-rating{font-family:var(--mono);font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+.tech-day-rating.good{color:var(--accent)}
+.tech-day-rating.mid{color:var(--amber)}
+.tech-day-rating.bad{color:var(--red)}
+
+.tech-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
+.tech-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
+.tech-add-name{margin-top:14px}
+
+/* Weekly summary card */
+.tech-week-card{margin-top:18px}
+.tech-week-tbl{width:100%;border-collapse:collapse}
+.tech-week-tbl thead th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 14px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
+.tech-week-tbl thead th:first-child{text-align:left}
+.tech-week-tbl tbody td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;text-align:right;font-family:var(--mono)}
+.tech-week-tbl tbody td:first-child{text-align:left;color:var(--text);font-family:var(--font);font-weight:500}
+.tech-week-tbl tbody tr:last-child td{border-bottom:none}
+.tech-week-tbl tbody tr:hover td{background:rgba(255,255,255,.02)}
+.tech-week-tbl .wk-zero{color:var(--muted2)}
+.tech-week-tbl .wk-rate.good{color:var(--accent)}
+.tech-week-tbl .wk-rate.mid{color:var(--amber)}
+.tech-week-tbl .wk-rate.bad{color:var(--red)}
+
+/* Daily job modal */
+.tech-job-list{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;max-height:55vh;overflow-y:auto;padding-right:4px}
+.tech-job-card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px}
+.tech-job-card-head{display:grid;grid-template-columns:1fr 130px 90px 28px;gap:8px;align-items:center;margin-bottom:8px}
+.tech-job-card-row{display:grid;grid-template-columns:1fr 110px;gap:8px}
+.tech-job-card select,.tech-job-card input,.tech-job-card textarea{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical}
+.tech-job-card select:focus,.tech-job-card input:focus,.tech-job-card textarea:focus{border-color:var(--accent)}
+.tech-job-rm{background:none;border:1px solid var(--border2);color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tech-job-rm:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
+.tech-duration{display:flex;gap:4px;align-items:center}
+.tech-duration input{width:46px;text-align:center;padding:7px 4px}
+.tech-duration span{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em}
+
+.tech-day-totals{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;margin:6px 0 4px;display:flex;gap:18px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.tech-day-totals strong{color:var(--text)}
+.tech-day-totals .rate-good{color:var(--accent);font-weight:600}
+.tech-day-totals .rate-mid{color:var(--amber);font-weight:600}
+.tech-day-totals .rate-bad{color:var(--red);font-weight:600}
+#techDayModal .modal{width:680px;max-width:96vw}
 .ab-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:170px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
 .ab-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
 .ab-notes-cell.empty{color:var(--muted2);font-style:italic}
@@ -900,6 +969,24 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('maintQuickModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveQuickMaintenance()">Add visit</button>
+    </div>
+  </div>
+</div>
+
+<!-- TECHNICIAN DAILY LOG MODAL -->
+<div class="overlay" id="techDayModal" onclick="if(event.target===this)closeModal('techDayModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="techDayModalTitle">Daily Log</span>
+      <button class="modal-close" onclick="closeModal('techDayModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="techDayModalMeta"></div>
+    <div class="tech-job-list" id="techJobList"></div>
+    <button class="maint-add-visit" onclick="addTechJobDraft()">+ Add Job</button>
+    <div class="tech-day-totals" id="techDayTotals"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('techDayModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTechnicianDay()">Save</button>
     </div>
   </div>
 </div>
@@ -2205,6 +2292,405 @@ async function saveQuickMaintenance(){
   }
 }
 
+// ─────────────────────────────────────────────
+// TECHNICIAN
+// Firestore: collection 'technicianWork', one doc per job:
+//   {technicianName, date:'YYYY-MM-DD', propertyId, propertyAddress,
+//    jobType, description, durationMinutes, performanceRating,
+//    createdAt, createdBy}
+// ─────────────────────────────────────────────
+const TECH_JOB_TYPES = ['Plumbing','Electrical','Roofing','HVAC','General','Other'];
+let techActiveName = '';
+let techNames = [];
+let techYear = new Date().getFullYear();
+let techMonth = new Date().getMonth();
+let techData = {}; // { 'YYYY-MM-DD': [job, ...] }
+let techActiveDate = null;
+let techDraft = []; // [{id?, propertyId, propertyAddress, jobType, description, durationMinutes, performanceRating}]
+let techOriginalIds = [];
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKey(y, m, d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+function fmtDuration(mins){
+  if(!mins || mins<=0) return '0m';
+  const h = Math.floor(mins/60);
+  const m = mins % 60;
+  if(h===0) return `${m}m`;
+  if(m===0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+function ratingClass(r){
+  if(r>=4) return 'good';
+  if(r>=3) return 'mid';
+  if(r>0) return 'bad';
+  return '';
+}
+
+async function loadTechniciansList(){
+  const snap = await db.collection('technicianWork').get();
+  const set = new Set();
+  snap.docs.forEach(d=>{
+    const n = d.data().technicianName;
+    if(n) set.add(n);
+  });
+  techNames = [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+async function loadTechnicianMonth(name, year, month){
+  techData = {};
+  if(!name) return;
+  const startKey = dateKey(year, month, 1);
+  const lastDay = new Date(year, month+1, 0).getDate();
+  const endKey = dateKey(year, month, lastDay);
+  const snap = await db.collection('technicianWork')
+    .where('technicianName','==',name)
+    .where('date','>=',startKey)
+    .where('date','<=',endKey)
+    .get();
+  snap.docs.forEach(d=>{
+    const v = {id:d.id, ...d.data()};
+    if(!techData[v.date]) techData[v.date] = [];
+    techData[v.date].push(v);
+  });
+}
+
+async function renderTechnicianView(){
+  const el = document.getElementById('technicianView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+
+  try{
+    await loadTechniciansList();
+  }catch(e){
+    console.error('loadTechniciansList', e);
+    el.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load technicians</div>${escapeHtml(e.message)}</div></div>`;
+    return;
+  }
+
+  // First-run / no technicians yet — show prompt to add one
+  if(techNames.length === 0 && !techActiveName){
+    el.innerHTML = `
+      <div class="table-card">
+        <div class="tech-empty">
+          <div class="tech-empty-title">No technicians yet</div>
+          Add a technician to start tracking work.
+          ${canEdit()?`<div class="tech-add-name"><button class="btn btn-primary btn-sm" style="width:auto" onclick="addNewTechnician()">+ Add technician</button></div>`:''}
+        </div>
+      </div>`;
+    return;
+  }
+
+  if(!techActiveName) techActiveName = techNames[0] || '';
+
+  try{
+    await loadTechnicianMonth(techActiveName, techYear, techMonth);
+  }catch(e){
+    console.error('loadTechnicianMonth', e);
+    el.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load month data</div>${escapeHtml(e.message)}</div></div>`;
+    return;
+  }
+
+  const editable = canEdit();
+  const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // Month stats
+  const allJobs = Object.values(techData).flat();
+  const totalJobs = allJobs.length;
+  const totalMins = allJobs.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+  const ratedJobs = allJobs.filter(j=>j.performanceRating>0);
+  const avgRating = ratedJobs.length ? (ratedJobs.reduce((s,j)=>s+j.performanceRating, 0) / ratedJobs.length) : 0;
+  const uniqueProps = new Set(allJobs.map(j=>j.propertyId).filter(Boolean)).size;
+
+  // Build calendar grid
+  const firstDay = new Date(techYear, techMonth, 1);
+  const startDow = firstDay.getDay();
+  const daysInMonth = new Date(techYear, techMonth+1, 0).getDate();
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear()===techYear && today.getMonth()===techMonth;
+  const todayDate = today.getDate();
+
+  let cells = '';
+  // leading blanks
+  for(let i=0; i<startDow; i++){
+    cells += `<div class="tech-cal-day outside"></div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const key = dateKey(techYear, techMonth, d);
+    const jobs = techData[key] || [];
+    const houses = new Set(jobs.map(j=>j.propertyId).filter(Boolean)).size;
+    const mins = jobs.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+    const rated = jobs.filter(j=>j.performanceRating>0);
+    const avg = rated.length ? (rated.reduce((s,j)=>s+j.performanceRating, 0) / rated.length) : 0;
+    const isToday = isCurrentMonth && d===todayDate;
+    const dis = editable ? '' : 'disabled';
+    const onclick = editable ? `onclick="openTechnicianDay('${key}')"` : '';
+    cells += `<div class="tech-cal-day ${isToday?'today':''} ${dis}" ${onclick}>
+      <div class="tech-day-num">${d}</div>
+      ${jobs.length>0?`
+        <div class="tech-day-stats">
+          <div class="ds-row"><span class="ds-jobs">${houses||jobs.length}</span> house${(houses||jobs.length)===1?'':'s'}</div>
+          <div class="ds-row ds-dur">${fmtDuration(mins)}</div>
+          ${avg>0?`<div class="ds-row"><span class="tech-day-rating ${ratingClass(avg)}">★ ${avg.toFixed(1)}</span></div>`:''}
+        </div>
+      `:''}
+    </div>`;
+  }
+  // trailing blanks to fill the row
+  const totalCells = startDow + daysInMonth;
+  const trail = (7 - (totalCells % 7)) % 7;
+  for(let i=0; i<trail; i++){
+    cells += `<div class="tech-cal-day outside"></div>`;
+  }
+
+  // Weekly summary: group jobs into weeks of the month based on calendar weeks
+  const weeks = [];
+  let weekIdx = 0;
+  const cellOffset = startDow;
+  for(let d=1; d<=daysInMonth; d++){
+    const cellPos = cellOffset + (d-1);
+    weekIdx = Math.floor(cellPos / 7);
+    if(!weeks[weekIdx]) weeks[weekIdx] = {jobs:0, mins:0, ratings:[], houses:new Set(), days:[]};
+    const key = dateKey(techYear, techMonth, d);
+    const dayJobs = techData[key] || [];
+    weeks[weekIdx].days.push(d);
+    weeks[weekIdx].jobs += dayJobs.length;
+    weeks[weekIdx].mins += dayJobs.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+    dayJobs.forEach(j=>{
+      if(j.propertyId) weeks[weekIdx].houses.add(j.propertyId);
+      if(j.performanceRating>0) weeks[weekIdx].ratings.push(j.performanceRating);
+    });
+  }
+  const weekRows = weeks.map((w,i)=>{
+    const avg = w.ratings.length ? (w.ratings.reduce((s,r)=>s+r, 0) / w.ratings.length) : 0;
+    const range = w.days.length ? `${MNAMES_FULL[techMonth].slice(0,3)} ${w.days[0]}\u2013${w.days[w.days.length-1]}` : `Week ${i+1}`;
+    return `<tr>
+      <td>${range}</td>
+      <td>${w.jobs>0?w.jobs:'<span class="wk-zero">0</span>'}</td>
+      <td>${w.houses.size>0?w.houses.size:'<span class="wk-zero">0</span>'}</td>
+      <td>${w.mins>0?fmtDuration(w.mins):'<span class="wk-zero">0m</span>'}</td>
+      <td>${avg>0?`<span class="wk-rate ${ratingClass(avg)}">★ ${avg.toFixed(1)}</span>`:'<span class="wk-zero">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // Technician dropdown options
+  const techOpts = techNames.map(n=>`<option value="${escapeAttr(n)}" ${n===techActiveName?'selected':''}>${escapeHtml(n)}</option>`).join('')
+    + `<option value="__add__">+ Add technician\u2026</option>`;
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="tech-toolbar">
+        <div class="tech-toolbar-left">
+          <label>Technician</label>
+          <select class="tech-select" onchange="changeTechName(this.value)">${techOpts}</select>
+          <div class="tech-month-nav">
+            <button class="tech-month-btn" onclick="changeTechMonth(-1)">\u2039</button>
+            <div class="tech-month-label">${MNAMES_FULL[techMonth]} ${techYear}</div>
+            <button class="tech-month-btn" onclick="changeTechMonth(1)">\u203A</button>
+          </div>
+        </div>
+        <div class="tech-stats">
+          <span><strong>${totalJobs}</strong> jobs</span>
+          <span><strong>${uniqueProps}</strong> properties</span>
+          <span><strong>${fmtDuration(totalMins)}</strong> worked</span>
+          <span>avg <strong class="${ratingClass(avgRating)}" style="color:${avgRating>=4?'var(--accent)':avgRating>=3?'var(--amber)':avgRating>0?'var(--red)':'var(--muted)'}">${avgRating>0?'★ '+avgRating.toFixed(1):'—'}</strong></span>
+        </div>
+      </div>
+      <div class="tech-cal">
+        ${DOWS.map(d=>`<div class="tech-cal-head">${d}</div>`).join('')}
+        ${cells}
+      </div>
+    </div>
+    <div class="table-card tech-week-card">
+      <div class="tech-toolbar"><div class="tech-toolbar-left">Weekly summary \u2014 ${MNAMES_FULL[techMonth]} ${techYear}</div></div>
+      <div class="tbl-wrap">
+        <table class="tech-week-tbl">
+          <thead><tr>
+            <th>Week</th>
+            <th>Jobs</th>
+            <th>Properties</th>
+            <th>Hours worked</th>
+            <th>Avg rating</th>
+          </tr></thead>
+          <tbody>${weekRows || `<tr><td colspan="5" style="text-align:center;color:var(--muted);font-family:var(--font);font-style:italic">No data for this month</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function changeTechName(v){
+  if(v === '__add__'){
+    addNewTechnician();
+    // Reset the dropdown so it doesn't stay on the placeholder option
+    await renderTechnicianView();
+    return;
+  }
+  techActiveName = v;
+  await renderTechnicianView();
+}
+
+function addNewTechnician(){
+  if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
+  const name = prompt('Technician name:');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if(!techNames.includes(trimmed)) techNames.push(trimmed);
+  techActiveName = trimmed;
+  renderTechnicianView();
+}
+
+async function changeTechMonth(dir){
+  techMonth += dir;
+  if(techMonth < 0){ techMonth = 11; techYear--; }
+  if(techMonth > 11){ techMonth = 0; techYear++; }
+  await renderTechnicianView();
+}
+
+function openTechnicianDay(date){
+  if(!canEdit()) return;
+  if(!techActiveName){ toast('Pick a technician first'); return; }
+  techActiveDate = date;
+  const existing = (techData[date] || []).slice();
+  techDraft = existing.map(j=>({
+    id: j.id,
+    propertyId: j.propertyId || '',
+    propertyAddress: j.propertyAddress || '',
+    jobType: j.jobType || 'General',
+    description: j.description || '',
+    durationMinutes: j.durationMinutes || 0,
+    performanceRating: j.performanceRating || 0
+  }));
+  techOriginalIds = existing.map(j=>j.id);
+
+  const d = new Date(date+'T00:00:00');
+  const titleDate = isNaN(d) ? date : d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('techDayModalTitle').textContent = titleDate;
+  document.getElementById('techDayModalMeta').textContent = techActiveName;
+  renderTechDraftList();
+  document.getElementById('techDayModal').classList.add('open');
+}
+
+function renderTechDraftList(){
+  const list = document.getElementById('techJobList');
+  const sortedProps = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const propOpts = `<option value="">— Select property —</option>` + sortedProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr||'(no address)')}</option>`).join('');
+
+  if(techDraft.length === 0){
+    list.innerHTML = `<div class="maint-modal-empty">No jobs yet. Click "+ Add Job" to start.</div>`;
+  } else {
+    list.innerHTML = techDraft.map((j,i)=>{
+      const hours = Math.floor((j.durationMinutes||0)/60);
+      const mins = (j.durationMinutes||0) % 60;
+      const optsWithSelected = propOpts.replace(`value="${j.propertyId}"`, `value="${j.propertyId}" selected`);
+      return `<div class="tech-job-card">
+        <div class="tech-job-card-head">
+          <select onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text)">${optsWithSelected}</select>
+          <select onchange="techDraftSet(${i},'jobType',this.value)">
+            ${TECH_JOB_TYPES.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <select onchange="techDraftSet(${i},'performanceRating',parseInt(this.value,10))">
+            <option value="0" ${!j.performanceRating?'selected':''}>★ Rate</option>
+            <option value="1" ${j.performanceRating===1?'selected':''}>★ 1</option>
+            <option value="2" ${j.performanceRating===2?'selected':''}>★ 2</option>
+            <option value="3" ${j.performanceRating===3?'selected':''}>★ 3</option>
+            <option value="4" ${j.performanceRating===4?'selected':''}>★ 4</option>
+            <option value="5" ${j.performanceRating===5?'selected':''}>★ 5</option>
+          </select>
+          <button class="tech-job-rm" title="Remove job" onclick="removeTechJobDraft(${i})">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+        <div class="tech-job-card-row">
+          <input type="text" placeholder="Description (what work was done)" value="${escapeAttr(j.description||'')}" oninput="techDraftSet(${i},'description',this.value)">
+          <div class="tech-duration">
+            <input type="number" min="0" max="23" value="${hours||''}" placeholder="0" oninput="techDraftDuration(${i},'h',this.value)">
+            <span>h</span>
+            <input type="number" min="0" max="59" value="${mins||''}" placeholder="0" oninput="techDraftDuration(${i},'m',this.value)">
+            <span>m</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Update totals footer
+  const totalJobs = techDraft.length;
+  const totalMins = techDraft.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+  const rated = techDraft.filter(j=>j.performanceRating>0);
+  const avg = rated.length ? (rated.reduce((s,j)=>s+j.performanceRating, 0) / rated.length) : 0;
+  const rateCls = avg>=4?'rate-good':avg>=3?'rate-mid':avg>0?'rate-bad':'';
+  document.getElementById('techDayTotals').innerHTML = `
+    <div><strong>${totalJobs}</strong> job${totalJobs===1?'':'s'}</div>
+    <div><strong>${fmtDuration(totalMins)}</strong> worked</div>
+    <div>avg ${avg>0?`<span class="${rateCls}">★ ${avg.toFixed(1)}</span>`:'<span style="color:var(--muted2)">—</span>'}</div>`;
+}
+
+function techDraftSet(i, field, value){
+  if(!techDraft[i]) return;
+  techDraft[i][field] = value;
+  // Recompute totals only — no full re-render to avoid losing input focus
+  if(field==='performanceRating'){
+    renderTechDraftList(); // need to redraw stars but cheap
+  }
+}
+
+function techDraftDuration(i, which, raw){
+  if(!techDraft[i]) return;
+  const v = parseInt(raw, 10) || 0;
+  const cur = techDraft[i].durationMinutes || 0;
+  let h = Math.floor(cur / 60);
+  let m = cur % 60;
+  if(which==='h') h = Math.max(0, Math.min(23, v));
+  else m = Math.max(0, Math.min(59, v));
+  techDraft[i].durationMinutes = h*60 + m;
+}
+
+function addTechJobDraft(){
+  techDraft.push({propertyId:'', propertyAddress:'', jobType:'General', description:'', durationMinutes:0, performanceRating:0});
+  renderTechDraftList();
+}
+
+function removeTechJobDraft(i){
+  techDraft.splice(i, 1);
+  renderTechDraftList();
+}
+
+async function saveTechnicianDay(){
+  if(!canEdit() || !techActiveName || !techActiveDate) return;
+  const date = techActiveDate;
+  const technicianName = techActiveName;
+  try{
+    const draftIds = techDraft.filter(j=>j.id).map(j=>j.id);
+    const toDelete = techOriginalIds.filter(id => !draftIds.includes(id));
+    for(const id of toDelete){
+      await db.collection('technicianWork').doc(id).delete();
+    }
+    for(const j of techDraft){
+      const data = {
+        technicianName,
+        date,
+        propertyId: j.propertyId || '',
+        propertyAddress: j.propertyAddress || '',
+        jobType: j.jobType || 'General',
+        description: j.description || '',
+        durationMinutes: j.durationMinutes || 0,
+        performanceRating: j.performanceRating || 0
+      };
+      if(j.id){
+        await db.collection('technicianWork').doc(j.id).update({...data, updatedAt:new Date(), updatedBy:currentUser?.name||''});
+      } else {
+        await db.collection('technicianWork').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
+      }
+    }
+    closeModal('techDayModal');
+    toast('Day saved');
+    techActiveDate = null; techDraft = []; techOriginalIds = [];
+    await renderTechnicianView();
+  }catch(e){
+    console.error('saveTechnicianDay', e);
+    toast('Error: '+e.message);
+  }
+}
+
 // Called from the Legal Cases section's Remove button. Flips the property's
 // toLegal flag back to false (so it reappears in collections), deletes the
 // legalCases doc, then re-renders the legal view.
@@ -3496,6 +3982,7 @@ function showView(v){
   if(v==='tasks') renderTasksView();
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
+  if(v==='technician') renderTechnicianView();
   if(v==='team'){
     if(!currentUser||currentUser.role!=='admin'){
       document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
