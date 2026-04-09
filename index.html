@@ -328,6 +328,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .maint-cell:hover{background:var(--surface2)}
 .maint-cell.has-visits{color:var(--accent)}
 .maint-cell.has-visits:hover{background:var(--accent-dim)}
+.maint-cell.warn{color:var(--amber);background:var(--amber-dim)}
+.maint-cell.warn:hover{background:rgba(245,201,106,0.22)}
 .maint-cell.disabled{cursor:not-allowed;opacity:.55}
 .maint-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
 .maint-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
@@ -1874,7 +1876,8 @@ async function renderMaintenanceView(){
       const visits = propMonths[key] || [];
       propTotal += visits.length;
       const has = visits.length > 0;
-      const cls = `maint-cell${has?' has-visits':' empty'}${editable?'':' disabled'}`;
+      const warn = visits.length >= 3;
+      const cls = `maint-cell${warn?' warn':has?' has-visits':' empty'}${editable?'':' disabled'}`;
       const onclick = editable ? `onclick="openMaintenanceCell('${p.id}',${m})"` : '';
       const title = maintCellTitle(visits).replace(/"/g,'&quot;');
       return `<td><div class="${cls}" ${onclick} title="${title}">${has?visits.length:'—'}</div></td>`;
