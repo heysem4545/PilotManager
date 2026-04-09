@@ -769,21 +769,21 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
-<!-- COLLECTION NOTES MODAL -->
+<!-- GENERIC POPUP EDIT MODAL (notes, lawyer info, update, court result) -->
 <div class="overlay" id="notesModal" onclick="if(event.target===this)closeModal('notesModal')">
   <div class="modal">
     <div class="modal-title">
-      Collection note
+      <span id="notesModalTitle">Note</span>
       <button class="modal-close" onclick="closeModal('notesModal')">×</button>
     </div>
     <div class="notes-modal-meta" id="notesModalAddr"></div>
     <div class="fg">
-      <label>Note</label>
-      <textarea id="notesModalText" class="notes-area" placeholder="Add details about this property's collection status…"></textarea>
+      <label id="notesModalLabel">Note</label>
+      <textarea id="notesModalText" class="notes-area" placeholder="Type details here…"></textarea>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('notesModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveCollectionNote()">Save note</button>
+      <button class="btn btn-primary btn-sm" onclick="savePopupField()">Save</button>
     </div>
   </div>
 </div>
@@ -1259,7 +1259,10 @@ async function renderAllBalances(){
     if(hasAnyBalance) rows.push({id:p.id,addr:p.addr,balances,
       notice30Date:p.notice30Date||'',notice30Pic:!!p.notice30Pic,
       notice3Date:p.notice3Date||'',notice3Pic:!!p.notice3Pic,
-      vawa:!!p.vawa,collectionNotes:p.collectionNotes||'',toLegal:!!p.toLegal});
+      vawa:!!p.vawa,collectionNotes:p.collectionNotes||'',toLegal:!!p.toLegal,
+      lawyerName:p.lawyerName||'',lawyerInfo:p.lawyerInfo||'',
+      collectionUpdate:p.collectionUpdate||'',courtDate:p.courtDate||'',
+      courtResult:p.courtResult||''});
   });
 
   // Totals row
@@ -1297,6 +1300,11 @@ async function renderAllBalances(){
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">VAWA</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Notes</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">To Legal</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Lawyer Name</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Lawyer Info</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Update</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Court Date</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Court Result</th>
             </tr>
             <tr>
               ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
@@ -1318,8 +1326,13 @@ async function renderAllBalances(){
                 <td><input type="date" class="ab-input ab-date" value="${r.notice3Date}" ${dis} onchange="abSaveField('${r.id}','notice3Date',this.value)"></td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 3 day notice" ${r.notice3Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice3Pic',this.checked)"></td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" ${r.vawa?'checked':''} ${dis} onchange="abSaveField('${r.id}','vawa',this.checked)"></td>
-                <td>${renderNotesCell(r.id, r.collectionNotes, editable)}</td>
+                <td>${renderPopupCell(r.id, r.collectionNotes, 'collectionNotes', 'Note', editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check legal" ${r.toLegal?'checked':''} ${dis} onchange="abSaveField('${r.id}','toLegal',this.checked)"></td>
+                <td><input type="text" class="ab-input ab-notes" value="${escapeHtml(r.lawyerName)}" placeholder="Lawyer name" ${dis} onchange="abSaveField('${r.id}','lawyerName',this.value)"></td>
+                <td>${renderPopupCell(r.id, r.lawyerInfo, 'lawyerInfo', 'Lawyer Info', editable)}</td>
+                <td>${renderPopupCell(r.id, r.collectionUpdate, 'collectionUpdate', 'Update', editable)}</td>
+                <td><input type="date" class="ab-input ab-date" value="${r.courtDate}" ${dis} onchange="abSaveField('${r.id}','courtDate',this.value)"></td>
+                <td>${renderPopupCell(r.id, r.courtResult, 'courtResult', 'Court Result', editable)}</td>
               </tr>`;
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
@@ -1327,7 +1340,7 @@ async function renderAllBalances(){
               ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
-              <td colspan="7"></td>
+              <td colspan="12"></td>
             </tr>
           </tbody>
         </table>
@@ -1434,38 +1447,50 @@ async function removeLegalCaseRow(propertyId){
   }
 }
 
-function renderNotesCell(id, note, editable){
-  const has = !!(note && note.trim());
-  const preview = has ? escapeHtml(note.trim().split(/\s+/).slice(0,3).join(' ')) : 'Add note…';
+function renderPopupCell(id, value, field, label, editable){
+  const has = !!(value && String(value).trim());
+  const safeLabel = label.toLowerCase();
+  const preview = has ? escapeHtml(String(value).trim().split(/\s+/).slice(0,3).join(' ')) : `Add ${safeLabel}…`;
   const cls = `ab-notes-cell${has?' has-note':''}${has?'':' empty'}${editable?'':' disabled'}`;
-  const onclick = editable ? `onclick="openNotesModal('${id}')"` : '';
+  const onclick = editable ? `onclick="openPopupEdit('${id}','${field}','${escapeAttr(label)}')"` : '';
   const icon = has
     ? `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3h7l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M5 8h6M5 11h4"/></svg>`
     : `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>`;
-  return `<div class="${cls}" ${onclick} title="${has?escapeHtml(note):'Click to add a note'}">
+  const tip = has ? escapeAttr(String(value)) : `Click to add ${safeLabel}`;
+  return `<div class="${cls}" ${onclick} title="${tip}">
     <span class="ab-notes-preview">${preview}</span>${icon}
   </div>`;
 }
 
-let activeNoteId = null;
-function openNotesModal(id){
+function escapeAttr(s){
+  return escapeHtml(s).replace(/\n/g,' ');
+}
+
+let activePopupId = null;
+let activePopupField = null;
+
+function openPopupEdit(id, field, label){
   if(!canEdit()) return;
   const p = properties.find(x=>x.id===id);
   if(!p) return;
-  activeNoteId = id;
+  activePopupId = id;
+  activePopupField = field;
+  document.getElementById('notesModalTitle').textContent = label;
+  document.getElementById('notesModalLabel').textContent = label;
   document.getElementById('notesModalAddr').textContent = p.addr || '';
-  document.getElementById('notesModalText').value = p.collectionNotes || '';
+  document.getElementById('notesModalText').value = p[field] || '';
+  document.getElementById('notesModalText').placeholder = `Type ${label.toLowerCase()} here\u2026`;
   document.getElementById('notesModal').classList.add('open');
   setTimeout(()=>document.getElementById('notesModalText').focus(),50);
 }
 
-async function saveCollectionNote(){
-  if(!activeNoteId || !canEdit()) return;
+async function savePopupField(){
+  if(!activePopupId || !activePopupField || !canEdit()) return;
   const value = document.getElementById('notesModalText').value;
   try{
-    await updatePropertyField(activeNoteId, 'collectionNotes', value);
+    await updatePropertyField(activePopupId, activePopupField, value);
     closeModal('notesModal');
-    toast('Note saved');
+    toast('Saved');
     if(currentView==='properties' && collectionViewMode==='allBalances') renderAllBalances();
   }catch(e){ toast('Error: '+e.message); }
 }
