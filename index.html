@@ -1225,6 +1225,7 @@ async function renderAllBalances(){
   // Build data: for each property, get balance per month
   const rows=[];
   properties.forEach(p=>{
+    if(p.toLegal) return; // moved to Legal Cases — hide from collections
     let hasAnyBalance=false;
     const balances=monthList.map(({m,y})=>{
       const key=monthKey(y,m);
@@ -1319,8 +1320,34 @@ async function abSaveField(id, field, value){
   if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
   try{
     await updatePropertyField(id, field, value);
-    toast('Saved');
+    if(field==='toLegal'){
+      if(value) await moveToLegalCase(id);
+      else await removeFromLegalCase(id);
+      // Re-render so the row disappears (or reappears) in All Balances
+      if(currentView==='properties' && collectionViewMode==='allBalances') renderAllBalances();
+    }
+    toast(field==='toLegal' ? (value?'Moved to Legal Cases':'Removed from Legal Cases') : 'Saved');
   }catch(e){ toast('Error: '+e.message); }
+}
+
+async function moveToLegalCase(propertyId){
+  const p = properties.find(x=>x.id===propertyId);
+  if(!p) return;
+  await db.collection('legalCases').doc(propertyId).set({
+    propertyId,
+    addr: p.addr || '',
+    notice30Date: p.notice30Date || '',
+    notice3Date: p.notice3Date || '',
+    vawa: !!p.vawa,
+    notes: p.collectionNotes || '',
+    source: 'collections',
+    createdAt: new Date(),
+    createdBy: currentUser?.name || ''
+  });
+}
+
+async function removeFromLegalCase(propertyId){
+  await db.collection('legalCases').doc(propertyId).delete();
 }
 
 function renderNotesCell(id, note, editable){
@@ -2224,8 +2251,62 @@ function escapeHtml(s){
 }
 
 async function renderLegalView(){
-  // UI cleared — Firestore "legalCases" collection is untouched.
-  document.getElementById('legalView').innerHTML = '';
+  const el = document.getElementById('legalView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  let cases = [];
+  try{
+    const snap = await db.collection('legalCases').get();
+    cases = snap.docs.map(d=>({id:d.id,...d.data()}));
+    cases.sort((a,b)=>{
+      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return tb - ta;
+    });
+  }catch(e){
+    el.innerHTML = `<div class="legal-empty"><div class="legal-empty-title">Couldn't load cases</div>${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  if(cases.length===0){
+    el.innerHTML = `<div class="table-card"><div class="legal-empty">
+      <div class="legal-empty-title">No legal cases</div>
+      Check the "To Legal" box on a property in Collection \u2192 All Balances to move it here.
+    </div></div>`;
+    return;
+  }
+
+  const body = cases.map(c=>{
+    const vawa = c.vawa
+      ? '<span class="lc-vawa yes">Yes</span>'
+      : '<span class="lc-vawa no">No</span>';
+    const notes = c.notes ? escapeHtml(c.notes) : '<span class="lc-date empty">—</span>';
+    return `<tr>
+      <td><div class="lc-addr">${escapeHtml(c.addr||'')}</div></td>
+      <td>${fmtLegalDate(c.notice30Date)}</td>
+      <td>${fmtLegalDate(c.notice3Date)}</td>
+      <td>${vawa}</td>
+      <td><div class="lc-update">${notes}</div></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="legal-toolbar">
+        <div class="legal-toolbar-left">${cases.length} case${cases.length===1?'':'s'} moved from collections</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="legal-tbl">
+          <thead><tr>
+            <th>Home Address</th>
+            <th>30 Day Notice</th>
+            <th>3 Day Notice</th>
+            <th>VAWA</th>
+            <th>Notes</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 async function _renderLegalViewFull_disabled(){
