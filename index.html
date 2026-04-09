@@ -2339,16 +2339,18 @@ async function loadTechniciansList(){
 async function loadTechnicianMonth(name, year, month){
   techData = {};
   if(!name) return;
+  // Use a single equality filter (no composite index required) and
+  // narrow to the requested month client-side. The dataset per
+  // technician is small so the extra rows are cheap.
   const startKey = dateKey(year, month, 1);
   const lastDay = new Date(year, month+1, 0).getDate();
   const endKey = dateKey(year, month, lastDay);
   const snap = await db.collection('technicianWork')
     .where('technicianName','==',name)
-    .where('date','>=',startKey)
-    .where('date','<=',endKey)
     .get();
   snap.docs.forEach(d=>{
     const v = {id:d.id, ...d.data()};
+    if(!v.date || v.date < startKey || v.date > endKey) return;
     if(!techData[v.date]) techData[v.date] = [];
     techData[v.date].push(v);
   });
