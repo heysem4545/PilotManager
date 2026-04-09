@@ -247,9 +247,29 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
 .fg label{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
-.fg input,.fg select{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .12s;width:100%}
-.fg input:focus,.fg select:focus{border-color:var(--accent)}
+.fg input,.fg select,.fg textarea{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .12s;width:100%;resize:vertical}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent)}
 .fg select option{background:var(--surface2)}
+
+/* ── LEGAL CASES ── */
+.legal-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.legal-toolbar-left{font-size:12px;color:var(--muted)}
+.legal-tbl thead th{cursor:default}
+.legal-tbl tbody td{font-size:12px;vertical-align:top}
+.legal-tbl .lc-addr{font-weight:500;color:var(--text);max-width:200px}
+.legal-tbl .lc-date{font-family:var(--mono);color:var(--text);white-space:nowrap}
+.legal-tbl .lc-date.empty{color:var(--muted2)}
+.legal-tbl .lc-update{max-width:240px;color:var(--muted);line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.legal-tbl .lc-email{color:var(--blue);font-size:11px}
+.legal-tbl .lc-vawa{display:inline-flex;font-size:10px;font-weight:500;padding:3px 8px;border-radius:5px}
+.legal-tbl .lc-vawa.yes{background:var(--purple-dim);color:var(--purple)}
+.legal-tbl .lc-vawa.no{background:var(--surface3);color:var(--muted)}
+.legal-tbl .lc-actions{display:flex;gap:6px;justify-content:flex-end}
+.legal-tbl .lc-icon-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);width:26px;height:26px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .12s;padding:0}
+.legal-tbl .lc-icon-btn:hover{color:var(--text);background:var(--surface3);border-color:var(--border2)}
+.legal-tbl .lc-icon-btn.danger:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
+.legal-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
+.legal-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
 .modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
 .pay-sum{background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:14px}
 .pay-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
@@ -698,6 +718,41 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('payModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="submitPayment()">Record payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT LEGAL CASE MODAL -->
+<div class="overlay" id="legalModal" onclick="if(event.target===this)closeModal('legalModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="legalModalTitle">Add legal case</span>
+      <button class="modal-close" onclick="closeModal('legalModal')">×</button>
+    </div>
+    <div class="fg"><label>Home address</label><input id="lc_addr" placeholder="123 Main St, Cleveland, OH"></div>
+    <div class="frow">
+      <div class="fg"><label>30 day notice date</label><input type="date" id="lc_n30"></div>
+      <div class="fg"><label>3 day notice date</label><input type="date" id="lc_n3"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>VAWA</label>
+        <select id="lc_vawa">
+          <option value="">—</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="fg"><label>Court date</label><input type="date" id="lc_court"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Lawyer name</label><input id="lc_lawyer" placeholder="Jane Doe"></div>
+      <div class="fg"><label>Lawyer email</label><input type="email" id="lc_email" placeholder="jane@firm.com"></div>
+    </div>
+    <div class="fg"><label>Update / notes</label><textarea id="lc_update" rows="4" placeholder="Latest status, court notes, follow-ups…"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('legalModal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="deleteLegalBtn" style="display:none" onclick="deleteLegalCase()">Delete</button>
+      <button class="btn btn-primary btn-sm" onclick="saveLegalCase()">Save case</button>
     </div>
   </div>
 </div>
@@ -2028,6 +2083,192 @@ async function tmNavMonth(dir){
   if(tmMonth>11){tmMonth=0;tmYear++;}
   await renderTasksView();
 }
+// ─────────────────────────────────────────────
+// LEGAL CASES
+// ─────────────────────────────────────────────
+let legalCases = [];
+let editLegalId = null;
+
+async function loadLegalCases(){
+  const snap = await db.collection('legalCases').orderBy('createdAt','desc').get();
+  legalCases = snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+function fmtLegalDate(v){
+  if(!v) return '<span class="lc-date empty">—</span>';
+  const d = new Date(v+'T00:00:00');
+  if(isNaN(d)) return `<span class="lc-date">${escapeHtml(v)}</span>`;
+  const opts={month:'short',day:'numeric',year:'numeric'};
+  return `<span class="lc-date">${d.toLocaleDateString('en-US',opts)}</span>`;
+}
+
+function escapeHtml(s){
+  if(s==null) return '';
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function renderLegalView(){
+  const el = document.getElementById('legalView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  try{
+    await loadLegalCases();
+  }catch(e){
+    el.innerHTML = `<div class="legal-empty"><div class="legal-empty-title">Couldn't load cases</div>${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  const editable = canEdit();
+  const addBtn = editable
+    ? `<button class="btn btn-primary btn-sm" onclick="openAddLegal()">+ Add Case</button>`
+    : '';
+
+  const headerRow = `
+    <thead><tr>
+      <th>Home Address</th>
+      <th>30 Day Notice</th>
+      <th>3 Day Notice</th>
+      <th>VAWA</th>
+      <th>Lawyer</th>
+      <th>Lawyer Email</th>
+      <th>Court Date</th>
+      <th>Update</th>
+      ${editable?'<th style="text-align:right">Actions</th>':''}
+    </tr></thead>`;
+
+  let body;
+  if(legalCases.length===0){
+    const cols = editable?9:8;
+    body = `<tbody><tr><td colspan="${cols}"><div class="legal-empty"><div class="legal-empty-title">No legal cases yet</div>${editable?'Click "+ Add Case" to create the first one.':'No cases have been recorded.'}</div></td></tr></tbody>`;
+  } else {
+    body = '<tbody>'+legalCases.map(c=>{
+      const vawa = c.vawa==='Yes'
+        ? '<span class="lc-vawa yes">Yes</span>'
+        : c.vawa==='No' ? '<span class="lc-vawa no">No</span>' : '<span class="lc-date empty">—</span>';
+      const emailCell = c.lawyerEmail
+        ? `<a href="mailto:${escapeHtml(c.lawyerEmail)}" class="lc-email">${escapeHtml(c.lawyerEmail)}</a>`
+        : '<span class="lc-date empty">—</span>';
+      const lawyerCell = c.lawyerName ? escapeHtml(c.lawyerName) : '<span class="lc-date empty">—</span>';
+      const updateCell = c.update ? escapeHtml(c.update) : '<span class="lc-date empty">—</span>';
+      const actions = editable ? `<td><div class="lc-actions">
+        <button class="lc-icon-btn" title="Edit" onclick="openEditLegal('${c.id}')">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>
+        </button>
+        ${currentUser.role==='admin'?`<button class="lc-icon-btn danger" title="Delete" onclick="confirmDeleteLegal('${c.id}')">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M6 4V2.5A.5.5 0 016.5 2h3a.5.5 0 01.5.5V4M5 4l.5 9a1 1 0 001 1h3a1 1 0 001-1L11 4"/></svg>
+        </button>`:''}
+      </div></td>` : '';
+      return `<tr>
+        <td><div class="lc-addr">${escapeHtml(c.addr||'')}</div></td>
+        <td>${fmtLegalDate(c.notice30)}</td>
+        <td>${fmtLegalDate(c.notice3)}</td>
+        <td>${vawa}</td>
+        <td>${lawyerCell}</td>
+        <td>${emailCell}</td>
+        <td>${fmtLegalDate(c.courtDate)}</td>
+        <td><div class="lc-update">${updateCell}</div></td>
+        ${actions}
+      </tr>`;
+    }).join('')+'</tbody>';
+  }
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="legal-toolbar">
+        <div class="legal-toolbar-left">${legalCases.length} active case${legalCases.length===1?'':'s'}</div>
+        ${addBtn}
+      </div>
+      <div class="tbl-wrap">
+        <table class="legal-tbl">${headerRow}${body}</table>
+      </div>
+    </div>`;
+}
+
+function clearLegalForm(){
+  ['lc_addr','lc_n30','lc_n3','lc_court','lc_lawyer','lc_email','lc_update'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('lc_vawa').value='';
+}
+
+function openAddLegal(){
+  if(!canEdit()) return;
+  editLegalId = null;
+  document.getElementById('legalModalTitle').textContent='Add legal case';
+  document.getElementById('deleteLegalBtn').style.display='none';
+  clearLegalForm();
+  document.getElementById('legalModal').classList.add('open');
+}
+
+function openEditLegal(id){
+  if(!canEdit()) return;
+  const c = legalCases.find(x=>x.id===id);
+  if(!c) return;
+  editLegalId = id;
+  document.getElementById('legalModalTitle').textContent='Edit legal case';
+  document.getElementById('deleteLegalBtn').style.display = currentUser.role==='admin'?'':'none';
+  document.getElementById('lc_addr').value = c.addr||'';
+  document.getElementById('lc_n30').value = c.notice30||'';
+  document.getElementById('lc_n3').value = c.notice3||'';
+  document.getElementById('lc_vawa').value = c.vawa||'';
+  document.getElementById('lc_court').value = c.courtDate||'';
+  document.getElementById('lc_lawyer').value = c.lawyerName||'';
+  document.getElementById('lc_email').value = c.lawyerEmail||'';
+  document.getElementById('lc_update').value = c.update||'';
+  document.getElementById('legalModal').classList.add('open');
+}
+
+async function saveLegalCase(){
+  if(!canEdit()) return;
+  const addr = document.getElementById('lc_addr').value.trim();
+  if(!addr){ toast('Please enter a home address'); return; }
+  const data = {
+    addr,
+    notice30: document.getElementById('lc_n30').value || '',
+    notice3: document.getElementById('lc_n3').value || '',
+    vawa: document.getElementById('lc_vawa').value || '',
+    lawyerName: document.getElementById('lc_lawyer').value.trim(),
+    lawyerEmail: document.getElementById('lc_email').value.trim(),
+    courtDate: document.getElementById('lc_court').value || '',
+    update: document.getElementById('lc_update').value.trim(),
+    updatedAt: new Date(),
+    updatedBy: currentUser?.name || ''
+  };
+  try{
+    if(editLegalId){
+      await db.collection('legalCases').doc(editLegalId).update(data);
+      toast('Case updated');
+    } else {
+      data.createdAt = new Date();
+      data.createdBy = currentUser?.name || '';
+      await db.collection('legalCases').add(data);
+      toast('Case added');
+    }
+    closeModal('legalModal');
+    await renderLegalView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function confirmDeleteLegal(id){
+  if(currentUser.role!=='admin') return;
+  if(!confirm('Delete this legal case? This cannot be undone.')) return;
+  try{
+    await db.collection('legalCases').doc(id).delete();
+    toast('Case deleted');
+    await renderLegalView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function deleteLegalCase(){
+  if(!editLegalId || currentUser.role!=='admin') return;
+  if(!confirm('Delete this legal case? This cannot be undone.')) return;
+  try{
+    await db.collection('legalCases').doc(editLegalId).delete();
+    closeModal('legalModal');
+    toast('Case deleted');
+    await renderLegalView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
 function exportCSV(){
   const rows=[['Address','Status','Tenant','Rent','CMHA','Tenant Portion','CMHA Paid','Tenant Paid','Collected','Balance']];
   properties.forEach(p=>rows.push([`"${p.addr}"`,p.status,`"${p.tenant||''}"`,p.rent,p.cmha,p.tenantPortion,p.cmhaPaid,p.tenantPaid,p.collected,p.balance]));
@@ -2081,7 +2322,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['meetings','legal','maintenance','notices','leads','available','utility','tenants','inspections'];
+  const comingSoon = ['meetings','maintenance','notices','leads','available','utility','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -2109,6 +2350,7 @@ function showView(v){
   }
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
+  if(v==='legal') renderLegalView();
   if(v==='team'){
     if(!currentUser||currentUser.role!=='admin'){
       document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
