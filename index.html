@@ -270,6 +270,27 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .legal-tbl .lc-icon-btn.danger:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
 .legal-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
 .legal-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
+.lc-chevron{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;cursor:pointer;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);transition:all .15s;flex-shrink:0;margin-right:8px;vertical-align:middle}
+.lc-chevron:hover{color:var(--text);background:var(--surface3)}
+.lc-chevron svg{width:11px;height:11px;transition:transform .18s}
+.lc-chevron.open svg{transform:rotate(90deg)}
+.lc-total{font-family:var(--mono);font-weight:600;color:var(--red);white-space:nowrap}
+.lc-total.zero{color:var(--muted2)}
+.lc-detail-row{background:var(--surface2)}
+.lc-detail-row td{padding:0 !important;border-bottom:1px solid var(--border) !important}
+.lc-detail-inner{padding:14px 22px 18px}
+.lc-detail-title{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.lc-detail-table{width:auto;border-collapse:collapse;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.lc-detail-table th{font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:7px 14px;text-align:right;background:var(--surface2);border-bottom:1px solid var(--border);cursor:default}
+.lc-detail-table th:first-child{text-align:left}
+.lc-detail-table td{padding:7px 14px;text-align:right;border-bottom:1px solid var(--border);font-family:var(--mono)}
+.lc-detail-table td:first-child{text-align:left;font-family:var(--font);color:var(--text);font-weight:500}
+.lc-detail-table tr:last-child td{border-bottom:none}
+.lc-detail-table .lc-cmha{color:var(--blue)}
+.lc-detail-table .lc-tenant{color:var(--amber)}
+.lc-detail-table .lc-row-total{font-weight:600;color:var(--red)}
+.lc-detail-table tfoot td{background:var(--surface2);font-weight:600;border-top:2px solid var(--border)}
+.lc-detail-empty{font-size:11px;color:var(--muted);font-style:italic}
 
 /* ── ALL BALANCES INLINE EDITS ── */
 .ab-input{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 7px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .12s;width:100%;min-width:0}
@@ -1333,6 +1354,36 @@ async function abSaveField(id, field, value){
 async function moveToLegalCase(propertyId){
   const p = properties.find(x=>x.id===propertyId);
   if(!p) return;
+
+  // Make sure we have month data for the full current year so the snapshot
+  // captures every unpaid month, not just whatever was in view.
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  for(let m=0; m<=curMonth; m++){
+    const key = monthKey(curYear, m);
+    const loaded = (monthData[propertyId]||{})[key] !== undefined
+      || Object.values(monthData).some(pd => pd[key] !== undefined);
+    if(!loaded) await loadMonthData(key);
+  }
+
+  // Build a snapshot of every month with an outstanding balance.
+  const balances = [];
+  let totalCmhaBal = 0, totalTenantBal = 0;
+  for(let m=0; m<=curMonth; m++){
+    const key = monthKey(curYear, m);
+    const md = (monthData[propertyId]||{})[key] || {};
+    const cmha = md.cmha||0, cmhaPaid = md.cmhaPaid||0;
+    const tp = md.tenantPortion||0, tPaid = md.tenantPaid||0;
+    const cmhaBal = Math.max(0, cmha-cmhaPaid);
+    const tenantBal = Math.max(0, tp-tPaid);
+    if(cmhaBal>0 || tenantBal>0){
+      balances.push({monthKey:key, month:m, year:curYear, cmhaBal, tenantBal});
+      totalCmhaBal += cmhaBal;
+      totalTenantBal += tenantBal;
+    }
+  }
+
   await db.collection('legalCases').doc(propertyId).set({
     propertyId,
     addr: p.addr || '',
@@ -1340,6 +1391,11 @@ async function moveToLegalCase(propertyId){
     notice3Date: p.notice3Date || '',
     vawa: !!p.vawa,
     notes: p.collectionNotes || '',
+    balances,
+    totalCmhaBal,
+    totalTenantBal,
+    totalBalance: totalCmhaBal + totalTenantBal,
+    snapshotYear: curYear,
     source: 'collections',
     createdAt: new Date(),
     createdBy: currentUser?.name || ''
@@ -2275,24 +2331,67 @@ async function renderLegalView(){
     return;
   }
 
+  const MNAMES_FULL2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
   const body = cases.map(c=>{
     const vawa = c.vawa
       ? '<span class="lc-vawa yes">Yes</span>'
       : '<span class="lc-vawa no">No</span>';
     const notes = c.notes ? escapeHtml(c.notes) : '<span class="lc-date empty">—</span>';
+    const total = (c.totalBalance!=null) ? c.totalBalance : ((c.totalCmhaBal||0)+(c.totalTenantBal||0));
+    const totalCell = total>0
+      ? `<span class="lc-total">${fmt(total)}</span>`
+      : `<span class="lc-total zero">$0</span>`;
+
+    const balances = Array.isArray(c.balances) ? c.balances : [];
+    let detailInner;
+    if(balances.length===0){
+      detailInner = `<div class="lc-detail-empty">No outstanding monthly balances were captured for this case.</div>`;
+    } else {
+      const rowsHtml = balances.map(b=>{
+        const label = `${MNAMES_FULL2[b.month]||''} ${b.year||''}`.trim();
+        const rowTotal = (b.cmhaBal||0)+(b.tenantBal||0);
+        return `<tr>
+          <td>${label}</td>
+          <td class="lc-cmha">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td>
+          <td class="lc-tenant">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>
+          <td class="lc-row-total">${fmt(rowTotal)}</td>
+        </tr>`;
+      }).join('');
+      detailInner = `
+        <div class="lc-detail-title">Unpaid months snapshot${c.snapshotYear?' \u2014 '+c.snapshotYear:''}</div>
+        <table class="lc-detail-table">
+          <thead><tr>
+            <th>Month</th><th>CMHA balance</th><th>Tenant balance</th><th>Total</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot><tr>
+            <td>Total</td>
+            <td class="lc-cmha">${fmt(c.totalCmhaBal||0)}</td>
+            <td class="lc-tenant">${fmt(c.totalTenantBal||0)}</td>
+            <td class="lc-row-total">${fmt(total)}</td>
+          </tr></tfoot>
+        </table>`;
+    }
+
+    const safeId = (c.id||'').replace(/[^a-zA-Z0-9_-]/g,'_');
     return `<tr>
-      <td><div class="lc-addr">${escapeHtml(c.addr||'')}</div></td>
+      <td><span class="lc-chevron" id="lc-chev-${safeId}" onclick="toggleLegalDetail('${safeId}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><span class="lc-addr">${escapeHtml(c.addr||'')}</span></td>
       <td>${fmtLegalDate(c.notice30Date)}</td>
       <td>${fmtLegalDate(c.notice3Date)}</td>
       <td>${vawa}</td>
       <td><div class="lc-update">${notes}</div></td>
+      <td>${totalCell}</td>
+    </tr>
+    <tr class="lc-detail-row" id="lc-detail-${safeId}" style="display:none">
+      <td colspan="6"><div class="lc-detail-inner">${detailInner}</div></td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `
     <div class="table-card">
       <div class="legal-toolbar">
-        <div class="legal-toolbar-left">${cases.length} case${cases.length===1?'':'s'} moved from collections</div>
+        <div class="legal-toolbar-left">${cases.length} case${cases.length===1?'':'s'} moved from collections \u2014 click a row to see the unpaid months</div>
       </div>
       <div class="tbl-wrap">
         <table class="legal-tbl">
@@ -2302,11 +2401,21 @@ async function renderLegalView(){
             <th>3 Day Notice</th>
             <th>VAWA</th>
             <th>Notes</th>
+            <th>Total Owed</th>
           </tr></thead>
           <tbody>${body}</tbody>
         </table>
       </div>
     </div>`;
+}
+
+function toggleLegalDetail(safeId){
+  const row = document.getElementById('lc-detail-'+safeId);
+  const chev = document.getElementById('lc-chev-'+safeId);
+  if(!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'table-row';
+  if(chev) chev.classList.toggle('open', !open);
 }
 
 async function _renderLegalViewFull_disabled(){
