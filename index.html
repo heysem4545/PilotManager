@@ -1420,6 +1420,23 @@ async function removeFromLegalCase(propertyId){
   await db.collection('legalCases').doc(propertyId).delete();
 }
 
+// Called from the Legal Cases section's Remove button. Flips the property's
+// toLegal flag back to false (so it reappears in collections), deletes the
+// legalCases doc, then re-renders the legal view.
+async function removeLegalCaseRow(propertyId){
+  if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
+  if(!confirm('Remove this case from Legal Cases? The property will return to the Collection view.')) return;
+  try{
+    await updatePropertyField(propertyId, 'toLegal', false);
+    await removeFromLegalCase(propertyId);
+    toast('Removed from Legal Cases');
+    await renderLegalView();
+  }catch(e){
+    console.error('removeLegalCaseRow', e);
+    toast('Error: '+e.message);
+  }
+}
+
 function renderNotesCell(id, note, editable){
   const has = !!(note && note.trim());
   const preview = has ? escapeHtml(note.trim().split(/\s+/).slice(0,3).join(' ')) : 'Add note…';
@@ -2389,6 +2406,9 @@ async function renderLegalView(){
     }
 
     const safeId = (c.id||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const removeBtn = canEdit() ? `<button class="lc-icon-btn danger" title="Remove from Legal — return property to Collection" onclick="removeLegalCaseRow('${c.id}')">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+    </button>` : '';
     return `<tr>
       <td><span class="lc-chevron" id="lc-chev-${safeId}" onclick="toggleLegalDetail('${safeId}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><span class="lc-addr">${escapeHtml(c.addr||'')}</span></td>
       <td>${fmtLegalDate(c.notice30Date)}</td>
@@ -2396,9 +2416,10 @@ async function renderLegalView(){
       <td>${vawa}</td>
       <td><div class="lc-update">${notes}</div></td>
       <td>${totalCell}</td>
+      <td style="text-align:right">${removeBtn}</td>
     </tr>
     <tr class="lc-detail-row" id="lc-detail-${safeId}" style="display:none">
-      <td colspan="6"><div class="lc-detail-inner">${detailInner}</div></td>
+      <td colspan="7"><div class="lc-detail-inner">${detailInner}</div></td>
     </tr>`;
   }).join('');
 
@@ -2416,6 +2437,7 @@ async function renderLegalView(){
             <th>VAWA</th>
             <th>Notes</th>
             <th>Total Owed</th>
+            <th style="text-align:right">Actions</th>
           </tr></thead>
           <tbody>${body}</tbody>
         </table>
