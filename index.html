@@ -585,6 +585,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 3l-2 2-2-2 2-2zM3 13l2-2 2 2-2 2zM11 5L5 11"/></svg>
         Maintenance
       </button>
+      <button class="nav-item" id="nav-technician" onclick="showView('technician')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5"/><path d="M11.5 2.5l1.5 1.5-1.5 1.5"/></svg>
+        Technician
+      </button>
       <button class="nav-item" id="nav-notices" onclick="showView('notices')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M5 6h6M5 9h4"/></svg>
         Notice Papers
@@ -750,6 +754,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="meetingsView" style="display:none"></div>
       <div id="legalView" style="display:none"></div>
       <div id="maintenanceView" style="display:none"></div>
+      <div id="technicianView" style="display:none"></div>
       <div id="noticesView" style="display:none"></div>
       <div id="leadsView" style="display:none"></div>
       <div id="availableView" style="display:none"></div>
@@ -3427,7 +3432,7 @@ function showView(v){
   const viewMap = {
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
-    legal:'legalView', maintenance:'maintenanceView', notices:'noticesView',
+    legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', inspections:'inspectionsView'
   };
@@ -3453,7 +3458,7 @@ function showView(v){
     dashboard:'Portfolio Dashboard', properties:'Properties',
     monthly:'Monthly Report', team:'Team Management',
     tasks:'Task Management', meetings:'Meeting Tracking',
-    legal:'Legal Cases', maintenance:'Maintenance Records',
+    legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', inspections:'Inspection Tracker'
