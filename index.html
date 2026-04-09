@@ -1850,6 +1850,9 @@ async function renderMaintenanceView(){
 
   const MNAMES_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const editable = canEdit();
+  // Pull every property from the global `properties` array (loaded from
+  // Firestore via loadProperties() — same source the All Properties view uses).
+  // No filter is applied, so every property in the collection becomes a row.
   const sortedProps = [...properties].sort((a,b)=> (a.addr||'').localeCompare(b.addr||''));
 
   const yearOpts = [];
@@ -1882,8 +1885,11 @@ async function renderMaintenanceView(){
       const title = maintCellTitle(visits).replace(/"/g,'&quot;');
       return `<td><div class="${cls}" ${onclick} title="${title}">${has?visits.length:'—'}</div></td>`;
     }).join('');
+    const addrLabel = p.addr && p.addr.trim()
+      ? escapeHtml(p.addr)
+      : `<span style="color:var(--muted2);font-style:italic">(no address)</span>`;
     return `<tr>
-      <td>${escapeHtml(p.addr||'')}</td>
+      <td>${addrLabel}</td>
       ${cells}
       <td><div class="maint-cell ${propTotal>0?'has-visits':'empty'}" style="cursor:default">${propTotal>0?propTotal:'—'}</div></td>
     </tr>`;
@@ -1900,6 +1906,8 @@ async function renderMaintenanceView(){
         <div class="maint-toolbar-left">
           <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Year:</span>
           <select class="maint-year-select" onchange="changeMaintenanceYear(this.value)">${yearOpts.join('')}</select>
+          <span><strong style="color:var(--text)">${sortedProps.length}</strong> propert${sortedProps.length===1?'y':'ies'} tracked</span>
+          <span>\u2022</span>
           <span>${totalVisits} visit${totalVisits===1?'':'s'} in ${maintenanceYear}</span>
         </div>
         ${editable?`<button class="btn btn-primary btn-sm" onclick="openQuickMaintenance()">+ Add Maintenance</button>`:''}
