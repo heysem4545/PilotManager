@@ -2224,6 +2224,11 @@ function escapeHtml(s){
 }
 
 async function renderLegalView(){
+  // UI cleared — Firestore "legalCases" collection is untouched.
+  document.getElementById('legalView').innerHTML = '';
+}
+
+async function _renderLegalViewFull_disabled(){
   const el = document.getElementById('legalView');
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
   try{
