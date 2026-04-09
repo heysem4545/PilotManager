@@ -270,6 +270,23 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .legal-tbl .lc-icon-btn.danger:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
 .legal-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
 .legal-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
+
+/* ── ALL BALANCES INLINE EDITS ── */
+.ab-input{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 7px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .12s;width:100%;min-width:0}
+.ab-input:focus{border-color:var(--accent)}
+.ab-input::-webkit-calendar-picker-indicator{filter:invert(.7) brightness(.8);cursor:pointer}
+.ab-input:disabled{opacity:.55;cursor:not-allowed}
+.ab-date{min-width:118px}
+.ab-notes{min-width:140px}
+.ab-check-cell{text-align:center}
+.ab-check{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);cursor:pointer;position:relative;vertical-align:middle;transition:all .12s}
+.ab-check:hover{border-color:var(--muted)}
+.ab-check:checked{background:var(--accent);border-color:var(--accent)}
+.ab-check:checked::after{content:'';position:absolute;left:4px;top:0px;width:5px;height:9px;border:solid #0d0d10;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.ab-check.legal:checked{background:var(--red);border-color:var(--red)}
+.ab-check.legal:checked::after{border-color:#fff}
+.ab-check:disabled{opacity:.4;cursor:not-allowed}
+.ab-extra-th{font-size:9px;color:var(--muted);text-align:center;white-space:nowrap}
 .modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
 .pay-sum{background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:14px}
 .pay-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
@@ -1008,6 +1025,12 @@ async function deleteProperty(id) {
   await db.collection('properties').doc(id).delete();
 }
 
+async function updatePropertyField(id, field, value){
+  await db.collection('properties').doc(id).update({[field]:value, updatedAt:new Date()});
+  const p = properties.find(x=>x.id===id);
+  if(p) p[field] = value;
+}
+
 // ─────────────────────────────────────────────
 // CALCULATIONS
 // ─────────────────────────────────────────────
@@ -1184,7 +1207,9 @@ async function renderAllBalances(){
       if(cmhaBal>0||tenantBal>0) hasAnyBalance=true;
       return {cmhaBal,tenantBal};
     });
-    if(hasAnyBalance) rows.push({addr:p.addr,balances});
+    if(hasAnyBalance) rows.push({id:p.id,addr:p.addr,balances,
+      notice30Date:p.notice30Date||'',notice3Date:p.notice3Date||'',
+      vawa:!!p.vawa,collectionNotes:p.collectionNotes||'',toLegal:!!p.toLegal});
   });
 
   // Totals row
@@ -1194,6 +1219,7 @@ async function renderAllBalances(){
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
 
+  const editable = canEdit();
   const abEl=document.getElementById('allBalancesView');
   abEl.innerHTML=`
     <div class="table-card">
@@ -1214,6 +1240,11 @@ async function renderAllBalances(){
               <th rowspan="2" style="vertical-align:bottom;min-width:140px">Address</th>
               ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">30 Day Notice</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">3 Day Notice</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">VAWA</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Notes</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">To Legal</th>
             </tr>
             <tr>
               ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
@@ -1224,11 +1255,17 @@ async function renderAllBalances(){
             ${rows.map(r=>{
               const rowTotalC=r.balances.reduce((s,b)=>s+b.cmhaBal,0);
               const rowTotalT=r.balances.reduce((s,b)=>s+b.tenantBal,0);
+              const dis = editable?'':'disabled';
               return `<tr>
                 <td><div class="addr-main">${r.addr}</div></td>
                 ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
+                <td><input type="date" class="ab-input ab-date" value="${r.notice30Date}" ${dis} onchange="abSaveField('${r.id}','notice30Date',this.value)"></td>
+                <td><input type="date" class="ab-input ab-date" value="${r.notice3Date}" ${dis} onchange="abSaveField('${r.id}','notice3Date',this.value)"></td>
+                <td class="ab-check-cell"><input type="checkbox" class="ab-check" ${r.vawa?'checked':''} ${dis} onchange="abSaveField('${r.id}','vawa',this.checked)"></td>
+                <td><input type="text" class="ab-input ab-notes" value="${escapeHtml(r.collectionNotes)}" placeholder="Add note…" ${dis} onchange="abSaveField('${r.id}','collectionNotes',this.value)"></td>
+                <td class="ab-check-cell"><input type="checkbox" class="ab-check legal" ${r.toLegal?'checked':''} ${dis} onchange="abSaveField('${r.id}','toLegal',this.checked)"></td>
               </tr>`;
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
@@ -1236,11 +1273,20 @@ async function renderAllBalances(){
               ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
+              <td colspan="5"></td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>`;
+}
+
+async function abSaveField(id, field, value){
+  if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
+  try{
+    await updatePropertyField(id, field, value);
+    toast('Saved');
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 function filteredData(){
