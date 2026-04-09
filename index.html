@@ -568,6 +568,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 
       <!-- PROPERTIES VIEW -->
       <div id="propsView" style="display:none">
+        <div id="collectionToggle" style="display:none;margin-bottom:12px;gap:8px;align-items:center" class="ftabs"></div>
         <div class="table-card">
           <div class="month-bar" id="monthBar"></div>
           <div class="toolbar">
@@ -1042,14 +1043,18 @@ function renderDonut(){
 
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
+  const toggleEl=document.getElementById('collectionToggle');
   if(currentFilter==='balance'){
-    el.style.display='';
-    el.innerHTML=`<div style="display:flex;align-items:center;gap:8px">
+    // Hide inner filter tabs, show collection toggle above card
+    el.style.display='none';
+    toggleEl.style.display='flex';
+    toggleEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">All Balances</button>
-    </div>`;
+    `;
     return;
   }
+  toggleEl.style.display='none';
   el.style.display='';
   const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented'},{k:'VACANT',l:'Vacant'},{k:'EVICTION',l:'Eviction'},{k:'CONSTRUCTION',l:'Construction'},{k:'balance',l:'Has Balance'}];
   el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
@@ -1065,14 +1070,21 @@ function switchCollectionView(mode){
 }
 
 function renderCollectionView(){
-  const tableCard=document.querySelector('#propsView .table-card');
+  const tblWrap=document.querySelector('#propsView .table-card .tbl-wrap');
+  const tblFooter=document.querySelector('#propsView .table-card .tbl-footer');
+  const toolbar=document.querySelector('#propsView .table-card .toolbar');
   const abView=document.getElementById('allBalancesView');
   if(currentFilter==='balance'&&collectionViewMode==='allBalances'){
-    tableCard.style.display='none';
+    // Keep month-bar visible, hide the monthly table portion
+    if(tblWrap) tblWrap.style.display='none';
+    if(tblFooter) tblFooter.style.display='none';
+    if(toolbar) toolbar.style.display='none';
     abView.style.display='block';
     renderAllBalances();
   } else {
-    tableCard.style.display='';
+    if(tblWrap) tblWrap.style.display='';
+    if(tblFooter) tblFooter.style.display='';
+    if(toolbar) toolbar.style.display='';
     abView.style.display='none';
     renderTable();
   }
