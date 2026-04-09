@@ -8,6 +8,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Collection History — authenticated users can read and write.
+    match /collectionHistory/{historyId} {
+      allow read, write: if request.auth != null;
+    }
+
     // NOTE: Rules for other collections (properties, monthlyData, users,
     // invites, tasks) currently live only in the Firebase console and are
     // not yet mirrored here. Merge them in before deploying this file via

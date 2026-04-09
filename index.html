@@ -669,6 +669,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           </div>
         </div>
         <div id="allBalancesView" style="display:none"></div>
+        <div id="historyView" style="display:none"></div>
       </div>
 
       <!-- TEAM VIEW (admin only) -->
@@ -1178,6 +1179,7 @@ function renderFilterTabs(){
     toggleEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">All Balances</button>
+      <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
     return;
   }
@@ -1201,18 +1203,28 @@ function renderCollectionView(){
   const tblFooter=document.querySelector('#propsView .table-card .tbl-footer');
   const toolbar=document.querySelector('#propsView .table-card .toolbar');
   const abView=document.getElementById('allBalancesView');
-  if(currentFilter==='balance'&&collectionViewMode==='allBalances'){
-    // Keep month-bar visible, hide the monthly table portion
+  const histView=document.getElementById('historyView');
+  const isBalance = currentFilter==='balance';
+  if(isBalance && collectionViewMode==='allBalances'){
     if(tblWrap) tblWrap.style.display='none';
     if(tblFooter) tblFooter.style.display='none';
     if(toolbar) toolbar.style.display='none';
     abView.style.display='block';
+    histView.style.display='none';
     renderAllBalances();
+  } else if(isBalance && collectionViewMode==='history'){
+    if(tblWrap) tblWrap.style.display='none';
+    if(tblFooter) tblFooter.style.display='none';
+    if(toolbar) toolbar.style.display='none';
+    abView.style.display='none';
+    histView.style.display='block';
+    renderCollectionHistory();
   } else {
     if(tblWrap) tblWrap.style.display='';
     if(tblFooter) tblFooter.style.display='';
     if(toolbar) toolbar.style.display='';
     abView.style.display='none';
+    histView.style.display='none';
     renderTable();
   }
 }
@@ -1245,6 +1257,7 @@ async function renderAllBalances(){
   // Build data: for each property, get balance per month
   const rows=[];
   properties.forEach(p=>{
+    if(p.archivedToHistory) return; // sent to Collection History — hide here
     let hasAnyBalance=false;
     const balances=monthList.map(({m,y})=>{
       const key=monthKey(y,m);
@@ -1305,6 +1318,7 @@ async function renderAllBalances(){
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Update</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Court Date</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Court Result</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Send to History</th>
             </tr>
             <tr>
               ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
@@ -1333,6 +1347,7 @@ async function renderAllBalances(){
                 <td>${renderPopupCell(r.id, r.collectionUpdate, 'collectionUpdate', 'Update', editable)}</td>
                 <td><input type="date" class="ab-input ab-date" value="${r.courtDate}" ${dis} onchange="abSaveField('${r.id}','courtDate',this.value)"></td>
                 <td>${renderPopupCell(r.id, r.courtResult, 'courtResult', 'Court Result', editable)}</td>
+                <td class="ab-check-cell"><input type="checkbox" class="ab-check legal" title="Send this row to Collection History" ${dis} onchange="abSaveField('${r.id}','sendToHistory',this.checked)"></td>
               </tr>`;
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
@@ -1340,7 +1355,7 @@ async function renderAllBalances(){
               ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
-              <td colspan="12"></td>
+              <td colspan="13"></td>
             </tr>
           </tbody>
         </table>
@@ -1350,10 +1365,19 @@ async function renderAllBalances(){
 
 async function abSaveField(id, field, value){
   if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
+  // sendToHistory is a one-shot action, not a persisted property field.
+  if(field==='sendToHistory'){
+    if(!value) return;
+    try{
+      await sendPropertyToHistory(id);
+      toast('Sent to Collection History');
+      renderAllBalances();
+    }catch(e){ console.error(e); toast('Error: '+e.message); }
+    return;
+  }
   try{
     await updatePropertyField(id, field, value);
     if(field==='toLegal'){
-      // Just toggle the row highlight in place — no longer moves to Legal Cases.
       const row = document.getElementById('ab-row-'+id);
       if(row) row.classList.toggle('to-legal', !!value);
     }
@@ -1428,6 +1452,239 @@ async function moveToLegalCase(propertyId){
 
 async function removeFromLegalCase(propertyId){
   await db.collection('legalCases').doc(propertyId).delete();
+}
+
+// ─────────────────────────────────────────────
+// COLLECTION HISTORY
+// ─────────────────────────────────────────────
+async function sendPropertyToHistory(propertyId){
+  const p = properties.find(x=>x.id===propertyId);
+  if(!p){ console.warn('[sendPropertyToHistory] property not found', propertyId); return; }
+
+  // Snapshot the same 24-month window we use for legal cases so the
+  // history doc is comprehensive regardless of the All Balances range filter.
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  const monthsToCheck = [];
+  for(let m=0; m<=11; m++) monthsToCheck.push({y:curYear-1, m});
+  for(let m=0; m<=curMonth; m++) monthsToCheck.push({y:curYear, m});
+
+  for(const {y, m} of monthsToCheck){
+    const key = monthKey(y, m);
+    const cached = Object.values(monthData).some(pd => pd[key] !== undefined);
+    if(!cached) await loadMonthData(key);
+  }
+
+  const balances = [];
+  let totalCmhaBal = 0, totalTenantBal = 0;
+  for(const {y, m} of monthsToCheck){
+    const key = monthKey(y, m);
+    const md = (monthData[propertyId]||{})[key] || {};
+    const cmha = md.cmha||0, cmhaPaid = md.cmhaPaid||0;
+    const tp = md.tenantPortion||0, tPaid = md.tenantPaid||0;
+    const cmhaBal = Math.max(0, cmha-cmhaPaid);
+    const tenantBal = Math.max(0, tp-tPaid);
+    if(cmhaBal>0 || tenantBal>0){
+      balances.push({monthKey:key, month:m, year:y, cmhaBal, tenantBal});
+      totalCmhaBal += cmhaBal;
+      totalTenantBal += tenantBal;
+    }
+  }
+
+  const snapshot = {
+    propertyId,
+    addr: p.addr || '',
+    notice30Date: p.notice30Date || '',
+    notice30Pic: !!p.notice30Pic,
+    notice3Date: p.notice3Date || '',
+    notice3Pic: !!p.notice3Pic,
+    vawa: !!p.vawa,
+    collectionNotes: p.collectionNotes || '',
+    toLegal: !!p.toLegal,
+    lawyerName: p.lawyerName || '',
+    lawyerInfo: p.lawyerInfo || '',
+    collectionUpdate: p.collectionUpdate || '',
+    courtDate: p.courtDate || '',
+    courtResult: p.courtResult || '',
+    balances,
+    totalCmhaBal,
+    totalTenantBal,
+    totalBalance: totalCmhaBal + totalTenantBal,
+    archivedAt: new Date(),
+    archivedBy: currentUser?.name || ''
+  };
+
+  console.log(`[sendPropertyToHistory] ${p.addr || propertyId}: ${balances.length} unpaid month(s), total $${totalCmhaBal+totalTenantBal}`);
+
+  await db.collection('collectionHistory').doc(propertyId).set(snapshot);
+  await updatePropertyField(propertyId, 'archivedToHistory', true);
+}
+
+async function restoreFromHistory(propertyId){
+  if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
+  if(!confirm('Restore this property to All Balances?')) return;
+  try{
+    await db.collection('collectionHistory').doc(propertyId).delete();
+    await updatePropertyField(propertyId, 'archivedToHistory', false);
+    toast('Restored to All Balances');
+    renderCollectionHistory();
+  }catch(e){
+    console.error('restoreFromHistory', e);
+    toast('Error: '+e.message);
+  }
+}
+
+async function renderCollectionHistory(){
+  const el = document.getElementById('historyView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  let entries = [];
+  try{
+    const snap = await db.collection('collectionHistory').get();
+    entries = snap.docs.map(d=>({id:d.id,...d.data()}));
+    entries.sort((a,b)=>{
+      const ta = a.archivedAt?.toMillis ? a.archivedAt.toMillis() : 0;
+      const tb = b.archivedAt?.toMillis ? b.archivedAt.toMillis() : 0;
+      return tb - ta;
+    });
+  }catch(e){
+    el.innerHTML = `<div class="table-card"><div class="legal-empty"><div class="legal-empty-title">Couldn't load history</div>${escapeHtml(e.message)}</div></div>`;
+    return;
+  }
+
+  if(entries.length===0){
+    el.innerHTML = `<div class="table-card"><div class="legal-empty">
+      <div class="legal-empty-title">No archived rows</div>
+      Check the "Send to History" box on a row in All Balances to archive it here.
+    </div></div>`;
+    return;
+  }
+
+  const editable = canEdit();
+  const MNAMES_FULL2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const previewText = (s)=>{
+    if(!s || !String(s).trim()) return '<span class="lc-date empty">—</span>';
+    const txt = String(s).trim();
+    const head = txt.split(/\s+/).slice(0,3).join(' ');
+    return `<span class="lc-update" title="${escapeAttr(txt)}">${escapeHtml(head)}${txt.split(/\s+/).length>3?'…':''}</span>`;
+  };
+  const fmtDt = (v)=>{
+    if(!v) return '<span class="lc-date empty">—</span>';
+    const d = new Date(v+'T00:00:00');
+    if(isNaN(d)) return `<span class="lc-date">${escapeHtml(v)}</span>`;
+    return `<span class="lc-date">${d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>`;
+  };
+  const fmtArchived = (ts)=>{
+    if(!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    if(isNaN(d)) return '—';
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  };
+  const yn = (b)=> b ? '<span class="lc-vawa yes">Yes</span>' : '<span class="lc-vawa no">No</span>';
+  const checkmark = (b)=> b ? '<span style="color:var(--accent)">✓</span>' : '<span class="lc-date empty">—</span>';
+
+  const body = entries.map(e=>{
+    const safeId = (e.id||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const balances = Array.isArray(e.balances) ? e.balances : [];
+    const total = (e.totalBalance!=null) ? e.totalBalance : ((e.totalCmhaBal||0)+(e.totalTenantBal||0));
+    const totalCell = total>0
+      ? `<span class="lc-total">${fmt(total)}</span>`
+      : `<span class="lc-total zero">$0</span>`;
+
+    let detailInner;
+    if(balances.length===0){
+      detailInner = `<div class="lc-detail-empty">No outstanding monthly balances were captured at the time of archive.</div>`;
+    } else {
+      const rowsHtml = balances.map(b=>{
+        const label = `${MNAMES_FULL2[b.month]||''} ${b.year||''}`.trim();
+        const rowTotal = (b.cmhaBal||0)+(b.tenantBal||0);
+        return `<tr>
+          <td>${label}</td>
+          <td class="lc-cmha">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td>
+          <td class="lc-tenant">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>
+          <td class="lc-row-total">${fmt(rowTotal)}</td>
+        </tr>`;
+      }).join('');
+      detailInner = `
+        <div class="lc-detail-title">Unpaid months snapshot</div>
+        <table class="lc-detail-table">
+          <thead><tr>
+            <th>Month</th><th>CMHA balance</th><th>Tenant balance</th><th>Total</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot><tr>
+            <td>Total</td>
+            <td class="lc-cmha">${fmt(e.totalCmhaBal||0)}</td>
+            <td class="lc-tenant">${fmt(e.totalTenantBal||0)}</td>
+            <td class="lc-row-total">${fmt(total)}</td>
+          </tr></tfoot>
+        </table>`;
+    }
+
+    const restoreBtn = editable ? `<button class="lc-icon-btn" title="Restore to All Balances" onclick="restoreFromHistory('${e.id}')">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 8a5 5 0 119.6 2"/><path d="M2 4v4h4"/></svg>
+    </button>` : '';
+
+    return `<tr>
+      <td><span class="lc-chevron" id="hist-chev-${safeId}" onclick="toggleHistoryDetail('${safeId}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><span class="lc-addr">${escapeHtml(e.addr||'')}</span></td>
+      <td>${fmtDt(e.notice30Date)}</td>
+      <td style="text-align:center">${checkmark(e.notice30Pic)}</td>
+      <td>${fmtDt(e.notice3Date)}</td>
+      <td style="text-align:center">${checkmark(e.notice3Pic)}</td>
+      <td>${yn(e.vawa)}</td>
+      <td>${previewText(e.collectionNotes)}</td>
+      <td>${escapeHtml(e.lawyerName||'') || '<span class="lc-date empty">—</span>'}</td>
+      <td>${previewText(e.lawyerInfo)}</td>
+      <td>${previewText(e.collectionUpdate)}</td>
+      <td>${fmtDt(e.courtDate)}</td>
+      <td>${previewText(e.courtResult)}</td>
+      <td>${totalCell}</td>
+      <td><span class="lc-date">${fmtArchived(e.archivedAt)}</span></td>
+      <td style="text-align:right">${restoreBtn}</td>
+    </tr>
+    <tr class="lc-detail-row" id="hist-detail-${safeId}" style="display:none">
+      <td colspan="15"><div class="lc-detail-inner">${detailInner}</div></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="legal-toolbar">
+        <div class="legal-toolbar-left">${entries.length} archived row${entries.length===1?'':'s'} \u2014 click an address to see the unpaid months snapshot</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="legal-tbl">
+          <thead><tr>
+            <th>Address</th>
+            <th>30 Day Notice</th>
+            <th>PIC</th>
+            <th>3 Day Notice</th>
+            <th>PIC</th>
+            <th>VAWA</th>
+            <th>Notes</th>
+            <th>Lawyer Name</th>
+            <th>Lawyer Info</th>
+            <th>Update</th>
+            <th>Court Date</th>
+            <th>Court Result</th>
+            <th>Total Owed</th>
+            <th>Archived On</th>
+            <th style="text-align:right">Actions</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function toggleHistoryDetail(safeId){
+  const row = document.getElementById('hist-detail-'+safeId);
+  const chev = document.getElementById('hist-chev-'+safeId);
+  if(!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'table-row';
+  if(chev) chev.classList.toggle('open', !open);
 }
 
 // Called from the Legal Cases section's Remove button. Flips the property's
