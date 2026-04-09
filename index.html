@@ -1353,36 +1353,49 @@ async function abSaveField(id, field, value){
 
 async function moveToLegalCase(propertyId){
   const p = properties.find(x=>x.id===propertyId);
-  if(!p) return;
+  if(!p){ console.warn('[moveToLegalCase] property not found', propertyId); return; }
 
-  // Make sure we have month data for the full current year so the snapshot
-  // captures every unpaid month, not just whatever was in view.
+  // Build a 24-month window: all of last year + Jan→current month of this
+  // year. The All Balances pivot's "Last N months" filter can span into the
+  // previous year, so a current-year-only snapshot was missing data — that
+  // was the empty-balances bug.
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
-  for(let m=0; m<=curMonth; m++){
-    const key = monthKey(curYear, m);
-    const loaded = (monthData[propertyId]||{})[key] !== undefined
-      || Object.values(monthData).some(pd => pd[key] !== undefined);
-    if(!loaded) await loadMonthData(key);
+  const monthsToCheck = [];
+  for(let m=0; m<=11; m++) monthsToCheck.push({y:curYear-1, m});
+  for(let m=0; m<=curMonth; m++) monthsToCheck.push({y:curYear, m});
+
+  // Make sure every one of those months is loaded into the local cache. Each
+  // loadMonthData(key) call fetches ALL property docs with that monthKey at
+  // once, so once any property has the key, the full month is cached.
+  for(const {y, m} of monthsToCheck){
+    const key = monthKey(y, m);
+    const cached = Object.values(monthData).some(pd => pd[key] !== undefined);
+    if(!cached){
+      await loadMonthData(key);
+    }
   }
 
-  // Build a snapshot of every month with an outstanding balance.
+  // Snapshot every month with an outstanding CMHA or tenant balance for THIS
+  // property, using the same calculation the All Balances view uses.
   const balances = [];
   let totalCmhaBal = 0, totalTenantBal = 0;
-  for(let m=0; m<=curMonth; m++){
-    const key = monthKey(curYear, m);
+  for(const {y, m} of monthsToCheck){
+    const key = monthKey(y, m);
     const md = (monthData[propertyId]||{})[key] || {};
     const cmha = md.cmha||0, cmhaPaid = md.cmhaPaid||0;
     const tp = md.tenantPortion||0, tPaid = md.tenantPaid||0;
     const cmhaBal = Math.max(0, cmha-cmhaPaid);
     const tenantBal = Math.max(0, tp-tPaid);
     if(cmhaBal>0 || tenantBal>0){
-      balances.push({monthKey:key, month:m, year:curYear, cmhaBal, tenantBal});
+      balances.push({monthKey:key, month:m, year:y, cmhaBal, tenantBal});
       totalCmhaBal += cmhaBal;
       totalTenantBal += tenantBal;
     }
   }
+
+  console.log(`[moveToLegalCase] ${p.addr || propertyId}: captured ${balances.length} unpaid month(s), total $${totalCmhaBal+totalTenantBal}`, balances);
 
   await db.collection('legalCases').doc(propertyId).set({
     propertyId,
@@ -1396,6 +1409,7 @@ async function moveToLegalCase(propertyId){
     totalTenantBal,
     totalBalance: totalCmhaBal + totalTenantBal,
     snapshotYear: curYear,
+    snapshotRange: {fromYear:curYear-1, fromMonth:0, toYear:curYear, toMonth:curMonth},
     source: 'collections',
     createdAt: new Date(),
     createdBy: currentUser?.name || ''
