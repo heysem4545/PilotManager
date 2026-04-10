@@ -3143,13 +3143,10 @@ function hideTechTooltip(){
 }
 
 async function loadTechniciansList(){
-  const snap = await db.collection('technicianWork').get();
-  const set = new Set();
-  snap.docs.forEach(d=>{
-    const n = d.data().technicianName;
-    if(n) set.add(n);
-  });
-  techNames = [...set].sort((a,b)=>a.localeCompare(b));
+  // Pull from the same users/team collection used by the Team section
+  // so technicians don't need to be maintained as a separate list.
+  const users = await getUsers();
+  techNames = users.map(u=>u.name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
 }
 
 async function loadTechnicianMonth(name, year, month){
