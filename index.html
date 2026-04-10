@@ -969,13 +969,13 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
 <!-- MAINTENANCE CELL EDIT MODAL -->
 <div class="overlay" id="maintModal" onclick="if(event.target===this)closeModal('maintModal')">
-  <div class="modal">
+  <div class="modal" style="width:600px;max-width:96vw">
     <div class="modal-title">
       <span id="maintModalTitle">Maintenance visits</span>
       <button class="modal-close" onclick="closeModal('maintModal')">×</button>
     </div>
     <div class="notes-modal-meta" id="maintModalAddr"></div>
-    <div class="maint-visit-list" id="maintVisitList"></div>
+    <div class="maint-visit-list" id="maintVisitList" style="max-height:55vh;overflow-y:auto"></div>
     <button class="maint-add-visit" onclick="addMaintVisitDraft()">+ Add visit</button>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('maintModal')">Cancel</button>
@@ -1007,10 +1007,25 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <option value="Electrical">Electrical</option>
           <option value="Roofing">Roofing</option>
           <option value="HVAC">HVAC</option>
+          <option value="Pest Control">Pest Control</option>
           <option value="General">General</option>
           <option value="Other">Other</option>
         </select>
       </div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label>Date</label>
+        <input type="date" id="mq_date">
+      </div>
+      <div class="fg">
+        <label>Cost ($)</label>
+        <input type="number" step="0.01" id="mq_cost" placeholder="0">
+      </div>
+    </div>
+    <div class="fg">
+      <label>Who did the service</label>
+      <input id="mq_performedBy" placeholder="Technician name or company">
     </div>
     <div class="fg">
       <label>Notes (optional)</label>
@@ -2035,7 +2050,7 @@ function toggleHistoryDetail(safeId){
 // Firestore: collection 'maintenance', one doc per visit:
 //   {propertyId, year, month, monthKey, type, notes, createdAt, createdBy}
 // ─────────────────────────────────────────────
-const MAINT_TYPES = ['Plumbing','Electrical','Roofing','HVAC','General','Other'];
+const MAINT_TYPES = ['Plumbing','Electrical','Roofing','HVAC','Pest Control','General','Other'];
 let maintenanceData = {}; // { propertyId: { 'YYYY-MM': [visit, ...] } }
 let maintenanceYear = new Date().getFullYear();
 let maintViewMode = 'tracking'; // 'tracking' or 'pest'
@@ -2338,7 +2353,15 @@ function openMaintenanceCell(propertyId, monthIdx){
   maintActiveMonth = monthIdx;
   const key = `${maintenanceYear}-${String(monthIdx+1).padStart(2,'0')}`;
   const existing = (maintenanceData[propertyId]||{})[key] || [];
-  maintDraft = existing.map(v=>({id:v.id, type:v.type||'General', notes:v.notes||''}));
+  const defaultDate = `${maintenanceYear}-${String(monthIdx+1).padStart(2,'0')}-01`;
+  maintDraft = existing.map(v=>({
+    id: v.id,
+    date: v.date || defaultDate,
+    type: v.type || 'General',
+    cost: v.cost || 0,
+    performedBy: v.performedBy || v.sourceTechnician || '',
+    notes: v.notes || ''
+  }));
   maintOriginalIds = existing.map(v=>v.id);
   const MNAMES_FULL3 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('maintModalTitle').textContent = `${MNAMES_FULL3[monthIdx]} ${maintenanceYear}`;
@@ -2355,22 +2378,35 @@ function renderMaintDraft(){
   }
   const isAdmin = currentUser?.role === 'admin';
   list.innerHTML = maintDraft.map((v,i)=>`
-    <div class="maint-visit-row">
-      <select onchange="maintDraft[${i}].type=this.value">
-        ${MAINT_TYPES.map(t=>`<option value="${t}" ${v.type===t?'selected':''}>${t}</option>`).join('')}
-      </select>
-      <input type="text" placeholder="Notes (optional)" value="${escapeAttr(v.notes||'')}" oninput="maintDraft[${i}].notes=this.value">
-      ${isAdmin
-        ? `<button class="maint-visit-rm" title="Remove visit" onclick="removeMaintVisitDraft(${i})">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-          </button>`
-        : `<div></div>`}
+    <div class="tech-job-card" style="border-left:3px solid var(--blue)">
+      <div style="display:grid;grid-template-columns:1fr 130px 100px ${isAdmin?'28px':''};gap:8px;align-items:center;margin-bottom:8px">
+        <select onchange="maintDraft[${i}].type=this.value" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+          ${MAINT_TYPES.map(t=>`<option value="${t}" ${v.type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+        <input type="date" value="${v.date||''}" onchange="maintDraft[${i}].date=this.value" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="color:var(--muted);font-size:11px">$</span>
+          <input type="number" step="0.01" placeholder="0" value="${v.cost||''}" oninput="maintDraft[${i}].cost=parseFloat(this.value)||0" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+        </div>
+        ${isAdmin
+          ? `<button class="tech-job-rm" title="Delete visit" onclick="removeMaintVisitDraft(${i})">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            </button>`
+          : ''}
+      </div>
+      <div style="margin-bottom:8px">
+        <input type="text" placeholder="Who did the service" value="${escapeAttr(v.performedBy||'')}" oninput="maintDraft[${i}].performedBy=this.value" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <textarea rows="2" placeholder="Notes (optional)" oninput="maintDraft[${i}].notes=this.value" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical">${escapeHtml(v.notes||'')}</textarea>
     </div>
   `).join('');
 }
 
 function addMaintVisitDraft(){
-  maintDraft.push({type:'General', notes:''});
+  const defaultDate = (maintActiveMonth!=null)
+    ? `${maintenanceYear}-${String(maintActiveMonth+1).padStart(2,'0')}-01`
+    : '';
+  maintDraft.push({type:'General', date:defaultDate, cost:0, performedBy:'', notes:''});
   renderMaintDraft();
 }
 
@@ -2397,6 +2433,9 @@ async function saveMaintVisits(){
       const data = {
         propertyId, year, month, monthKey,
         type: v.type || 'General',
+        date: v.date || '',
+        cost: v.cost || 0,
+        performedBy: v.performedBy || '',
         notes: v.notes || '',
       };
       if(v.id){
@@ -2425,6 +2464,10 @@ function openQuickMaintenance(){
   const curMonth = new Date().getMonth();
   monthSelect.innerHTML = MNAMES_FULL4.map((n,i)=>`<option value="${i}" ${i===curMonth?'selected':''}>${n} ${maintenanceYear}</option>`).join('');
   document.getElementById('mq_type').value = 'General';
+  const today = new Date();
+  document.getElementById('mq_date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  document.getElementById('mq_cost').value = '';
+  document.getElementById('mq_performedBy').value = '';
   document.getElementById('mq_notes').value = '';
   document.getElementById('maintQuickModal').classList.add('open');
 }
@@ -2434,13 +2477,16 @@ async function saveQuickMaintenance(){
   const propertyId = document.getElementById('mq_property').value;
   const month = parseInt(document.getElementById('mq_month').value, 10);
   const type = document.getElementById('mq_type').value;
+  const date = document.getElementById('mq_date').value || '';
+  const cost = parseFloat(document.getElementById('mq_cost').value) || 0;
+  const performedBy = document.getElementById('mq_performedBy').value.trim();
   const notes = document.getElementById('mq_notes').value.trim();
   if(!propertyId){ toast('Pick a property'); return; }
   const year = maintenanceYear;
   const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
   try{
     await db.collection('maintenance').add({
-      propertyId, year, month, monthKey, type, notes,
+      propertyId, year, month, monthKey, type, date, cost, performedBy, notes,
       createdAt:new Date(), createdBy:currentUser?.name||''
     });
     closeModal('maintQuickModal');
