@@ -434,6 +434,27 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .tech-day-totals .rate-mid{color:var(--amber);font-weight:600}
 .tech-day-totals .rate-bad{color:var(--red);font-weight:600}
 #techDayModal .modal{width:680px;max-width:96vw}
+
+/* Technician day tooltip */
+.tech-tooltip{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border2);border-radius:10px;box-shadow:0 12px 28px rgba(0,0,0,.55);min-width:250px;max-width:340px;font-family:var(--font);pointer-events:none;opacity:0;transform:translateY(-2px);transition:opacity .12s ease,transform .12s ease}
+.tech-tooltip.open{opacity:1;transform:translateY(0)}
+.tech-tooltip .tt-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;gap:10px}
+.tech-tooltip .tt-date{color:var(--text);font-weight:600}
+.tech-tooltip .tt-total{font-family:var(--mono);color:var(--accent);font-size:11px}
+.tech-tooltip .tt-body{padding:4px 0;max-height:340px;overflow-y:auto}
+.tech-tooltip .tt-job{padding:9px 14px;border-bottom:1px solid var(--border)}
+.tech-tooltip .tt-job:last-child{border-bottom:none}
+.tech-tooltip .tt-job-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.tech-tooltip .tt-addr{font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tech-tooltip .tt-rating{font-family:var(--mono);font-size:11px;font-weight:600;flex-shrink:0}
+.tech-tooltip .tt-rating.good{color:var(--accent)}
+.tech-tooltip .tt-rating.mid{color:var(--amber)}
+.tech-tooltip .tt-rating.bad{color:var(--red)}
+.tech-tooltip .tt-meta{font-size:10px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.tech-tooltip .tt-type{text-transform:uppercase;letter-spacing:.06em;font-weight:500;color:var(--muted)}
+.tech-tooltip .tt-dur{font-family:var(--mono);color:var(--text)}
+.tech-tooltip .tt-sep{color:var(--muted2)}
+.tech-tooltip .tt-desc{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4;word-break:break-word}
 .ab-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:170px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
 .ab-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
 .ab-notes-cell.empty{color:var(--muted2);font-style:italic}
@@ -2326,6 +2347,85 @@ function ratingClass(r){
   return '';
 }
 
+// Single shared tooltip element used for every day-cell hover.
+let techTooltipEl = null;
+function ensureTechTooltip(){
+  if(!techTooltipEl){
+    techTooltipEl = document.createElement('div');
+    techTooltipEl.className = 'tech-tooltip';
+    document.body.appendChild(techTooltipEl);
+  }
+  return techTooltipEl;
+}
+
+function showTechTooltip(date, cellEl){
+  const jobs = techData[date] || [];
+  if(jobs.length === 0) return;
+  const tip = ensureTechTooltip();
+
+  const items = jobs.map(j=>{
+    const addr = escapeHtml(j.propertyAddress || '(no address)');
+    const type = escapeHtml(j.jobType || 'General');
+    const dur = fmtDuration(j.durationMinutes || 0);
+    const rating = j.performanceRating > 0
+      ? `<span class="tt-rating ${ratingClass(j.performanceRating)}">\u2605 ${j.performanceRating}</span>`
+      : '';
+    const desc = j.description
+      ? `<div class="tt-desc">${escapeHtml(j.description)}</div>`
+      : '';
+    return `<div class="tt-job">
+      <div class="tt-job-head">
+        <span class="tt-addr">${addr}</span>
+        ${rating}
+      </div>
+      <div class="tt-meta">
+        <span class="tt-type">${type}</span>
+        <span class="tt-sep">\u00b7</span>
+        <span class="tt-dur">${dur}</span>
+      </div>
+      ${desc}
+    </div>`;
+  }).join('');
+
+  const totalMins = jobs.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+  const d = new Date(date+'T00:00:00');
+  const dateLabel = isNaN(d) ? date : d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+
+  tip.innerHTML = `
+    <div class="tt-header">
+      <span class="tt-date">${dateLabel}</span>
+      <span class="tt-total">${jobs.length} job${jobs.length===1?'':'s'} \u00b7 ${fmtDuration(totalMins)}</span>
+    </div>
+    <div class="tt-body">${items}</div>`;
+
+  // Measure then position. Default: bottom-left of the cell.
+  // Flip if it would overflow the viewport.
+  tip.style.left = '0px';
+  tip.style.top = '0px';
+  tip.style.display = 'block';
+  const rect = cellEl.getBoundingClientRect();
+  const tipRect = tip.getBoundingClientRect();
+  let x = rect.left;
+  let y = rect.bottom + 6;
+  if(x + tipRect.width > window.innerWidth - 12){
+    x = Math.max(12, window.innerWidth - tipRect.width - 12);
+  }
+  if(y + tipRect.height > window.innerHeight - 12){
+    y = rect.top - tipRect.height - 6;
+  }
+  if(y < 12) y = 12;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+  // Trigger CSS transition
+  requestAnimationFrame(()=>tip.classList.add('open'));
+}
+
+function hideTechTooltip(){
+  if(!techTooltipEl) return;
+  techTooltipEl.classList.remove('open');
+  techTooltipEl.style.display = 'none';
+}
+
 async function loadTechniciansList(){
   const snap = await db.collection('technicianWork').get();
   const set = new Set();
@@ -2426,7 +2526,8 @@ async function renderTechnicianView(){
     const isToday = isCurrentMonth && d===todayDate;
     const dis = editable ? '' : 'disabled';
     const onclick = editable ? `onclick="openTechnicianDay('${key}')"` : '';
-    cells += `<div class="tech-cal-day ${isToday?'today':''} ${dis}" ${onclick}>
+    const hover = jobs.length>0 ? `onmouseenter="showTechTooltip('${key}',this)" onmouseleave="hideTechTooltip()"` : '';
+    cells += `<div class="tech-cal-day ${isToday?'today':''} ${dis}" ${onclick} ${hover}>
       <div class="tech-day-num">${d}</div>
       ${jobs.length>0?`
         <div class="tech-day-stats">
