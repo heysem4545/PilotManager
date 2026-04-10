@@ -3290,7 +3290,8 @@ function openTechnicianDay(date){
     jobType: j.jobType || 'General',
     description: j.description || '',
     durationMinutes: j.durationMinutes || 0,
-    performanceRating: j.performanceRating || 0
+    performanceRating: j.performanceRating || 0,
+    cost: j.cost || 0
   }));
   techOriginalIds = existing.map(j=>j.id);
 
@@ -3321,28 +3322,41 @@ function renderTechDraftList(){
       const badgeStyle = isPest
         ? 'background:var(--accent-dim);color:var(--accent)'
         : 'background:var(--blue-dim);color:var(--blue)';
+      const lbl = 'font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px';
       return `<div class="tech-job-card" style="border-left:3px solid ${isPest?'var(--accent)':'var(--blue)'}">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em;${badgeStyle}">${badgeLbl}</span>
-        </div>
-        <div class="tech-job-card-head">
-          <select onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text)">${optsWithSelected}</select>
-          <select onchange="techDraftSet(${i},'jobType',this.value)">
-            ${typeList.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-          <select onchange="techDraftSet(${i},'performanceRating',parseInt(this.value,10))">
-            <option value="0" ${!j.performanceRating?'selected':''}>★ Rate</option>
-            <option value="1" ${j.performanceRating===1?'selected':''}>★ 1</option>
-            <option value="2" ${j.performanceRating===2?'selected':''}>★ 2</option>
-            <option value="3" ${j.performanceRating===3?'selected':''}>★ 3</option>
-            <option value="4" ${j.performanceRating===4?'selected':''}>★ 4</option>
-            <option value="5" ${j.performanceRating===5?'selected':''}>★ 5</option>
-          </select>
           ${isAdmin
             ? `<button class="tech-job-rm" title="Remove record" onclick="removeTechJobDraft(${i})">
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
               </button>`
-            : `<div></div>`}
+            : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 130px 90px 90px;gap:8px;margin-bottom:8px">
+          <div><div style="${lbl}">Houses</div>
+            <select onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text)" style="width:100%">${optsWithSelected}</select>
+          </div>
+          <div><div style="${lbl}">Job Type</div>
+            <select onchange="techDraftSet(${i},'jobType',this.value)" style="width:100%">
+              ${typeList.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div><div style="${lbl}">Rating</div>
+            <select onchange="techDraftSet(${i},'performanceRating',parseInt(this.value,10))" style="width:100%">
+              <option value="0" ${!j.performanceRating?'selected':''}>★ Rate</option>
+              <option value="1" ${j.performanceRating===1?'selected':''}>★ 1</option>
+              <option value="2" ${j.performanceRating===2?'selected':''}>★ 2</option>
+              <option value="3" ${j.performanceRating===3?'selected':''}>★ 3</option>
+              <option value="4" ${j.performanceRating===4?'selected':''}>★ 4</option>
+              <option value="5" ${j.performanceRating===5?'selected':''}>★ 5</option>
+            </select>
+          </div>
+          <div><div style="${lbl}">Cost</div>
+            <div style="display:flex;align-items:center;gap:3px">
+              <span style="color:var(--muted);font-size:11px">$</span>
+              <input type="number" step="0.01" placeholder="0" value="${j.cost||''}" oninput="techDraftSet(${i},'cost',parseFloat(this.value)||0)" style="width:100%">
+            </div>
+          </div>
         </div>
         <div class="tech-job-card-row">
           <input type="text" placeholder="Description (what work was done)" value="${escapeAttr(j.description||'')}" oninput="techDraftSet(${i},'description',this.value)">
@@ -3362,6 +3376,7 @@ function renderTechDraftList(){
   const maintCount = techDraft.filter(j=>j.recordType!=='pestService').length;
   const pestCount = techDraft.filter(j=>j.recordType==='pestService').length;
   const totalMins = techDraft.reduce((s,j)=>s+(j.durationMinutes||0), 0);
+  const totalCost = techDraft.reduce((s,j)=>s+(j.cost||0), 0);
   const rated = techDraft.filter(j=>j.performanceRating>0);
   const avg = rated.length ? (rated.reduce((s,j)=>s+j.performanceRating, 0) / rated.length) : 0;
   const rateCls = avg>=4?'rate-good':avg>=3?'rate-mid':avg>0?'rate-bad':'';
@@ -3369,6 +3384,7 @@ function renderTechDraftList(){
     <div><strong>${totalJobs}</strong> record${totalJobs===1?'':'s'}</div>
     <div><span style="color:var(--blue)">${maintCount} maint</span> · <span style="color:var(--accent)">${pestCount} pest</span></div>
     <div><strong>${fmtDuration(totalMins)}</strong> worked</div>
+    ${totalCost>0?`<div><strong>$${totalCost.toFixed(2)}</strong> cost</div>`:''}
     <div>avg ${avg>0?`<span class="${rateCls}">★ ${avg.toFixed(1)}</span>`:'<span style="color:var(--muted2)">—</span>'}</div>`;
 }
 
@@ -3398,7 +3414,7 @@ function addTechJobDraft(recordType){
     recordType: recordType || 'maintenance',
     propertyId:'', propertyAddress:'',
     jobType: isPest ? 'Pest Control' : 'General',
-    description:'', durationMinutes:0, performanceRating:0
+    description:'', durationMinutes:0, performanceRating:0, cost:0
   });
   renderTechDraftList();
 }
@@ -3495,7 +3511,8 @@ async function saveTechnicianDay(){
         jobType: j.jobType || 'General',
         description: j.description || '',
         durationMinutes: j.durationMinutes || 0,
-        performanceRating: j.performanceRating || 0
+        performanceRating: j.performanceRating || 0,
+        cost: j.cost || 0
       };
       let jobId;
       if(j.id){
