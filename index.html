@@ -240,6 +240,38 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .invite-form input:focus{border-color:var(--accent)}
 .invite-form select{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
 
+/* ── TEAM TABS ── */
+.team-tabs{display:flex;gap:3px;padding:0 18px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.team-tabs button{padding:10px 18px;font-size:12px;font-weight:500;cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font);transition:all .12s}
+.team-tabs button:hover{color:var(--text)}
+.team-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ── ROLE CARDS ── */
+.roles-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.role-cards{padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.role-card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;transition:border-color .12s}
+.role-card:hover{border-color:var(--muted2)}
+.role-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.role-card-name{font-size:14px;font-weight:600}
+.role-card-actions{display:flex;gap:6px}
+.role-card-perms{display:flex;flex-wrap:wrap;gap:4px}
+.role-perm-tag{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:500}
+.role-perm-tag.view{background:var(--blue-dim);color:var(--blue)}
+.role-perm-tag.edit{background:var(--accent-dim);color:var(--accent)}
+.role-perm-tag.none{background:var(--surface3);color:var(--muted2)}
+
+/* ── PERMISSION TABLE ── */
+.perm-table{width:100%;border-collapse:collapse;margin:12px 0}
+.perm-table th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:8px 10px;text-align:center;border-bottom:1px solid var(--border)}
+.perm-table th:first-child{text-align:left}
+.perm-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;text-align:center}
+.perm-table td:first-child{text-align:left;color:var(--text);font-weight:500}
+.perm-table tbody tr:last-child td{border-bottom:none}
+.perm-check{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);cursor:pointer;position:relative;vertical-align:middle;transition:all .12s}
+.perm-check:hover{border-color:var(--muted)}
+.perm-check:checked{background:var(--accent);border-color:var(--accent)}
+.perm-check:checked::after{content:'';position:absolute;left:5px;top:1px;width:5px;height:9px;border:solid #0d0d10;border-width:0 2px 2px 0;transform:rotate(45deg)}
+
 /* ── MODAL ── */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
 .overlay.open{opacity:1;pointer-events:all}
@@ -857,19 +889,32 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="teamView" style="display:none">
         <div class="team-card">
           <div class="team-head">
-            <div class="team-head-title">Team members</div>
+            <div class="team-head-title">Team Management</div>
           </div>
-          <div id="teamList"></div>
-          <div class="invite-form" id="inviteForm">
-            <input type="email" id="inviteEmail" placeholder="team@email.com">
-            <select id="inviteRole">
-              <option value="agent">Agent</option>
-              <option value="technician">Technician</option>
-              <option value="office">Office</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button class="btn btn-primary btn-sm" onclick="inviteUser()">Send invite</button>
+          <div class="team-tabs">
+            <button class="active" onclick="switchTeamTab('users')">Users</button>
+            <button onclick="switchTeamTab('roles')">Roles</button>
+          </div>
+          <div id="teamUsersTab">
+            <div id="teamList"></div>
+            <div class="invite-form" id="inviteForm">
+              <input type="email" id="inviteEmail" placeholder="team@email.com">
+              <select id="inviteRole">
+                <option value="agent">Agent</option>
+                <option value="technician">Technician</option>
+                <option value="office">Office</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="inviteUser()">Send invite</button>
+            </div>
+          </div>
+          <div id="teamRolesTab" style="display:none">
+            <div class="roles-toolbar">
+              <div style="font-size:12px;color:var(--muted)">Custom roles define view &amp; edit permissions per section</div>
+              <button class="btn btn-primary btn-sm" onclick="openRoleModal()">+ Create Role</button>
+            </div>
+            <div class="role-cards" id="roleCardsList"></div>
           </div>
         </div>
       </div>
@@ -1188,6 +1233,25 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- CREATE / EDIT ROLE MODAL -->
+<div class="overlay" id="roleModal" onclick="if(event.target===this)closeModal('roleModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      <span id="roleModalTitle">Create Role</span>
+      <button class="modal-close" onclick="closeModal('roleModal')">×</button>
+    </div>
+    <div class="fg"><label>Role name</label><input id="role_name" placeholder="e.g. Office Manager"></div>
+    <table class="perm-table">
+      <thead><tr><th>Section</th><th>View</th><th>Edit</th></tr></thead>
+      <tbody id="permTableBody"></tbody>
+    </table>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('roleModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveRole()">Save role</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <!-- Firebase Config -->
@@ -1211,6 +1275,9 @@ const auth = firebase.auth();
 // STATE
 // ─────────────────────────────────────────────
 let currentUser = null;
+let currentPermissions = null;
+let rolesCache = []; // cached roles from Firestore
+let editingRoleId = null; // for role modal edit mode
 let properties = [];
 let activePayId = null;
 let editPropId = null;
@@ -1321,6 +1388,9 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   }
   currentUser={uid:firebaseUser.uid,...userDoc.data()};
 
+  // Load permissions for this user's role
+  await loadUserPermissions();
+
   // Update sidebar
   const initials=currentUser.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('sidebarAvatar').textContent=initials;
@@ -1329,7 +1399,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   roleEl.textContent=currentUser.role;
   roleEl.className='u-role role-'+currentUser.role;
 
-  if(currentUser.role!=='admin' && currentUser.role!=='manager'){
+  // Apply permission-based sidebar visibility
+  applySidebarPermissions();
+
+  if(!canViewSection('team')){
     document.getElementById('nav-team').classList.add('disabled');
   }
   if(!canEdit()){
@@ -1422,7 +1495,123 @@ function pct(a,b){return b>0?Math.round(a/b*100):0}
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
-function canEdit(){return currentUser&&['admin','manager','office','editor'].includes(currentUser.role);}
+// ─────────────────────────────────────────────
+// PERMISSION SYSTEM
+// ─────────────────────────────────────────────
+const PERM_SECTIONS = [
+  {id:'dashboard',label:'Dashboard'},
+  {id:'properties',label:'All Properties'},
+  {id:'collection',label:'Collection'},
+  {id:'maintenance',label:'Maintenance'},
+  {id:'technician',label:'Technician'},
+  {id:'tasks',label:'Task Management'},
+  {id:'meetings',label:'Meeting Tracking'},
+  {id:'monthly',label:'Monthly Report'},
+  {id:'team',label:'Team'}
+];
+
+function allPermsTrue(){
+  const p={};
+  PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});
+  return p;
+}
+
+function isAdmin(){
+  return currentUser && currentUser.role === 'admin';
+}
+
+function isFullAccess(){
+  if(isAdmin()) return true;
+  if(!currentPermissions) return true;
+  return PERM_SECTIONS.every(s=>currentPermissions[s.id]&&currentPermissions[s.id].view&&currentPermissions[s.id].edit);
+}
+
+function canViewSection(sectionId){
+  if(isAdmin()||!currentPermissions) return true;
+  const p=currentPermissions[sectionId];
+  return p ? p.view : false;
+}
+
+function canEditSection(sectionId){
+  if(isAdmin()||!currentPermissions) return true;
+  const p=currentPermissions[sectionId];
+  return p ? p.edit : false;
+}
+
+function getCurrentSectionId(){
+  if(currentFilter==='balance') return 'collection';
+  const map={dashboard:'dashboard',properties:'properties',maintenance:'maintenance',technician:'technician',tasks:'tasks',meetings:'meetings',monthly:'monthly',team:'team'};
+  return map[currentView]||'dashboard';
+}
+
+function canEdit(){
+  return canEditSection(getCurrentSectionId());
+}
+
+async function loadUserPermissions(){
+  if(isAdmin()){
+    currentPermissions=allPermsTrue();
+    return;
+  }
+  // Try loading by roleId
+  if(currentUser.roleId){
+    try{
+      const roleDoc=await db.collection('roles').doc(currentUser.roleId).get();
+      if(roleDoc.exists){
+        currentPermissions=roleDoc.data().permissions||allPermsTrue();
+        return;
+      }
+    }catch(e){console.error('loadUserPermissions',e);}
+  }
+  // Fallback: map old role strings to permissions
+  const fallbackPerms={
+    manager:()=>{const p=allPermsTrue();p.team.edit=false;return p;},
+    office:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:false});p.properties.edit=true;p.collection.edit=true;p.tasks.edit=true;return p;},
+    technician:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;},
+    agent:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;},
+    editor:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});p.team.edit=false;return p;}
+  };
+  if(currentUser.role && fallbackPerms[currentUser.role]){
+    currentPermissions=fallbackPerms[currentUser.role]();
+  } else {
+    currentPermissions=allPermsTrue();
+  }
+}
+
+function applySidebarPermissions(){
+  if(isAdmin()||!currentPermissions) return;
+  const navMappings={
+    'nav-dashboard':'dashboard',
+    'nav-properties':'properties',
+    'nav-maintenance':'maintenance',
+    'nav-technician':'technician',
+    'nav-tasks':'tasks',
+    'nav-meetings':'meetings',
+    'nav-team':'team'
+  };
+  Object.entries(navMappings).forEach(([navId,sectionId])=>{
+    const el=document.getElementById(navId);
+    if(el){
+      if(!canViewSection(sectionId)){
+        el.style.display='none';
+      } else {
+        el.style.display='';
+      }
+    }
+  });
+  // Collection nav item (no id, uses setFilter('balance'))
+  document.querySelectorAll('.sidebar .nav-item').forEach(btn=>{
+    if(btn.getAttribute('onclick')==="setFilter('balance')"){
+      btn.style.display=canViewSection('collection')?'':'none';
+    }
+  });
+  // Monthly Report nav item (no id, uses showView('monthly'))
+  document.querySelectorAll('.sidebar .nav-item').forEach(btn=>{
+    if(btn.getAttribute('onclick')==="showView('monthly')"){
+      btn.style.display=canViewSection('monthly')?'':'none';
+    }
+  });
+}
 
 async function saveProperty(data, id = null) {
   if (id) {
@@ -3924,35 +4113,42 @@ async function renderMonthly(){
 }
 
 async function renderTeam(){
+  await loadRoles();
   const users=await getUsers();
+  const roleOptions=rolesCache.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
   document.getElementById('teamList').innerHTML=users.map(u=>{
     const initials=u.name?u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?';
     const colors=['var(--accent-dim)/var(--accent)','var(--blue-dim)/var(--blue)','var(--purple-dim)/var(--purple)','var(--amber-dim)/var(--amber)'];
     const [bg,col]=colors[u.email.charCodeAt(0)%colors.length].split('/');
     const isMe=u.uid===currentUser.uid;
+    const roleName=u.role||'agent';
+    // Build role dropdown with selection based on roleId or role name
+    let selectHtml='';
+    if(isAdmin()&&!isMe){
+      const opts=rolesCache.map(r=>{
+        const sel=(u.roleId===r.id)||((!u.roleId)&&r.name.toLowerCase()===roleName)?'selected':'';
+        return `<option value="${r.id}" ${sel}>${r.name}</option>`;
+      }).join('');
+      selectHtml=`<select class="role-select" onchange="changeRole('${u.uid}',this.value)">${opts}</select>`;
+    } else {
+      selectHtml=`<span class="u-role role-${roleName}">${roleName}</span>`;
+    }
     return `<div class="team-member">
       <div class="tm-avatar" style="background:${bg};color:${col}">${initials}</div>
       <div class="tm-info">
         <div class="tm-name">${u.name}${isMe?' (you)':''}</div>
         <div class="tm-email">${u.email||''}</div>
       </div>
-      <div class="tm-actions">
-        ${currentUser.role==='admin'&&!isMe?`
-          <select class="role-select" onchange="changeRole('${u.uid}',this.value)">
-            <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-            <option value="manager" ${u.role==='manager'?'selected':''}>Manager</option>
-            <option value="office" ${u.role==='office'?'selected':''}>Office</option>
-            <option value="technician" ${u.role==='technician'?'selected':''}>Technician</option>
-            <option value="agent" ${u.role==='agent'?'selected':''}>Agent</option>
-          </select>
-        `:`<span class="u-role role-${u.role}">${u.role}</span>`}
-      </div>
+      <div class="tm-actions">${selectHtml}</div>
     </div>`;
   }).join('');
+  updateInviteRoleDropdown();
 }
 
-async function changeRole(uid,role){
-  await updateUserRole(uid,role);
+async function changeRole(uid,roleId){
+  const role=rolesCache.find(r=>r.id===roleId);
+  const roleName=role?role.name.toLowerCase():'agent';
+  await db.collection('users').doc(uid).update({roleId,role:roleName});
   toast('Role updated');
   renderTeam();
 }
@@ -3966,6 +4162,148 @@ async function inviteUser(){
   toast('Invite sent to '+email+' — they can register and will get '+role+' access');
   document.getElementById('inviteEmail').value='';
   renderTeam();
+}
+
+// ─────────────────────────────────────────────
+// ROLE MANAGEMENT
+// ─────────────────────────────────────────────
+const DEFAULT_ROLES=[
+  {name:'Admin',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});return p;})()},
+  {name:'Manager',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});p.team={view:true,edit:false};return p;})()},
+  {name:'Office',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:false});p.properties={view:true,edit:true};p.collection={view:true,edit:true};p.tasks={view:true,edit:true};return p;})()},
+  {name:'Technician',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;})()},
+  {name:'Agent',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;})()}
+];
+
+async function loadRoles(){
+  const snap=await db.collection('roles').get();
+  rolesCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  return rolesCache;
+}
+
+async function ensureDefaultRoles(){
+  if(rolesCache.length>0) return;
+  const snap=await db.collection('roles').get();
+  if(!snap.empty){
+    rolesCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    return;
+  }
+  // Create defaults
+  for(const r of DEFAULT_ROLES){
+    const ref=await db.collection('roles').add({name:r.name,permissions:r.permissions,createdAt:new Date()});
+    rolesCache.push({id:ref.id,name:r.name,permissions:r.permissions});
+  }
+}
+
+function switchTeamTab(tab){
+  const btns=document.querySelectorAll('.team-tabs button');
+  btns.forEach(b=>b.classList.remove('active'));
+  if(tab==='users'){
+    btns[0].classList.add('active');
+    document.getElementById('teamUsersTab').style.display='';
+    document.getElementById('teamRolesTab').style.display='none';
+  } else {
+    btns[1].classList.add('active');
+    document.getElementById('teamUsersTab').style.display='none';
+    document.getElementById('teamRolesTab').style.display='';
+    renderRolesTab();
+  }
+}
+
+async function renderRolesTab(){
+  await ensureDefaultRoles();
+  const container=document.getElementById('roleCardsList');
+  if(!rolesCache.length){
+    container.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">No roles defined yet</div>';
+    return;
+  }
+  container.innerHTML=rolesCache.map(r=>{
+    const permSummary=PERM_SECTIONS.map(s=>{
+      const p=(r.permissions||{})[s.id];
+      if(!p||(!p.view&&!p.edit)) return '';
+      if(p.view&&p.edit) return `<span class="role-perm-tag edit">${s.label}: Edit</span>`;
+      if(p.view) return `<span class="role-perm-tag view">${s.label}: View</span>`;
+      return '';
+    }).filter(Boolean).join('');
+    const noPerms=!permSummary?'<span class="role-perm-tag none">No permissions</span>':'';
+    return `<div class="role-card">
+      <div class="role-card-head">
+        <div class="role-card-name">${r.name}</div>
+        <div class="role-card-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editRole('${r.id}')">Edit</button>
+          ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteRole('${r.id}')">Delete</button>`:''}
+        </div>
+      </div>
+      <div class="role-card-perms">${permSummary||noPerms}</div>
+    </div>`;
+  }).join('');
+}
+
+function openRoleModal(roleId){
+  editingRoleId=roleId||null;
+  const role=roleId?rolesCache.find(r=>r.id===roleId):null;
+  document.getElementById('roleModalTitle').textContent=role?'Edit Role':'Create Role';
+  document.getElementById('role_name').value=role?role.name:'';
+  const tbody=document.getElementById('permTableBody');
+  tbody.innerHTML=PERM_SECTIONS.map(s=>{
+    const p=role?(role.permissions||{})[s.id]||{view:false,edit:false}:{view:false,edit:false};
+    return `<tr>
+      <td>${s.label}</td>
+      <td><input type="checkbox" class="perm-check" data-section="${s.id}" data-perm="view" ${p.view?'checked':''}></td>
+      <td><input type="checkbox" class="perm-check" data-section="${s.id}" data-perm="edit" ${p.edit?'checked':''}></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('roleModal').classList.add('open');
+}
+
+function editRole(id){ openRoleModal(id); }
+
+async function saveRole(){
+  const name=document.getElementById('role_name').value.trim();
+  if(!name){toast('Enter a role name');return;}
+  const permissions={};
+  document.querySelectorAll('#permTableBody .perm-check').forEach(cb=>{
+    const sec=cb.dataset.section;
+    const perm=cb.dataset.perm;
+    if(!permissions[sec]) permissions[sec]={view:false,edit:false};
+    permissions[sec][perm]=cb.checked;
+  });
+  try{
+    if(editingRoleId){
+      await db.collection('roles').doc(editingRoleId).update({name,permissions});
+      const idx=rolesCache.findIndex(r=>r.id===editingRoleId);
+      if(idx>=0) rolesCache[idx]={...rolesCache[idx],name,permissions};
+      toast('Role updated');
+    } else {
+      const ref=await db.collection('roles').add({name,permissions,createdAt:new Date()});
+      rolesCache.push({id:ref.id,name,permissions});
+      toast('Role created');
+    }
+    closeModal('roleModal');
+    renderRolesTab();
+    // Also update invite dropdown with new roles
+    updateInviteRoleDropdown();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteRole(id){
+  if(!confirm('Delete this role? Users assigned to it will lose their role permissions.')) return;
+  try{
+    await db.collection('roles').doc(id).delete();
+    rolesCache=rolesCache.filter(r=>r.id!==id);
+    toast('Role deleted');
+    renderRolesTab();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+function updateInviteRoleDropdown(){
+  const sel=document.getElementById('inviteRole');
+  if(!sel) return;
+  sel.innerHTML=rolesCache.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  // Add fallback if no roles
+  if(!rolesCache.length){
+    sel.innerHTML='<option value="agent">Agent</option><option value="technician">Technician</option><option value="office">Office</option><option value="manager">Manager</option><option value="admin">Admin</option>';
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -4844,8 +5182,8 @@ function showView(v){
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
   if(v==='team'){
-    if(!currentUser||(currentUser.role!=='admin'&&currentUser.role!=='manager')){
-      document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin/Manager access required</h2><p>Only admins and managers can manage the team.</p></div>';
+    if(!currentUser||!canViewSection('team')){
+      document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
     }else{renderTeam();}
   }
 }
