@@ -1032,7 +1032,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     </div>
     <div class="notes-modal-meta" id="techDayModalMeta"></div>
     <div class="tech-job-list" id="techJobList"></div>
-    <button class="maint-add-visit" onclick="addTechJobDraft()">+ Add Job</button>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <button class="maint-add-visit" style="flex:1" onclick="addTechJobDraft('maintenance')">+ Add Maintenance Record</button>
+      <button class="maint-add-visit" style="flex:1;border-color:var(--accent-dim);color:var(--accent)" onclick="addTechJobDraft('pestService')">+ Add Pest Service Record</button>
+    </div>
     <div class="tech-day-totals" id="techDayTotals"></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('techDayModal')">Cancel</button>
@@ -2817,6 +2820,7 @@ async function savePestQuickEntry(){
 //    createdAt, createdBy}
 // ─────────────────────────────────────────────
 const TECH_JOB_TYPES = ['Plumbing','Electrical','Roofing','HVAC','General','Other'];
+const TECH_PEST_TYPES = ['Pest Control','Bed Bugs','Roaches','Rodents','Termites','General Pest','Other'];
 let techActiveName = '';
 let techNames = [];
 let techYear = new Date().getFullYear();
@@ -2863,6 +2867,9 @@ function showTechTooltip(date, cellEl){
     const addr = escapeHtml(j.propertyAddress || '(no address)');
     const type = escapeHtml(j.jobType || 'General');
     const dur = fmtDuration(j.durationMinutes || 0);
+    const isPest = j.recordType === 'pestService';
+    const badgeLbl = isPest ? 'PEST' : 'MAINT';
+    const badgeColor = isPest ? 'var(--accent)' : 'var(--blue)';
     const rating = j.performanceRating > 0
       ? `<span class="tt-rating ${ratingClass(j.performanceRating)}">\u2605 ${j.performanceRating}</span>`
       : '';
@@ -2875,6 +2882,7 @@ function showTechTooltip(date, cellEl){
         ${rating}
       </div>
       <div class="tt-meta">
+        <span style="font-size:8px;font-weight:600;padding:1px 5px;border-radius:3px;background:${isPest?'var(--accent-dim)':'var(--blue-dim)'};color:${badgeColor}">${badgeLbl}</span>
         <span class="tt-type">${type}</span>
         <span class="tt-sep">\u00b7</span>
         <span class="tt-dur">${dur}</span>
@@ -3015,7 +3023,8 @@ async function renderTechnicianView(){
   for(let d=1; d<=daysInMonth; d++){
     const key = dateKey(techYear, techMonth, d);
     const jobs = techData[key] || [];
-    const houses = new Set(jobs.map(j=>j.propertyId).filter(Boolean)).size;
+    const maintJobs = jobs.filter(j=>j.recordType!=='pestService');
+    const pestJobs = jobs.filter(j=>j.recordType==='pestService');
     const mins = jobs.reduce((s,j)=>s+(j.durationMinutes||0), 0);
     const rated = jobs.filter(j=>j.performanceRating>0);
     const avg = rated.length ? (rated.reduce((s,j)=>s+j.performanceRating, 0) / rated.length) : 0;
@@ -3023,15 +3032,21 @@ async function renderTechnicianView(){
     const dis = editable ? '' : 'disabled';
     const onclick = editable ? `onclick="openTechnicianDay('${key}')"` : '';
     const hover = jobs.length>0 ? `onmouseenter="showTechTooltip('${key}',this)" onmouseleave="hideTechTooltip()"` : '';
-    cells += `<div class="tech-cal-day ${isToday?'today':''} ${dis}" ${onclick} ${hover}>
-      <div class="tech-day-num">${d}</div>
-      ${jobs.length>0?`
+    let statsHtml = '';
+    if(jobs.length > 0){
+      const parts = [];
+      if(maintJobs.length>0) parts.push(`<span style="color:var(--blue)">${maintJobs.length} maint</span>`);
+      if(pestJobs.length>0) parts.push(`<span style="color:var(--accent)">${pestJobs.length} pest</span>`);
+      statsHtml = `
         <div class="tech-day-stats">
-          <div class="ds-row"><span class="ds-jobs">${houses||jobs.length}</span> house${(houses||jobs.length)===1?'':'s'}</div>
+          <div class="ds-row">${parts.join(' <span style="color:var(--muted2)">·</span> ')}</div>
           <div class="ds-row ds-dur">${fmtDuration(mins)}</div>
           ${avg>0?`<div class="ds-row"><span class="tech-day-rating ${ratingClass(avg)}">★ ${avg.toFixed(1)}</span></div>`:''}
-        </div>
-      `:''}
+        </div>`;
+    }
+    cells += `<div class="tech-cal-day ${isToday?'today':''} ${dis}" ${onclick} ${hover}>
+      <div class="tech-day-num">${d}</div>
+      ${statsHtml}
     </div>`;
   }
   // trailing blanks to fill the row
@@ -3151,6 +3166,7 @@ function openTechnicianDay(date){
   const existing = (techData[date] || []).slice();
   techDraft = existing.map(j=>({
     id: j.id,
+    recordType: j.recordType || 'maintenance',
     propertyId: j.propertyId || '',
     propertyAddress: j.propertyAddress || '',
     jobType: j.jobType || 'General',
@@ -3175,17 +3191,26 @@ function renderTechDraftList(){
 
   const isAdmin = currentUser?.role === 'admin';
   if(techDraft.length === 0){
-    list.innerHTML = `<div class="maint-modal-empty">No jobs yet. Click "+ Add Job" to start.</div>`;
+    list.innerHTML = `<div class="maint-modal-empty">No records yet. Use the buttons below to add a record.</div>`;
   } else {
     list.innerHTML = techDraft.map((j,i)=>{
       const hours = Math.floor((j.durationMinutes||0)/60);
       const mins = (j.durationMinutes||0) % 60;
       const optsWithSelected = propOpts.replace(`value="${j.propertyId}"`, `value="${j.propertyId}" selected`);
-      return `<div class="tech-job-card">
+      const isPest = j.recordType === 'pestService';
+      const typeList = isPest ? TECH_PEST_TYPES : TECH_JOB_TYPES;
+      const badgeLbl = isPest ? 'Pest' : 'Maint';
+      const badgeStyle = isPest
+        ? 'background:var(--accent-dim);color:var(--accent)'
+        : 'background:var(--blue-dim);color:var(--blue)';
+      return `<div class="tech-job-card" style="border-left:3px solid ${isPest?'var(--accent)':'var(--blue)'}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em;${badgeStyle}">${badgeLbl}</span>
+        </div>
         <div class="tech-job-card-head">
           <select onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text)">${optsWithSelected}</select>
           <select onchange="techDraftSet(${i},'jobType',this.value)">
-            ${TECH_JOB_TYPES.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
+            ${typeList.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
           </select>
           <select onchange="techDraftSet(${i},'performanceRating',parseInt(this.value,10))">
             <option value="0" ${!j.performanceRating?'selected':''}>★ Rate</option>
@@ -3196,7 +3221,7 @@ function renderTechDraftList(){
             <option value="5" ${j.performanceRating===5?'selected':''}>★ 5</option>
           </select>
           ${isAdmin
-            ? `<button class="tech-job-rm" title="Remove job" onclick="removeTechJobDraft(${i})">
+            ? `<button class="tech-job-rm" title="Remove record" onclick="removeTechJobDraft(${i})">
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
               </button>`
             : `<div></div>`}
@@ -3216,12 +3241,15 @@ function renderTechDraftList(){
 
   // Update totals footer
   const totalJobs = techDraft.length;
+  const maintCount = techDraft.filter(j=>j.recordType!=='pestService').length;
+  const pestCount = techDraft.filter(j=>j.recordType==='pestService').length;
   const totalMins = techDraft.reduce((s,j)=>s+(j.durationMinutes||0), 0);
   const rated = techDraft.filter(j=>j.performanceRating>0);
   const avg = rated.length ? (rated.reduce((s,j)=>s+j.performanceRating, 0) / rated.length) : 0;
   const rateCls = avg>=4?'rate-good':avg>=3?'rate-mid':avg>0?'rate-bad':'';
   document.getElementById('techDayTotals').innerHTML = `
-    <div><strong>${totalJobs}</strong> job${totalJobs===1?'':'s'}</div>
+    <div><strong>${totalJobs}</strong> record${totalJobs===1?'':'s'}</div>
+    <div><span style="color:var(--blue)">${maintCount} maint</span> · <span style="color:var(--accent)">${pestCount} pest</span></div>
     <div><strong>${fmtDuration(totalMins)}</strong> worked</div>
     <div>avg ${avg>0?`<span class="${rateCls}">★ ${avg.toFixed(1)}</span>`:'<span style="color:var(--muted2)">—</span>'}</div>`;
 }
@@ -3246,8 +3274,14 @@ function techDraftDuration(i, which, raw){
   techDraft[i].durationMinutes = h*60 + m;
 }
 
-function addTechJobDraft(){
-  techDraft.push({propertyId:'', propertyAddress:'', jobType:'General', description:'', durationMinutes:0, performanceRating:0});
+function addTechJobDraft(recordType){
+  const isPest = recordType === 'pestService';
+  techDraft.push({
+    recordType: recordType || 'maintenance',
+    propertyId:'', propertyAddress:'',
+    jobType: isPest ? 'Pest Control' : 'General',
+    description:'', durationMinutes:0, performanceRating:0
+  });
   renderTechDraftList();
 }
 
@@ -3304,6 +3338,7 @@ async function saveTechnicianDay(){
       const data = {
         technicianName,
         date,
+        recordType: j.recordType || 'maintenance',
         propertyId: j.propertyId || '',
         propertyAddress: j.propertyAddress || '',
         jobType: j.jobType || 'General',
@@ -3319,8 +3354,8 @@ async function saveTechnicianDay(){
         const ref = await db.collection('technicianWork').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
         jobId = ref.id;
       }
-      // Mirror to maintenance when a property is selected, otherwise
-      // make sure no stale mirror is left behind from a previous save.
+      // Mirror both maintenance AND pest service records to the
+      // maintenance collection so the Maintenance pivot picks them up.
       if(jobId && data.propertyId){
         await mirrorJobToMaintenance(jobId, data);
       } else if(jobId){
