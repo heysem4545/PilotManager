@@ -1076,7 +1076,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
       <div class="fg"><label>Cost ($)</label><input type="number" id="pc_cost" placeholder="0" step="0.01"></div>
     </div>
-    <div class="fg"><label>Who did the service</label><input id="pc_performedBy" list="techNamesList" placeholder="Technician name or company"></div>
+    <div class="fg"><label>Who did the service</label>
+      <select id="pc_performedBy" onchange="togglePerfCustom('pc')"><option value="">— Select —</option></select>
+      <input id="pc_performedByCustom" style="display:none;margin-top:6px" placeholder="Type company or technician name">
+    </div>
     <div class="fg"><label>Notes</label><textarea id="pc_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('pestCellModal')">Cancel</button>
@@ -1117,7 +1120,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
       <div class="fg"><label>Cost ($)</label><input type="number" id="pq_cost" placeholder="0" step="0.01"></div>
     </div>
-    <div class="fg"><label>Who did the service</label><input id="pq_performedBy" list="techNamesList" placeholder="Technician name or company"></div>
+    <div class="fg"><label>Who did the service</label>
+      <select id="pq_performedBy" onchange="togglePerfCustom('pq')"><option value="">— Select —</option></select>
+      <input id="pq_performedByCustom" style="display:none;margin-top:6px" placeholder="Type company or technician name">
+    </div>
     <div class="fg"><label>Notes</label><textarea id="pq_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('pestQuickModal')">Cancel</button>
@@ -1161,7 +1167,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
-<datalist id="techNamesList"></datalist>
 <div class="toast" id="toast"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <!-- Firebase Config -->
@@ -2615,12 +2620,12 @@ async function updatePestFrequency(propertyId, value){
   }
 }
 
-async function populateTechNamesList(){
+async function populatePerfSelects(){
   // Ensure technician names are loaded
   if(techNames.length === 0){
     try{ await loadTechniciansList(); }catch(e){ /* non-fatal */ }
   }
-  // Augment with any names from existing pest control data
+  // Augment with any performedBy values already in pest control data
   const extraNames = new Set();
   for(const pid of Object.keys(pestControlData)){
     for(const mk of Object.keys(pestControlData[pid])){
@@ -2630,8 +2635,49 @@ async function populateTechNamesList(){
     }
   }
   const all = [...new Set([...techNames, ...extraNames])].sort((a,b)=>a.localeCompare(b));
-  const dl = document.getElementById('techNamesList');
-  if(dl) dl.innerHTML = all.map(n=>`<option value="${escapeAttr(n)}">`).join('');
+  // Populate both selects (cell + quick-add) with the same options
+  ['pc_performedBy','pq_performedBy'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const cur = sel.value; // preserve current selection
+    sel.innerHTML = `<option value="">— Select —</option>`
+      + all.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('')
+      + `<option value="__other__">Other (type name)\u2026</option>`;
+    if(cur && cur !== '__other__') sel.value = cur;
+  });
+}
+
+function togglePerfCustom(prefix){
+  const sel = document.getElementById(prefix+'_performedBy');
+  const inp = document.getElementById(prefix+'_performedByCustom');
+  if(!sel || !inp) return;
+  inp.style.display = sel.value === '__other__' ? '' : 'none';
+  if(sel.value !== '__other__') inp.value = '';
+}
+
+function setPerfValue(prefix, value){
+  const sel = document.getElementById(prefix+'_performedBy');
+  const inp = document.getElementById(prefix+'_performedByCustom');
+  if(!sel || !inp) return;
+  // If the value matches an option, select it; otherwise use "Other"
+  const match = [...sel.options].find(o => o.value === value);
+  if(value && !match){
+    sel.value = '__other__';
+    inp.style.display = '';
+    inp.value = value;
+  } else {
+    sel.value = value || '';
+    inp.style.display = 'none';
+    inp.value = '';
+  }
+}
+
+function getPerfValue(prefix){
+  const sel = document.getElementById(prefix+'_performedBy');
+  const inp = document.getElementById(prefix+'_performedByCustom');
+  if(!sel) return '';
+  if(sel.value === '__other__') return (inp?.value || '').trim();
+  return sel.value;
 }
 
 function openPestCell(propertyId, monthIdx){
@@ -2678,11 +2724,11 @@ function openPestCell(propertyId, monthIdx){
   document.getElementById('pc_serviceType').value = p.pestFrequency || 'Monthly';
   document.getElementById('pc_pestType').value = 'General';
   document.getElementById('pc_cost').value = '';
-  document.getElementById('pc_performedBy').value = '';
   document.getElementById('pc_notes').value = '';
   document.getElementById('pestDeleteBtn').style.display = 'none';
 
-  populateTechNamesList();
+  populatePerfSelects();
+  setPerfValue('pc', '');
   document.getElementById('pestCellModal').classList.add('open');
 }
 
@@ -2703,7 +2749,7 @@ function editPestEntry(entryId){
   document.getElementById('pc_serviceType').value = entry.serviceType || 'Monthly';
   document.getElementById('pc_pestType').value = entry.pestType || 'General';
   document.getElementById('pc_cost').value = entry.cost || '';
-  document.getElementById('pc_performedBy').value = entry.performedBy || '';
+  setPerfValue('pc', entry.performedBy || '');
   document.getElementById('pc_notes').value = entry.notes || '';
   document.getElementById('pestDeleteBtn').style.display = currentUser?.role==='admin' ? 'inline-block' : 'none';
   document.getElementById('pestCellExisting').innerHTML = `<div style="font-size:10px;font-weight:500;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Editing existing entry</div>`;
@@ -2722,7 +2768,7 @@ async function savePestCellEntry(){
   const month = parseInt(dateParts[1],10) - 1;
   const mk = `${dateParts[0]}-${dateParts[1]}`;
 
-  const performedBy = document.getElementById('pc_performedBy').value.trim();
+  const performedBy = getPerfValue('pc');
   const data = {
     propertyId: pestCellActiveProp,
     date, monthKey: mk, year, month,
@@ -2775,9 +2821,9 @@ function openPestQuickAdd(){
   document.getElementById('pq_serviceType').value = 'Monthly';
   document.getElementById('pq_pestType').value = 'General';
   document.getElementById('pq_cost').value = '';
-  document.getElementById('pq_performedBy').value = '';
   document.getElementById('pq_notes').value = '';
-  populateTechNamesList();
+  populatePerfSelects();
+  setPerfValue('pq', '');
   document.getElementById('pestQuickModal').classList.add('open');
 }
 
@@ -2791,7 +2837,7 @@ async function savePestQuickEntry(){
   const pestType = document.getElementById('pq_pestType').value;
   const cost = parseFloat(document.getElementById('pq_cost').value) || 0;
   const notes = document.getElementById('pq_notes').value.trim();
-  const performedBy = document.getElementById('pq_performedBy').value.trim();
+  const performedBy = getPerfValue('pq');
   const dateParts = date.split('-');
   const year = parseInt(dateParts[0],10);
   const month = parseInt(dateParts[1],10) - 1;
