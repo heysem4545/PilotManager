@@ -1054,7 +1054,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="notes-modal-meta" id="pestCellModalAddr"></div>
     <div id="pestCellExisting"></div>
     <div class="frow">
-      <div class="fg"><label>Date</label><input type="date" id="pc_date"></div>
+      <div class="fg"><label>Date</label><input type="date" id="pc_date" onchange="lookupTechForPest('pc')"></div>
       <div class="fg"><label>Service Type</label>
         <select id="pc_serviceType">
           <option value="Monthly">Monthly</option>
@@ -1077,8 +1077,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div class="fg"><label>Cost ($)</label><input type="number" id="pc_cost" placeholder="0" step="0.01"></div>
     </div>
     <div class="fg"><label>Who did the service</label>
-      <select id="pc_performedBy" onchange="togglePerfCustom('pc')"><option value="">— Select —</option></select>
-      <input id="pc_performedByCustom" style="display:none;margin-top:6px" placeholder="Type company or technician name">
+      <div id="pc_performedByAuto" style="font-size:12px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;min-height:34px;display:flex;align-items:center"><span style="color:var(--muted2)">Select property &amp; date first</span></div>
+      <input id="pc_performedByManual" style="display:none;margin-top:6px" placeholder="Type technician or company name">
     </div>
     <div class="fg"><label>Notes</label><textarea id="pc_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
@@ -1096,9 +1096,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       Add Pest Service
       <button class="modal-close" onclick="closeModal('pestQuickModal')">×</button>
     </div>
-    <div class="fg"><label>Property</label><select id="pq_property"></select></div>
+    <div class="fg"><label>Property</label><select id="pq_property" onchange="lookupTechForPest('pq')"></select></div>
     <div class="frow">
-      <div class="fg"><label>Date</label><input type="date" id="pq_date"></div>
+      <div class="fg"><label>Date</label><input type="date" id="pq_date" onchange="lookupTechForPest('pq')"></div>
       <div class="fg"><label>Service Type</label>
         <select id="pq_serviceType">
           <option value="Monthly">Monthly</option>
@@ -1121,8 +1121,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div class="fg"><label>Cost ($)</label><input type="number" id="pq_cost" placeholder="0" step="0.01"></div>
     </div>
     <div class="fg"><label>Who did the service</label>
-      <select id="pq_performedBy" onchange="togglePerfCustom('pq')"><option value="">— Select —</option></select>
-      <input id="pq_performedByCustom" style="display:none;margin-top:6px" placeholder="Type company or technician name">
+      <div id="pq_performedByAuto" style="font-size:12px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;min-height:34px;display:flex;align-items:center"><span style="color:var(--muted2)">Select property &amp; date first</span></div>
+      <input id="pq_performedByManual" style="display:none;margin-top:6px" placeholder="Type technician or company name">
     </div>
     <div class="fg"><label>Notes</label><textarea id="pq_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
@@ -2620,64 +2620,87 @@ async function updatePestFrequency(propertyId, value){
   }
 }
 
-async function populatePerfSelects(){
-  // Ensure technician names are loaded
-  if(techNames.length === 0){
-    try{ await loadTechniciansList(); }catch(e){ /* non-fatal */ }
+// Auto-lookup technician from technicianWork for a given property+date.
+// Uses a single equality query on propertyId (no composite index needed)
+// and filters by date client-side.
+async function lookupTechnician(propertyId, date, prefix){
+  const autoEl = document.getElementById(prefix+'_performedByAuto');
+  const manualEl = document.getElementById(prefix+'_performedByManual');
+  if(!autoEl || !manualEl) return;
+
+  if(!propertyId || !date){
+    autoEl.innerHTML = `<span style="color:var(--muted2)">Select property &amp; date first</span>`;
+    autoEl.dataset.resolved = '';
+    manualEl.style.display = 'none';
+    manualEl.value = '';
+    return;
   }
-  // Augment with any performedBy values already in pest control data
-  const extraNames = new Set();
-  for(const pid of Object.keys(pestControlData)){
-    for(const mk of Object.keys(pestControlData[pid])){
-      pestControlData[pid][mk].forEach(e=>{
-        if(e.performedBy) extraNames.add(e.performedBy);
-      });
+
+  autoEl.innerHTML = `<span style="color:var(--muted2)">Looking up\u2026</span>`;
+  autoEl.dataset.resolved = '';
+  manualEl.style.display = 'none';
+
+  try{
+    const snap = await db.collection('technicianWork')
+      .where('propertyId','==',propertyId)
+      .get();
+    const names = [...new Set(
+      snap.docs
+        .map(d=>d.data())
+        .filter(d=>d.date===date && d.technicianName)
+        .map(d=>d.technicianName)
+    )];
+
+    if(names.length > 0){
+      autoEl.innerHTML = `<span style="color:var(--accent);font-weight:500">${names.map(n=>escapeHtml(n)).join(', ')}</span>`;
+      autoEl.dataset.resolved = names.join(', ');
+      manualEl.style.display = 'none';
+      manualEl.value = '';
+    } else {
+      autoEl.innerHTML = `<span style="color:var(--muted2)">No technician found \u2014 enter manually</span>`;
+      autoEl.dataset.resolved = '';
+      manualEl.style.display = '';
     }
+  }catch(e){
+    console.warn('lookupTechnician', e?.message);
+    autoEl.innerHTML = `<span style="color:var(--red)">Lookup failed</span>`;
+    autoEl.dataset.resolved = '';
+    manualEl.style.display = '';
   }
-  const all = [...new Set([...techNames, ...extraNames])].sort((a,b)=>a.localeCompare(b));
-  // Populate both selects (cell + quick-add) with the same options
-  ['pc_performedBy','pq_performedBy'].forEach(id=>{
-    const sel = document.getElementById(id);
-    if(!sel) return;
-    const cur = sel.value; // preserve current selection
-    sel.innerHTML = `<option value="">— Select —</option>`
-      + all.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('')
-      + `<option value="__other__">Other (type name)\u2026</option>`;
-    if(cur && cur !== '__other__') sel.value = cur;
-  });
 }
 
-function togglePerfCustom(prefix){
-  const sel = document.getElementById(prefix+'_performedBy');
-  const inp = document.getElementById(prefix+'_performedByCustom');
-  if(!sel || !inp) return;
-  inp.style.display = sel.value === '__other__' ? '' : 'none';
-  if(sel.value !== '__other__') inp.value = '';
+function lookupTechForPest(prefix){
+  let propertyId, date;
+  if(prefix === 'pc'){
+    propertyId = pestCellActiveProp;
+    date = document.getElementById('pc_date').value;
+  } else {
+    propertyId = document.getElementById('pq_property').value;
+    date = document.getElementById('pq_date').value;
+  }
+  lookupTechnician(propertyId, date, prefix);
 }
 
 function setPerfValue(prefix, value){
-  const sel = document.getElementById(prefix+'_performedBy');
-  const inp = document.getElementById(prefix+'_performedByCustom');
-  if(!sel || !inp) return;
-  // If the value matches an option, select it; otherwise use "Other"
-  const match = [...sel.options].find(o => o.value === value);
-  if(value && !match){
-    sel.value = '__other__';
-    inp.style.display = '';
-    inp.value = value;
+  const autoEl = document.getElementById(prefix+'_performedByAuto');
+  const manualEl = document.getElementById(prefix+'_performedByManual');
+  if(!autoEl || !manualEl) return;
+  if(value){
+    autoEl.innerHTML = `<span style="color:var(--accent);font-weight:500">${escapeHtml(value)}</span>`;
+    autoEl.dataset.resolved = value;
+    manualEl.style.display = 'none';
+    manualEl.value = '';
   } else {
-    sel.value = value || '';
-    inp.style.display = 'none';
-    inp.value = '';
+    autoEl.dataset.resolved = '';
   }
 }
 
 function getPerfValue(prefix){
-  const sel = document.getElementById(prefix+'_performedBy');
-  const inp = document.getElementById(prefix+'_performedByCustom');
-  if(!sel) return '';
-  if(sel.value === '__other__') return (inp?.value || '').trim();
-  return sel.value;
+  const autoEl = document.getElementById(prefix+'_performedByAuto');
+  const manualEl = document.getElementById(prefix+'_performedByManual');
+  const resolved = autoEl?.dataset?.resolved;
+  if(resolved) return resolved;
+  return (manualEl?.value || '').trim();
 }
 
 function openPestCell(propertyId, monthIdx){
@@ -2727,8 +2750,7 @@ function openPestCell(propertyId, monthIdx){
   document.getElementById('pc_notes').value = '';
   document.getElementById('pestDeleteBtn').style.display = 'none';
 
-  populatePerfSelects();
-  setPerfValue('pc', '');
+  lookupTechForPest('pc');
   document.getElementById('pestCellModal').classList.add('open');
 }
 
@@ -2749,7 +2771,11 @@ function editPestEntry(entryId){
   document.getElementById('pc_serviceType').value = entry.serviceType || 'Monthly';
   document.getElementById('pc_pestType').value = entry.pestType || 'General';
   document.getElementById('pc_cost').value = entry.cost || '';
-  setPerfValue('pc', entry.performedBy || '');
+  if(entry.performedBy){
+    setPerfValue('pc', entry.performedBy);
+  } else {
+    lookupTechForPest('pc');
+  }
   document.getElementById('pc_notes').value = entry.notes || '';
   document.getElementById('pestDeleteBtn').style.display = currentUser?.role==='admin' ? 'inline-block' : 'none';
   document.getElementById('pestCellExisting').innerHTML = `<div style="font-size:10px;font-weight:500;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Editing existing entry</div>`;
@@ -2822,8 +2848,8 @@ function openPestQuickAdd(){
   document.getElementById('pq_pestType').value = 'General';
   document.getElementById('pq_cost').value = '';
   document.getElementById('pq_notes').value = '';
-  populatePerfSelects();
-  setPerfValue('pq', '');
+  document.getElementById('pq_performedByManual').value = '';
+  lookupTechForPest('pq');
   document.getElementById('pestQuickModal').classList.add('open');
 }
 
