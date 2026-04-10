@@ -589,50 +589,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .pest-summary .ps-overdue{color:var(--red);font-weight:600}
 .pest-summary .ps-done{color:var(--accent);font-weight:600}
 
-/* ── POOL SAVINGS ── */
-.ps-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:20px}
-.ps-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;transition:border-color .15s}
-.ps-card:hover{border-color:var(--border2)}
-.ps-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.ps-card-name{font-size:15px;font-weight:600;letter-spacing:-.02em}
-.ps-card-actions{display:flex;gap:6px}
-.ps-card-badge{font-size:10px;font-weight:500;padding:3px 8px;border-radius:5px;background:var(--accent-dim);color:var(--accent)}
-.ps-card-badge.released{background:var(--surface3);color:var(--muted)}
-.ps-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.ps-stat{display:flex;flex-direction:column;gap:2px}
-.ps-stat-lbl{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
-.ps-stat-val{font-size:14px;font-weight:600;font-family:var(--mono)}
-.ps-stat-val.accent{color:var(--accent)}
-.ps-progress{width:100%;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-bottom:6px}
-.ps-progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
-.ps-progress-info{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:14px}
-.ps-deposit-toggle{background:none;border:1px solid var(--border2);border-radius:7px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .12s;width:100%;text-align:left;display:flex;align-items:center;gap:6px}
-.ps-deposit-toggle:hover{color:var(--text);background:var(--surface2)}
-.ps-deposit-toggle svg{width:11px;height:11px;transition:transform .18s}
-.ps-deposit-toggle.open svg{transform:rotate(90deg)}
-.ps-deposits{margin-top:10px;max-height:200px;overflow-y:auto}
-.ps-deposit-row{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px}
-.ps-deposit-row:last-child{border-bottom:none}
-.ps-deposit-row .ps-dep-date{color:var(--text);font-family:var(--mono);font-size:11px}
-.ps-deposit-row .ps-dep-amt{color:var(--accent);font-family:var(--mono);font-weight:500}
-.ps-deposit-row .ps-dep-run{color:var(--muted);font-family:var(--mono)}
-.ps-pending{opacity:.55;font-style:italic}
-.ps-released .ps-card{border-color:var(--border);opacity:.7}
-.ps-released .ps-card:hover{opacity:.85}
-.ps-released-section{margin-top:24px}
-.ps-released-toggle{background:none;border:none;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:8px;padding:8px 0;transition:color .12s}
-.ps-released-toggle:hover{color:var(--text)}
-.ps-released-toggle svg{width:12px;height:12px;transition:transform .18s}
-.ps-released-toggle.open svg{transform:rotate(90deg)}
-.ps-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:40vh;gap:12px;color:var(--muted)}
-.ps-empty-title{font-size:16px;font-weight:500;color:var(--text)}
-
 @media(max-width:860px){
   .app{grid-template-columns:1fr}
   .sidebar{display:none}
   .metrics{grid-template-columns:repeat(2,1fr)}
   .overview-row,.potential-grid{grid-template-columns:1fr}
-  .ps-cards{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -774,10 +735,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="nav-item" id="nav-inspections" onclick="showView('inspections')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><path d="M10.5 10.5l3 3"/></svg>
         Inspection Tracker
-      </button>
-      <button class="nav-item" id="nav-poolSavings" onclick="showView('poolSavings')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13V7l5-4 5 4v6"/><path d="M7 10h2v3H7z"/><circle cx="8" cy="6.5" r="1.5"/></svg>
-        Pool Savings
       </button>
       <div class="sidebar-bottom">
         <div class="user-row">
@@ -923,7 +880,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
-      <div id="poolSavingsView" style="display:none"></div>
 
     </main>
   </div>
@@ -1222,56 +1178,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('legalModal')">Cancel</button>
       <button class="btn btn-danger btn-sm" id="deleteLegalBtn" style="display:none" onclick="deleteLegalCase()">Delete</button>
       <button class="btn btn-primary btn-sm" onclick="saveLegalCase()">Save case</button>
-    </div>
-  </div>
-</div>
-
-<!-- POOL SAVINGS MODAL -->
-<div class="overlay" id="poolSavingsModal" onclick="if(event.target===this)closeModal('poolSavingsModal')">
-  <div class="modal">
-    <div class="modal-title">
-      <span id="psModalTitle">Add Employee</span>
-      <button class="modal-close" onclick="closeModal('poolSavingsModal')">×</button>
-    </div>
-    <div class="fg"><label>Employee Name</label><input type="text" id="ps_name" placeholder="Full name"></div>
-    <div class="frow">
-      <div class="fg"><label>Monthly Contribution ($)</label><input type="number" id="ps_monthly" placeholder="0" step="1" min="0"></div>
-      <div class="fg"><label>Duration (Years)</label>
-        <select id="ps_duration">
-          <option value="1">1 year</option>
-          <option value="2">2 years</option>
-          <option value="3" selected>3 years</option>
-          <option value="4">4 years</option>
-          <option value="5">5 years</option>
-          <option value="6">6 years</option>
-          <option value="7">7 years</option>
-          <option value="8">8 years</option>
-          <option value="9">9 years</option>
-          <option value="10">10 years</option>
-        </select>
-      </div>
-    </div>
-    <div class="fg"><label>Start Date</label><input type="date" id="ps_startDate"></div>
-    <input type="hidden" id="ps_editId" value="">
-    <div class="modal-foot">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('poolSavingsModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="psSaveBtn" onclick="savePoolSavingsEntry()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- POOL SAVINGS RELEASE CONFIRM MODAL -->
-<div class="overlay" id="psReleaseModal" onclick="if(event.target===this)closeModal('psReleaseModal')">
-  <div class="modal" style="width:380px">
-    <div class="modal-title">
-      Release Funds
-      <button class="modal-close" onclick="closeModal('psReleaseModal')">×</button>
-    </div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5" id="psReleaseMsg">Are you sure you want to release funds for this employee? This action cannot be undone.</p>
-    <input type="hidden" id="ps_releaseId" value="">
-    <div class="modal-foot">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('psReleaseModal')">Cancel</button>
-      <button class="btn btn-danger btn-sm" onclick="confirmReleasePoolSavings()">Release Funds</button>
     </div>
   </div>
 </div>
@@ -4871,7 +4777,7 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', inspections:'inspectionsView', poolSavings:'poolSavingsView'
+    tenants:'tenantsView', inspections:'inspectionsView'
   };
 
   // Hide all views
@@ -4898,8 +4804,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', inspections:'Inspection Tracker',
-    poolSavings:'Pool Savings'
+    tenants:'Tenant Info', inspections:'Inspection Tracker'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -4935,7 +4840,6 @@ function showView(v){
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
-  if(v==='poolSavings') renderPoolSavingsView();
   if(v==='team'){
     if(!currentUser||currentUser.role!=='admin'){
       document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
@@ -4957,302 +4861,6 @@ function setFilter(f){
 
 function refreshAll(){
   showView(currentView);
-}
-
-// ─────────────────────────────────────────────
-// POOL SAVINGS
-// ─────────────────────────────────────────────
-let poolSavingsData = [];
-let psReleasedOpen = false;
-let psDepositOpenMap = {};
-
-function psMonthsBetween(startDateStr, endDateStr) {
-  const [sy,sm] = startDateStr.split('-').map(Number);
-  const [ey,em] = endDateStr.split('-').map(Number);
-  const months = [];
-  let y = sy, m = sm;
-  while (y < ey || (y === ey && m <= em)) {
-    months.push(String(y) + '-' + String(m).padStart(2,'0'));
-    m++;
-    if (m > 12) { m = 1; y++; }
-  }
-  return months;
-}
-
-async function psAutoDeposits(doc) {
-  if (doc.status === 'released') return doc;
-  const now = new Date();
-  const curMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-  const allMonths = psMonthsBetween(doc.startDate, curMonthKey);
-  const existing = new Set((doc.deposits||[]).map(d => d.monthKey));
-  let changed = false;
-  const deposits = [...(doc.deposits||[])];
-  for (const mk of allMonths) {
-    if (!existing.has(mk)) {
-      deposits.push({ date: mk + '-01', amount: doc.monthlyAmount, monthKey: mk });
-      changed = true;
-    }
-  }
-  if (changed) {
-    deposits.sort((a,b) => a.monthKey.localeCompare(b.monthKey));
-    await db.collection('poolSavings').doc(doc.id).update({ deposits });
-    doc.deposits = deposits;
-  }
-  return doc;
-}
-
-async function renderPoolSavingsView() {
-  const container = document.getElementById('poolSavingsView');
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Loading...</div>';
-
-  // Update head actions
-  const ha = document.getElementById('headActions');
-  if (canEdit()) {
-    ha.innerHTML = '<button class="btn btn-primary btn-sm" onclick="openPoolSavingsAdd()">+ Add Employee</button>';
-  } else {
-    ha.innerHTML = '';
-  }
-
-  try {
-    const snap = await db.collection('poolSavings').get();
-    poolSavingsData = [];
-    snap.forEach(d => poolSavingsData.push({ id: d.id, ...d.data() }));
-
-    // Auto-deposit for active entries
-    for (let i = 0; i < poolSavingsData.length; i++) {
-      poolSavingsData[i] = await psAutoDeposits(poolSavingsData[i]);
-    }
-
-    const active = poolSavingsData.filter(e => e.status === 'active');
-    const released = poolSavingsData.filter(e => e.status === 'released');
-
-    if (active.length === 0 && released.length === 0) {
-      container.innerHTML = `
-        <div class="ps-empty">
-          <div style="font-size:36px;color:var(--muted2)">&#x1f4b0;</div>
-          <div class="ps-empty-title">No Pool Savings Yet</div>
-          <div style="font-size:12px">Add employees to start tracking pool savings contributions.</div>
-        </div>`;
-      return;
-    }
-
-    let html = '';
-
-    if (active.length > 0) {
-      html += '<div class="ps-cards">';
-      for (const emp of active) {
-        html += buildPsCard(emp, false);
-      }
-      html += '</div>';
-    }
-
-    if (released.length > 0) {
-      html += '<div class="ps-released-section">';
-      html += `<button class="ps-released-toggle ${psReleasedOpen?'open':''}" onclick="psToggleReleased()">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg>
-        Released (${released.length})
-      </button>`;
-      if (psReleasedOpen) {
-        html += '<div class="ps-released ps-cards" style="margin-top:10px">';
-        for (const emp of released) {
-          html += buildPsCard(emp, true);
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-    }
-
-    container.innerHTML = html;
-  } catch (err) {
-    console.error('Pool savings load error:', err);
-    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red)">Error loading pool savings data.</div>';
-  }
-}
-
-function buildPsCard(emp, isReleased) {
-  const target = emp.monthlyAmount * emp.durationYears * 12;
-  const deposits = emp.deposits || [];
-  const totalSaved = deposits.reduce((s, d) => s + d.amount, 0);
-  const pct = target > 0 ? Math.min(100, (totalSaved / target) * 100) : 0;
-
-  const now = new Date();
-  const curMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-
-  // Months remaining
-  const [sy,sm] = emp.startDate.split('-').map(Number);
-  const totalMonths = emp.durationYears * 12;
-  const startD = new Date(sy, sm-1, 1);
-  const endD = new Date(startD);
-  endD.setMonth(endD.getMonth() + totalMonths);
-  const endDateStr = endD.toLocaleDateString('en-US', {month:'short', year:'numeric'});
-  const nowMs = now.getTime();
-  const monthsElapsed = (now.getFullYear() - sy) * 12 + (now.getMonth() + 1 - sm);
-  const monthsRemaining = Math.max(0, totalMonths - monthsElapsed);
-
-  const depOpen = psDepositOpenMap[emp.id] || false;
-  const badgeClass = isReleased ? 'ps-card-badge released' : 'ps-card-badge';
-  const badgeText = isReleased ? 'Released' : 'Active';
-  const releasedDate = emp.releasedAt ? new Date(emp.releasedAt.seconds ? emp.releasedAt.seconds*1000 : emp.releasedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
-
-  let actionsHtml = '';
-  if (!isReleased && canEdit()) {
-    actionsHtml += `<button class="btn btn-ghost btn-sm" onclick="openPoolSavingsEdit('${emp.id}')" style="padding:4px 10px;font-size:11px">Edit</button>`;
-    if (pct >= 100 || currentUser.role === 'admin') {
-      actionsHtml += `<button class="btn btn-sm" style="padding:4px 10px;font-size:11px;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-dim)" onclick="openReleasePoolSavings('${emp.id}')">Release</button>`;
-    }
-    if (currentUser.role === 'admin') {
-      actionsHtml += `<button class="btn btn-danger btn-sm" onclick="deletePoolSavingsEntry('${emp.id}')" style="padding:4px 10px;font-size:11px">Remove</button>`;
-    }
-  }
-
-  // Build deposit log
-  let depositsHtml = '';
-  if (depOpen && deposits.length > 0) {
-    let running = 0;
-    depositsHtml = '<div class="ps-deposits">';
-    for (const dep of deposits) {
-      running += dep.amount;
-      const isPending = dep.monthKey === curMonthKey && !isReleased;
-      depositsHtml += `<div class="ps-deposit-row ${isPending?'ps-pending':''}">
-        <span class="ps-dep-date">${dep.monthKey}</span>
-        <span class="ps-dep-amt">${fmt(dep.amount)}</span>
-        <span class="ps-dep-run">${fmt(running)}</span>
-      </div>`;
-    }
-    depositsHtml += '</div>';
-  }
-
-  return `<div class="ps-card">
-    <div class="ps-card-head">
-      <div>
-        <div class="ps-card-name">${escapeHtml(emp.name)}</div>
-        <span class="${badgeClass}">${badgeText}</span>
-        ${isReleased && releasedDate ? '<span style="font-size:10px;color:var(--muted);margin-left:6px">'+releasedDate+'</span>' : ''}
-      </div>
-      <div class="ps-card-actions">${actionsHtml}</div>
-    </div>
-    <div class="ps-stats">
-      <div class="ps-stat"><span class="ps-stat-lbl">Monthly</span><span class="ps-stat-val">${fmt(emp.monthlyAmount)}</span></div>
-      <div class="ps-stat"><span class="ps-stat-lbl">Duration</span><span class="ps-stat-val">${emp.durationYears} yr${emp.durationYears>1?'s':''}</span></div>
-      <div class="ps-stat"><span class="ps-stat-lbl">Total Saved</span><span class="ps-stat-val accent">${fmt(totalSaved)}</span></div>
-      <div class="ps-stat"><span class="ps-stat-lbl">Target</span><span class="ps-stat-val">${fmt(target)}</span></div>
-      ${isReleased ? '' : '<div class="ps-stat"><span class="ps-stat-lbl">Months Left</span><span class="ps-stat-val">'+monthsRemaining+'</span></div>'}
-      ${isReleased ? '' : '<div class="ps-stat"><span class="ps-stat-lbl">Completion</span><span class="ps-stat-val">'+endDateStr+'</span></div>'}
-    </div>
-    <div class="ps-progress"><div class="ps-progress-fill" style="width:${pct.toFixed(1)}%"></div></div>
-    <div class="ps-progress-info"><span>${pct.toFixed(1)}% complete</span><span>${fmt(totalSaved)} / ${fmt(target)}</span></div>
-    <button class="ps-deposit-toggle ${depOpen?'open':''}" onclick="psToggleDeposits('${emp.id}')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg>
-      Deposit History (${deposits.length})
-    </button>
-    ${depositsHtml}
-  </div>`;
-}
-
-function psToggleReleased() {
-  psReleasedOpen = !psReleasedOpen;
-  renderPoolSavingsView();
-}
-
-function psToggleDeposits(id) {
-  psDepositOpenMap[id] = !psDepositOpenMap[id];
-  renderPoolSavingsView();
-}
-
-function openPoolSavingsAdd() {
-  document.getElementById('psModalTitle').textContent = 'Add Employee';
-  document.getElementById('ps_name').value = '';
-  document.getElementById('ps_monthly').value = '';
-  document.getElementById('ps_duration').value = '3';
-  document.getElementById('ps_startDate').value = new Date().toISOString().slice(0,10);
-  document.getElementById('ps_editId').value = '';
-  document.getElementById('psSaveBtn').textContent = 'Save';
-  document.getElementById('poolSavingsModal').classList.add('open');
-}
-
-function openPoolSavingsEdit(id) {
-  const emp = poolSavingsData.find(e => e.id === id);
-  if (!emp) return;
-  document.getElementById('psModalTitle').textContent = 'Edit Employee';
-  document.getElementById('ps_name').value = emp.name;
-  document.getElementById('ps_monthly').value = emp.monthlyAmount;
-  document.getElementById('ps_duration').value = String(emp.durationYears);
-  document.getElementById('ps_startDate').value = emp.startDate;
-  document.getElementById('ps_editId').value = id;
-  document.getElementById('psSaveBtn').textContent = 'Update';
-  document.getElementById('poolSavingsModal').classList.add('open');
-}
-
-async function savePoolSavingsEntry() {
-  const name = document.getElementById('ps_name').value.trim();
-  const monthly = parseFloat(document.getElementById('ps_monthly').value) || 0;
-  const duration = parseInt(document.getElementById('ps_duration').value) || 3;
-  const startDate = document.getElementById('ps_startDate').value;
-  const editId = document.getElementById('ps_editId').value;
-
-  if (!name) { toast('Please enter a name'); return; }
-  if (monthly <= 0) { toast('Please enter a valid monthly amount'); return; }
-  if (!startDate) { toast('Please select a start date'); return; }
-
-  try {
-    if (editId) {
-      await db.collection('poolSavings').doc(editId).update({
-        name, monthlyAmount: monthly, durationYears: duration, startDate
-      });
-      toast('Employee updated');
-    } else {
-      await db.collection('poolSavings').add({
-        name, monthlyAmount: monthly, durationYears: duration, startDate,
-        status: 'active', releasedAt: null, deposits: [],
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: currentUser ? currentUser.email : ''
-      });
-      toast('Employee added');
-    }
-    closeModal('poolSavingsModal');
-    renderPoolSavingsView();
-  } catch (err) {
-    console.error('Pool savings save error:', err);
-    toast('Error saving entry');
-  }
-}
-
-function openReleasePoolSavings(id) {
-  const emp = poolSavingsData.find(e => e.id === id);
-  if (!emp) return;
-  const totalSaved = (emp.deposits||[]).reduce((s,d) => s+d.amount, 0);
-  document.getElementById('psReleaseMsg').textContent = `Release ${fmt(totalSaved)} in pool savings for ${emp.name}? This will archive the entry and cannot be undone.`;
-  document.getElementById('ps_releaseId').value = id;
-  document.getElementById('psReleaseModal').classList.add('open');
-}
-
-async function confirmReleasePoolSavings() {
-  const id = document.getElementById('ps_releaseId').value;
-  if (!id) return;
-  try {
-    await db.collection('poolSavings').doc(id).update({
-      status: 'released',
-      releasedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    toast('Funds released');
-    closeModal('psReleaseModal');
-    renderPoolSavingsView();
-  } catch (err) {
-    console.error('Release error:', err);
-    toast('Error releasing funds');
-  }
-}
-
-async function deletePoolSavingsEntry(id) {
-  if (!confirm('Remove this employee from pool savings? This cannot be undone.')) return;
-  try {
-    await db.collection('poolSavings').doc(id).delete();
-    toast('Employee removed');
-    renderPoolSavingsView();
-  } catch (err) {
-    console.error('Delete error:', err);
-    toast('Error removing entry');
-  }
 }
 
 function initApp(){
