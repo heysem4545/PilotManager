@@ -3318,8 +3318,40 @@ async function removeMirroredMaintenance(jobId){
   try{
     await db.collection('maintenance').doc(`tech_${jobId}`).delete();
   }catch(e){
-    // Non-fatal if the mirror never existed
     console.warn('removeMirroredMaintenance', jobId, e?.message);
+  }
+}
+
+// Mirror a pest-service technician job into the pestControl collection
+// so the Pest Control tab picks it up. Doc id = `tech_${jobId}`.
+async function mirrorJobToPestControl(jobId, jobData){
+  if(!jobId || !jobData || !jobData.propertyId || !jobData.date) return;
+  const [yStr, mStr] = jobData.date.split('-');
+  const year = parseInt(yStr, 10);
+  const month = parseInt(mStr, 10) - 1;
+  if(isNaN(year) || isNaN(month)) return;
+  const monthKey = `${year}-${pad2(month+1)}`;
+  await db.collection('pestControl').doc(`tech_${jobId}`).set({
+    propertyId: jobData.propertyId,
+    date: jobData.date,
+    year, month, monthKey,
+    serviceType: 'Monthly',
+    pestType: jobData.jobType || 'General Pest',
+    notes: jobData.description || '',
+    cost: 0,
+    performedBy: jobData.technicianName || '',
+    sourceJobId: jobId,
+    createdAt: new Date(),
+    createdBy: jobData.createdBy || (currentUser?.name || '')
+  });
+}
+
+async function removeMirroredPestControl(jobId){
+  if(!jobId) return;
+  try{
+    await db.collection('pestControl').doc(`tech_${jobId}`).delete();
+  }catch(e){
+    console.warn('removeMirroredPestControl', jobId, e?.message);
   }
 }
 
@@ -3333,6 +3365,7 @@ async function saveTechnicianDay(){
     for(const id of toDelete){
       await db.collection('technicianWork').doc(id).delete();
       await removeMirroredMaintenance(id);
+      await removeMirroredPestControl(id);
     }
     for(const j of techDraft){
       const data = {
@@ -3354,12 +3387,20 @@ async function saveTechnicianDay(){
         const ref = await db.collection('technicianWork').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
         jobId = ref.id;
       }
-      // Mirror both maintenance AND pest service records to the
-      // maintenance collection so the Maintenance pivot picks them up.
+      // Mirror to maintenance collection (both types) so the
+      // Maintenance pivot/summary picks them up.
       if(jobId && data.propertyId){
         await mirrorJobToMaintenance(jobId, data);
       } else if(jobId){
         await removeMirroredMaintenance(jobId);
+      }
+      // Additionally mirror pest service records to the pestControl
+      // collection so the Pest Control tab shows them.
+      if(jobId && data.propertyId && data.recordType === 'pestService'){
+        await mirrorJobToPestControl(jobId, data);
+      } else if(jobId){
+        // Either not pest, or no property — clean up any stale mirror
+        await removeMirroredPestControl(jobId);
       }
     }
     closeModal('techDayModal');
