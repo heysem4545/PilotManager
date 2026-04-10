@@ -2217,15 +2217,18 @@ function renderMaintDraft(){
     list.innerHTML = `<div class="maint-modal-empty">No visits yet. Click "+ Add visit" to start.</div>`;
     return;
   }
+  const isAdmin = currentUser?.role === 'admin';
   list.innerHTML = maintDraft.map((v,i)=>`
     <div class="maint-visit-row">
       <select onchange="maintDraft[${i}].type=this.value">
         ${MAINT_TYPES.map(t=>`<option value="${t}" ${v.type===t?'selected':''}>${t}</option>`).join('')}
       </select>
       <input type="text" placeholder="Notes (optional)" value="${escapeAttr(v.notes||'')}" oninput="maintDraft[${i}].notes=this.value">
-      <button class="maint-visit-rm" title="Remove visit" onclick="removeMaintVisitDraft(${i})">
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-      </button>
+      ${isAdmin
+        ? `<button class="maint-visit-rm" title="Remove visit" onclick="removeMaintVisitDraft(${i})">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>`
+        : `<div></div>`}
     </div>
   `).join('');
 }
@@ -2677,6 +2680,7 @@ function renderTechDraftList(){
   const sortedProps = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
   const propOpts = `<option value="">— Select property —</option>` + sortedProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr||'(no address)')}</option>`).join('');
 
+  const isAdmin = currentUser?.role === 'admin';
   if(techDraft.length === 0){
     list.innerHTML = `<div class="maint-modal-empty">No jobs yet. Click "+ Add Job" to start.</div>`;
   } else {
@@ -2698,9 +2702,11 @@ function renderTechDraftList(){
             <option value="4" ${j.performanceRating===4?'selected':''}>★ 4</option>
             <option value="5" ${j.performanceRating===5?'selected':''}>★ 5</option>
           </select>
-          <button class="tech-job-rm" title="Remove job" onclick="removeTechJobDraft(${i})">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
-          </button>
+          ${isAdmin
+            ? `<button class="tech-job-rm" title="Remove job" onclick="removeTechJobDraft(${i})">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              </button>`
+            : `<div></div>`}
         </div>
         <div class="tech-job-card-row">
           <input type="text" placeholder="Description (what work was done)" value="${escapeAttr(j.description||'')}" oninput="techDraftSet(${i},'description',this.value)">
