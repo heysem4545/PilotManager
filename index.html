@@ -75,6 +75,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .u-name{font-size:12px;font-weight:500}
 .u-role{font-size:10px;padding:1px 7px;border-radius:4px;display:inline-block;margin-top:2px}
 .role-admin{background:var(--accent-dim);color:var(--accent)}
+.role-manager{background:var(--purple-dim);color:var(--purple)}
+.role-office{background:var(--blue-dim);color:var(--blue)}
+.role-technician{background:var(--amber-dim);color:var(--amber)}
+.role-agent{background:var(--surface3);color:var(--muted)}
 .role-editor{background:var(--blue-dim);color:var(--blue)}
 .role-viewer{background:var(--surface3);color:var(--muted)}
 .logout-btn{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;margin-top:6px;transition:all .12s}
@@ -859,8 +863,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <div class="invite-form" id="inviteForm">
             <input type="email" id="inviteEmail" placeholder="team@email.com">
             <select id="inviteRole">
-              <option value="editor">Editor</option>
-              <option value="viewer">Viewer</option>
+              <option value="agent">Agent</option>
+              <option value="technician">Technician</option>
+              <option value="office">Office</option>
+              <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="inviteUser()">Send invite</button>
@@ -1273,7 +1279,7 @@ async function registerEmail(){
     const cred=await auth.createUserWithEmailAndPassword(email,pass);
     // Check if this is first user → make admin
     const usersSnap=await db.collection('users').get();
-    const role=usersSnap.empty?'admin':'viewer';
+    const role=usersSnap.empty?'admin':'agent';
     await db.collection('users').doc(cred.user.uid).set({
       name,email,role,createdAt:new Date()
     });
@@ -1306,7 +1312,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   let userDoc=await db.collection('users').doc(firebaseUser.uid).get();
   if(!userDoc.exists){
     const usersSnap=await db.collection('users').get();
-    const role=usersSnap.empty?'admin':'viewer';
+    const role=usersSnap.empty?'admin':'agent';
     await db.collection('users').doc(firebaseUser.uid).set({
       name:firebaseUser.displayName||firebaseUser.email,
       email:firebaseUser.email,role,createdAt:new Date()
@@ -1323,11 +1329,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   roleEl.textContent=currentUser.role;
   roleEl.className='u-role role-'+currentUser.role;
 
-  if(currentUser.role!=='admin'){
+  if(currentUser.role!=='admin' && currentUser.role!=='manager'){
     document.getElementById('nav-team').classList.add('disabled');
-    document.getElementById('addPropBtn').style.display='none';
   }
-  if(currentUser.role==='viewer'){
+  if(!canEdit()){
     document.getElementById('addPropBtn').style.display='none';
   }
 
@@ -1417,7 +1422,7 @@ function pct(a,b){return b>0?Math.round(a/b*100):0}
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
-function canEdit(){return currentUser&&(currentUser.role==='admin'||currentUser.role==='editor');}
+function canEdit(){return currentUser&&['admin','manager','office','editor'].includes(currentUser.role);}
 
 async function saveProperty(data, id = null) {
   if (id) {
@@ -3049,10 +3054,9 @@ function hideTechTooltip(){
 }
 
 async function loadTechniciansList(){
-  // Pull from the same users/team collection used by the Team section
-  // so technicians don't need to be maintained as a separate list.
+  // Pull users with the 'technician' role from the users collection.
   const users = await getUsers();
-  techNames = users.map(u=>u.name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  techNames = users.filter(u=>u.role==='technician').map(u=>u.name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
 }
 
 async function loadTechnicianMonth(name, year, month){
@@ -3936,8 +3940,10 @@ async function renderTeam(){
         ${currentUser.role==='admin'&&!isMe?`
           <select class="role-select" onchange="changeRole('${u.uid}',this.value)">
             <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-            <option value="editor" ${u.role==='editor'?'selected':''}>Editor</option>
-            <option value="viewer" ${u.role==='viewer'?'selected':''}>Viewer</option>
+            <option value="manager" ${u.role==='manager'?'selected':''}>Manager</option>
+            <option value="office" ${u.role==='office'?'selected':''}>Office</option>
+            <option value="technician" ${u.role==='technician'?'selected':''}>Technician</option>
+            <option value="agent" ${u.role==='agent'?'selected':''}>Agent</option>
           </select>
         `:`<span class="u-role role-${u.role}">${u.role}</span>`}
       </div>
@@ -4838,8 +4844,8 @@ function showView(v){
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
   if(v==='team'){
-    if(!currentUser||currentUser.role!=='admin'){
-      document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin access required</h2><p>Only admins can manage the team.</p></div>';
+    if(!currentUser||(currentUser.role!=='admin'&&currentUser.role!=='manager')){
+      document.getElementById('teamView').innerHTML='<div class="access-denied"><h2>Admin/Manager access required</h2><p>Only admins and managers can manage the team.</p></div>';
     }else{renderTeam();}
   }
 }
