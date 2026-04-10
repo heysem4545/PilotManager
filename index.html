@@ -2656,6 +2656,39 @@ function removeTechJobDraft(i){
   renderTechDraftList();
 }
 
+// Mirror a technician job into the maintenance collection so the
+// Maintenance pivot/summary auto-reflect technician work without
+// double-entry. Maintenance doc id = `tech_${jobId}` to keep the
+// link 1-to-1 and idempotent across re-saves.
+async function mirrorJobToMaintenance(jobId, jobData){
+  if(!jobId || !jobData || !jobData.propertyId || !jobData.date) return;
+  const [yStr, mStr] = jobData.date.split('-');
+  const year = parseInt(yStr, 10);
+  const month = parseInt(mStr, 10) - 1;
+  if(isNaN(year) || isNaN(month)) return;
+  const monthKey = `${year}-${pad2(month+1)}`;
+  await db.collection('maintenance').doc(`tech_${jobId}`).set({
+    propertyId: jobData.propertyId,
+    year, month, monthKey,
+    type: jobData.jobType || 'General',
+    notes: jobData.description || '',
+    sourceJobId: jobId,
+    sourceTechnician: jobData.technicianName || '',
+    createdAt: new Date(),
+    createdBy: jobData.createdBy || (currentUser?.name || '')
+  });
+}
+
+async function removeMirroredMaintenance(jobId){
+  if(!jobId) return;
+  try{
+    await db.collection('maintenance').doc(`tech_${jobId}`).delete();
+  }catch(e){
+    // Non-fatal if the mirror never existed
+    console.warn('removeMirroredMaintenance', jobId, e?.message);
+  }
+}
+
 async function saveTechnicianDay(){
   if(!canEdit() || !techActiveName || !techActiveDate) return;
   const date = techActiveDate;
@@ -2665,6 +2698,7 @@ async function saveTechnicianDay(){
     const toDelete = techOriginalIds.filter(id => !draftIds.includes(id));
     for(const id of toDelete){
       await db.collection('technicianWork').doc(id).delete();
+      await removeMirroredMaintenance(id);
     }
     for(const j of techDraft){
       const data = {
@@ -2677,10 +2711,20 @@ async function saveTechnicianDay(){
         durationMinutes: j.durationMinutes || 0,
         performanceRating: j.performanceRating || 0
       };
+      let jobId;
       if(j.id){
         await db.collection('technicianWork').doc(j.id).update({...data, updatedAt:new Date(), updatedBy:currentUser?.name||''});
+        jobId = j.id;
       } else {
-        await db.collection('technicianWork').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
+        const ref = await db.collection('technicianWork').add({...data, createdAt:new Date(), createdBy:currentUser?.name||''});
+        jobId = ref.id;
+      }
+      // Mirror to maintenance when a property is selected, otherwise
+      // make sure no stale mirror is left behind from a previous save.
+      if(jobId && data.propertyId){
+        await mirrorJobToMaintenance(jobId, data);
+      } else if(jobId){
+        await removeMirroredMaintenance(jobId);
       }
     }
     closeModal('techDayModal');
