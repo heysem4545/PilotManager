@@ -1073,6 +1073,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
       <div class="fg"><label>Cost ($)</label><input type="number" id="pc_cost" placeholder="0" step="0.01"></div>
     </div>
+    <div class="fg"><label>Who did the service</label><input id="pc_performedBy" list="techNamesList" placeholder="Technician name or company"></div>
     <div class="fg"><label>Notes</label><textarea id="pc_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('pestCellModal')">Cancel</button>
@@ -1113,6 +1114,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
       <div class="fg"><label>Cost ($)</label><input type="number" id="pq_cost" placeholder="0" step="0.01"></div>
     </div>
+    <div class="fg"><label>Who did the service</label><input id="pq_performedBy" list="techNamesList" placeholder="Technician name or company"></div>
     <div class="fg"><label>Notes</label><textarea id="pq_notes" rows="2" placeholder="Service details..."></textarea></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('pestQuickModal')">Cancel</button>
@@ -1156,6 +1158,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<datalist id="techNamesList"></datalist>
 <div class="toast" id="toast"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <!-- Firebase Config -->
@@ -2609,6 +2612,25 @@ async function updatePestFrequency(propertyId, value){
   }
 }
 
+async function populateTechNamesList(){
+  // Ensure technician names are loaded
+  if(techNames.length === 0){
+    try{ await loadTechniciansList(); }catch(e){ /* non-fatal */ }
+  }
+  // Augment with any names from existing pest control data
+  const extraNames = new Set();
+  for(const pid of Object.keys(pestControlData)){
+    for(const mk of Object.keys(pestControlData[pid])){
+      pestControlData[pid][mk].forEach(e=>{
+        if(e.performedBy) extraNames.add(e.performedBy);
+      });
+    }
+  }
+  const all = [...new Set([...techNames, ...extraNames])].sort((a,b)=>a.localeCompare(b));
+  const dl = document.getElementById('techNamesList');
+  if(dl) dl.innerHTML = all.map(n=>`<option value="${escapeAttr(n)}">`).join('');
+}
+
 function openPestCell(propertyId, monthIdx){
   if(!canEdit()) return;
   const p = properties.find(x=>x.id===propertyId);
@@ -2634,7 +2656,7 @@ function openPestCell(propertyId, monthIdx){
         return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-size:12px;font-weight:500;color:var(--text)">${escapeHtml(e.pestType||'General')} \u2014 ${escapeHtml(e.serviceType||'')}</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">${escapeHtml(dateStr)}${costStr?' \u2022 '+costStr:''}${e.notes?' \u2022 '+escapeHtml(e.notes):''}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${escapeHtml(dateStr)}${costStr?' \u2022 '+costStr:''}${e.performedBy?' \u2022 '+escapeHtml(e.performedBy):''}${e.notes?' \u2022 '+escapeHtml(e.notes):''}</div>
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="editPestEntry('${escapeAttr(e.id)}')">Edit</button>
@@ -2653,9 +2675,11 @@ function openPestCell(propertyId, monthIdx){
   document.getElementById('pc_serviceType').value = p.pestFrequency || 'Monthly';
   document.getElementById('pc_pestType').value = 'General';
   document.getElementById('pc_cost').value = '';
+  document.getElementById('pc_performedBy').value = '';
   document.getElementById('pc_notes').value = '';
   document.getElementById('pestDeleteBtn').style.display = 'none';
 
+  populateTechNamesList();
   document.getElementById('pestCellModal').classList.add('open');
 }
 
@@ -2676,6 +2700,7 @@ function editPestEntry(entryId){
   document.getElementById('pc_serviceType').value = entry.serviceType || 'Monthly';
   document.getElementById('pc_pestType').value = entry.pestType || 'General';
   document.getElementById('pc_cost').value = entry.cost || '';
+  document.getElementById('pc_performedBy').value = entry.performedBy || '';
   document.getElementById('pc_notes').value = entry.notes || '';
   document.getElementById('pestDeleteBtn').style.display = currentUser?.role==='admin' ? 'inline-block' : 'none';
   document.getElementById('pestCellExisting').innerHTML = `<div style="font-size:10px;font-weight:500;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Editing existing entry</div>`;
@@ -2694,10 +2719,11 @@ async function savePestCellEntry(){
   const month = parseInt(dateParts[1],10) - 1;
   const mk = `${dateParts[0]}-${dateParts[1]}`;
 
+  const performedBy = document.getElementById('pc_performedBy').value.trim();
   const data = {
     propertyId: pestCellActiveProp,
     date, monthKey: mk, year, month,
-    serviceType, pestType, notes, cost
+    serviceType, pestType, notes, cost, performedBy
   };
 
   try{
@@ -2746,7 +2772,9 @@ function openPestQuickAdd(){
   document.getElementById('pq_serviceType').value = 'Monthly';
   document.getElementById('pq_pestType').value = 'General';
   document.getElementById('pq_cost').value = '';
+  document.getElementById('pq_performedBy').value = '';
   document.getElementById('pq_notes').value = '';
+  populateTechNamesList();
   document.getElementById('pestQuickModal').classList.add('open');
 }
 
@@ -2760,6 +2788,7 @@ async function savePestQuickEntry(){
   const pestType = document.getElementById('pq_pestType').value;
   const cost = parseFloat(document.getElementById('pq_cost').value) || 0;
   const notes = document.getElementById('pq_notes').value.trim();
+  const performedBy = document.getElementById('pq_performedBy').value.trim();
   const dateParts = date.split('-');
   const year = parseInt(dateParts[0],10);
   const month = parseInt(dateParts[1],10) - 1;
@@ -2768,7 +2797,7 @@ async function savePestQuickEntry(){
   try{
     await db.collection('pestControl').add({
       propertyId, date, monthKey: mk, year, month,
-      serviceType, pestType, notes, cost,
+      serviceType, pestType, notes, cost, performedBy,
       createdAt:new Date(), createdBy:currentUser?.name||''
     });
     closeModal('pestQuickModal');
