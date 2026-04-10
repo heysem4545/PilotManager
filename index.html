@@ -1966,7 +1966,7 @@ async function renderMaintenanceView(){
   // Pull every property from the global `properties` array (loaded from
   // Firestore via loadProperties() — same source the All Properties view uses).
   // No filter is applied, so every property in the collection becomes a row.
-  const sortedProps = [...properties].sort((a,b)=> (a.addr||'').localeCompare(b.addr||''));
+  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
 
   const yearOpts = [];
   const curYear = new Date().getFullYear();
@@ -2283,7 +2283,7 @@ function openQuickMaintenance(){
   if(!canEdit()) return;
   const propSelect = document.getElementById('mq_property');
   const monthSelect = document.getElementById('mq_month');
-  const sortedProps = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   propSelect.innerHTML = sortedProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr||'')}</option>`).join('');
   const MNAMES_FULL4 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const curMonth = new Date().getMonth();
@@ -2677,7 +2677,7 @@ function openTechnicianDay(date){
 
 function renderTechDraftList(){
   const list = document.getElementById('techJobList');
-  const sortedProps = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const propOpts = `<option value="">— Select property —</option>` + sortedProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr||'(no address)')}</option>`).join('');
 
   const isAdmin = currentUser?.role === 'admin';
