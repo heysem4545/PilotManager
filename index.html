@@ -668,6 +668,35 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .pest-summary .ps-overdue{color:var(--red);font-weight:600}
 .pest-summary .ps-done{color:var(--accent);font-weight:600}
 
+/* ── UTILITY TRACKING ── */
+.util-toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.util-toolbar select{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;cursor:pointer}
+.util-toolbar select:focus{border-color:var(--accent)}
+.util-stats{font-size:11px;color:var(--muted);margin-left:auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.util-stats strong{color:var(--text);font-weight:600}
+.util-tbl{width:100%;border-collapse:collapse;min-width:1600px}
+.util-tbl thead th{font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 5px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
+.util-tbl thead th:first-child{text-align:left;padding-left:12px;min-width:150px}
+.util-tbl thead th.util-acct-hdr{min-width:90px;text-align:left}
+.util-tbl thead th.util-month-hdr{border-left:1px solid var(--border)}
+.util-tbl thead th.util-total-hdr{background:var(--surface2);font-weight:600}
+.util-tbl tbody td{padding:4px 5px;border-bottom:1px solid var(--border);font-size:11px;text-align:center;vertical-align:middle}
+.util-tbl tbody td:first-child{text-align:left;padding-left:12px;font-weight:500;color:var(--text);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+.util-tbl tbody tr:hover td{background:rgba(255,255,255,.02)}
+.util-tbl tbody tr:last-child td{border-bottom:none}
+.util-cell{cursor:pointer;border-radius:3px;padding:3px 4px;transition:background .12s;font-family:var(--mono);font-size:10px;color:var(--muted);min-width:38px;display:inline-block;text-align:center}
+.util-cell:hover{background:var(--surface3)}
+.util-cell.has-val{color:var(--text)}
+.util-cell.over-limit{background:var(--red-dim);color:var(--red);font-weight:600}
+.util-acct{cursor:pointer;border-radius:3px;padding:3px 5px;transition:background .12s;font-family:var(--mono);font-size:10px;color:var(--muted);min-width:60px;display:inline-block;text-align:left}
+.util-acct:hover{background:var(--surface3)}
+.util-acct.has-val{color:var(--text)}
+.util-input{background:var(--surface2);border:1px solid var(--accent);border-radius:4px;padding:2px 5px;font-size:10px;font-family:var(--mono);color:var(--text);outline:none;width:60px;text-align:center}
+.util-input.acct{width:90px;text-align:left}
+.util-total-cell{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text);background:var(--surface2);padding:4px 5px}
+.util-sum-row td{background:var(--surface2)!important;font-weight:600;color:var(--text)!important;font-family:var(--mono);font-size:10px;border-top:2px solid var(--border2)}
+.util-sum-row td:first-child{font-family:var(--font);text-transform:uppercase;letter-spacing:.06em;font-size:10px;color:var(--muted)!important}
+
 @media(max-width:860px){
   .app{grid-template-columns:1fr}
   .sidebar{display:none}
@@ -1297,6 +1326,24 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('roleModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveRole()">Save role</button>
+    </div>
+  </div>
+</div>
+
+<!-- UTILITY LIMIT MODAL -->
+<div class="overlay" id="utilLimitModal" onclick="if(event.target===this)closeModal('utilLimitModal')">
+  <div class="modal" style="width:340px">
+    <div class="modal-head">
+      <div class="modal-title">Utility Limits</div>
+      <button class="modal-close" onclick="closeModal('utilLimitModal')">&times;</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+      <div class="fg"><label>Water limit ($/month)</label><input id="utilWaterLimitInput" type="number" step="0.01" min="0" placeholder="0 = no limit"></div>
+      <div class="fg"><label>Sewer limit ($/month)</label><input id="utilSewerLimitInput" type="number" step="0.01" min="0" placeholder="0 = no limit"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('utilLimitModal')">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveUtilityLimits()">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5313,7 +5360,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['meetings','notices','leads','available','utility','tenants','inspections'];
+  const comingSoon = ['meetings','notices','leads','available','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -5345,6 +5392,7 @@ function showView(v){
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
+  if(v==='utility') renderUtilityView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -5374,6 +5422,247 @@ function initApp(){
   applyTheme(localStorage.getItem('pm-theme') || 'dark');
   renderCourtAlerts(); // update badge immediately
   showView('dashboard');
+}
+
+// ─────────────────────────────────────────────
+// UTILITY TRACKING
+// ─────────────────────────────────────────────
+let utilityData = {};
+let utilityYear = new Date().getFullYear();
+let utilityWaterLimit = parseFloat(localStorage.getItem('pm-util-water-limit')) || 0;
+let utilitySewerLimit = parseFloat(localStorage.getItem('pm-util-sewer-limit')) || 0;
+
+async function loadUtilityData(){
+  try {
+    const snap = await db.collection('utilityTracking').get();
+    utilityData = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      utilityData[d.propertyId] = {
+        docId: doc.id,
+        waterAccount: d.waterAccount || '',
+        sewerAccount: d.sewerAccount || '',
+        payments: d.payments || {}
+      };
+    });
+  } catch(e){ console.error('loadUtilityData', e); }
+}
+
+async function renderUtilityView(){
+  await loadUtilityData();
+  const el = document.getElementById('utilityView');
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const sorted = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const yr = utilityYear;
+
+  // Compute stats
+  let grandWater=0, grandSewer=0;
+  sorted.forEach(p => {
+    const ud = utilityData[p.id];
+    if(!ud) return;
+    months.forEach(m => {
+      const key = yr+'-'+m;
+      const pay = ud.payments[key];
+      if(pay){
+        grandWater += pay.water||0;
+        grandSewer += pay.sewer||0;
+      }
+    });
+  });
+
+  // Year options
+  const curYr = new Date().getFullYear();
+  let yearOpts = '';
+  for(let y=curYr-3;y<=curYr+3;y++){
+    yearOpts += `<option value="${y}"${y===yr?' selected':''}>${y}</option>`;
+  }
+
+  let html = `<div class="table-card">
+    <div class="util-toolbar">
+      <span style="font-size:12px;font-weight:500;color:var(--muted)">Year:</span>
+      <select onchange="utilityYear=parseInt(this.value);renderUtilityView()">${yearOpts}</select>`;
+
+  if(canEdit()){
+    html += `<button class="btn btn-ghost btn-sm" onclick="openUtilityLimits()" style="margin-left:4px">Limits</button>`;
+  }
+
+  html += `<div class="util-stats">
+        <span>${sorted.length} properties</span>
+        <span>Water: <strong>$${grandWater.toFixed(2)}</strong></span>
+        <span>Sewer: <strong>$${grandSewer.toFixed(2)}</strong></span>
+        <span>Total: <strong>$${(grandWater+grandSewer).toFixed(2)}</strong></span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+    <table class="util-tbl">
+      <thead>
+        <tr>
+          <th rowspan="2" style="text-align:left;min-width:150px">Address</th>
+          <th rowspan="2" class="util-acct-hdr">Water Acct</th>
+          <th rowspan="2" class="util-acct-hdr">Sewer Acct</th>`;
+
+  months.forEach((m,i) => {
+    html += `<th colspan="2" class="util-month-hdr">${monthNames[i]}</th>`;
+  });
+  html += `<th colspan="2" class="util-total-hdr">Yearly Total</th></tr><tr>`;
+  months.forEach(() => {
+    html += `<th style="font-size:8px;color:var(--blue)">W</th><th style="font-size:8px;color:var(--amber)">S</th>`;
+  });
+  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue)">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber)">Sewer</th>`;
+  html += `</tr></thead><tbody>`;
+
+  // Month totals accumulators
+  const monthTotals = {};
+  months.forEach(m => { monthTotals[m] = {water:0, sewer:0}; });
+
+  sorted.forEach(p => {
+    const ud = utilityData[p.id] || {waterAccount:'',sewerAccount:'',payments:{}};
+    let rowWater=0, rowSewer=0;
+
+    html += `<tr><td title="${escapeAttr(p.address)}">${escapeHtml(p.address)}</td>`;
+
+    // Water account
+    html += `<td><span class="util-acct${ud.waterAccount?' has-val':''}" onclick="utilEditAcct('${p.id}','waterAccount',this)">${ud.waterAccount?escapeHtml(ud.waterAccount):'&mdash;'}</span></td>`;
+    // Sewer account
+    html += `<td><span class="util-acct${ud.sewerAccount?' has-val':''}" onclick="utilEditAcct('${p.id}','sewerAccount',this)">${ud.sewerAccount?escapeHtml(ud.sewerAccount):'&mdash;'}</span></td>`;
+
+    months.forEach(m => {
+      const key = yr+'-'+m;
+      const pay = ud.payments[key] || {};
+      const w = pay.water||0;
+      const s = pay.sewer||0;
+      rowWater += w;
+      rowSewer += s;
+      monthTotals[m].water += w;
+      monthTotals[m].sewer += s;
+
+      const wOver = utilityWaterLimit>0 && w>utilityWaterLimit;
+      const sOver = utilitySewerLimit>0 && s>utilitySewerLimit;
+
+      html += `<td><span class="util-cell${w?' has-val':''}${wOver?' over-limit':''}" onclick="utilEditPayment('${p.id}','${key}','water',this)">${w?w.toFixed(2):'&mdash;'}</span></td>`;
+      html += `<td><span class="util-cell${s?' has-val':''}${sOver?' over-limit':''}" onclick="utilEditPayment('${p.id}','${key}','sewer',this)">${s?s.toFixed(2):'&mdash;'}</span></td>`;
+    });
+
+    html += `<td class="util-total-cell">${rowWater?'$'+rowWater.toFixed(2):'—'}</td>`;
+    html += `<td class="util-total-cell">${rowSewer?'$'+rowSewer.toFixed(2):'—'}</td>`;
+    html += `</tr>`;
+  });
+
+  // Summary row
+  html += `<tr class="util-sum-row"><td>Totals</td><td></td><td></td>`;
+  let sumW=0, sumS=0;
+  months.forEach(m => {
+    sumW += monthTotals[m].water;
+    sumS += monthTotals[m].sewer;
+    html += `<td>$${monthTotals[m].water.toFixed(2)}</td><td>$${monthTotals[m].sewer.toFixed(2)}</td>`;
+  });
+  html += `<td class="util-total-cell">$${sumW.toFixed(2)}</td><td class="util-total-cell">$${sumS.toFixed(2)}</td>`;
+  html += `</tr></tbody></table></div></div>`;
+
+  el.innerHTML = html;
+}
+
+function utilEditAcct(propertyId, field, span){
+  if(!canEdit()) return;
+  const cur = (utilityData[propertyId] && utilityData[propertyId][field]) || '';
+  const input = document.createElement('input');
+  input.className = 'util-input acct';
+  input.type = 'text';
+  input.value = cur;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  const save = () => {
+    const val = input.value.trim();
+    saveUtilityField(propertyId, field, val);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => { if(e.key==='Enter'){ input.blur(); } if(e.key==='Escape'){ input.removeEventListener('blur',save); renderUtilityView(); } });
+}
+
+function utilEditPayment(propertyId, monthKey, type, span){
+  if(!canEdit()) return;
+  const ud = utilityData[propertyId];
+  const cur = (ud && ud.payments[monthKey] && ud.payments[monthKey][type]) || '';
+  const input = document.createElement('input');
+  input.className = 'util-input';
+  input.type = 'number';
+  input.step = '0.01';
+  input.min = '0';
+  input.value = cur || '';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  const save = () => {
+    const val = parseFloat(input.value) || 0;
+    saveUtilityPayment(propertyId, monthKey, type, val);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => { if(e.key==='Enter'){ input.blur(); } if(e.key==='Escape'){ input.removeEventListener('blur',save); renderUtilityView(); } });
+}
+
+async function saveUtilityField(propertyId, field, value){
+  try {
+    const ud = utilityData[propertyId];
+    const data = {
+      propertyId: propertyId,
+      [field]: value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if(ud && ud.docId){
+      await db.collection('utilityTracking').doc(ud.docId).update(data);
+    } else {
+      data.waterAccount = field==='waterAccount' ? value : '';
+      data.sewerAccount = field==='sewerAccount' ? value : '';
+      data.payments = {};
+      const ref = await db.collection('utilityTracking').add(data);
+      utilityData[propertyId] = { docId:ref.id, waterAccount:data.waterAccount, sewerAccount:data.sewerAccount, payments:{} };
+    }
+    toast('Saved');
+    renderUtilityView();
+  } catch(e){ console.error('saveUtilityField',e); toast('Error saving'); renderUtilityView(); }
+}
+
+async function saveUtilityPayment(propertyId, monthKey, type, value){
+  try {
+    const ud = utilityData[propertyId];
+    const payField = 'payments.'+monthKey+'.'+type;
+    if(ud && ud.docId){
+      await db.collection('utilityTracking').doc(ud.docId).update({
+        [payField]: value,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      const data = {
+        propertyId: propertyId,
+        waterAccount: '',
+        sewerAccount: '',
+        payments: { [monthKey]: { [type]: value } },
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      const ref = await db.collection('utilityTracking').add(data);
+      utilityData[propertyId] = { docId:ref.id, waterAccount:'', sewerAccount:'', payments:data.payments };
+    }
+    toast('Saved');
+    renderUtilityView();
+  } catch(e){ console.error('saveUtilityPayment',e); toast('Error saving'); renderUtilityView(); }
+}
+
+function openUtilityLimits(){
+  document.getElementById('utilWaterLimitInput').value = utilityWaterLimit || '';
+  document.getElementById('utilSewerLimitInput').value = utilitySewerLimit || '';
+  document.getElementById('utilLimitModal').classList.add('open');
+}
+
+function saveUtilityLimits(){
+  utilityWaterLimit = parseFloat(document.getElementById('utilWaterLimitInput').value) || 0;
+  utilitySewerLimit = parseFloat(document.getElementById('utilSewerLimitInput').value) || 0;
+  localStorage.setItem('pm-util-water-limit', utilityWaterLimit);
+  localStorage.setItem('pm-util-sewer-limit', utilitySewerLimit);
+  closeModal('utilLimitModal');
+  toast('Limits saved');
+  if(currentView==='utility') renderUtilityView();
 }
 </script>
 </body>
