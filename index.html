@@ -23,6 +23,21 @@
   --purple:#b56af5;--purple-dim:rgba(181,106,245,0.1);
   --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
 }
+[data-theme="light"]{
+  --bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f1f3;--surface3:#e4e5e9;
+  --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
+  --text:#1a1a1e;--muted:#6b6b74;--muted2:#9b9ba3;
+  --accent:#3a8a0e;--accent-dim:rgba(58,138,14,0.1);
+  --red:#d9453d;--red-dim:rgba(217,69,61,0.1);
+  --amber:#b8860b;--amber-dim:rgba(184,134,11,0.1);
+  --blue:#1a73c7;--blue-dim:rgba(26,115,199,0.1);
+  --purple:#8b3cc7;--purple-dim:rgba(139,60,199,0.1);
+}
+[data-theme="light"] ::-webkit-scrollbar-track{background:var(--surface2)}
+[data-theme="light"] ::-webkit-scrollbar-thumb{background:var(--surface3)}
+[data-theme="light"] .fg select option{background:var(--surface)}
+[data-theme="light"] .ab-input::-webkit-calendar-picker-indicator{filter:none}
+[data-theme="light"] .maint-sum-date::-webkit-calendar-picker-indicator{filter:none}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
@@ -89,7 +104,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:16px}
 .page-title{font-size:21px;font-weight:600;letter-spacing:-.02em}
 .page-sub{font-size:12px;color:var(--muted);margin-top:2px}
-.head-actions{display:flex;gap:8px;flex-shrink:0}
+.head-actions{display:flex;gap:8px;flex-shrink:0;align-items:center}
+.theme-toggle{width:34px;height:34px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0;flex-shrink:0}
+.theme-toggle:hover{color:var(--text);background:var(--surface3);border-color:var(--muted2)}
+.theme-toggle svg{width:16px;height:16px}
 
 /* ── METRICS ── */
 .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
@@ -797,6 +815,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <div class="head-actions" id="headActions">
           <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
           <button class="btn btn-primary btn-sm" id="addPropBtn" onclick="openAdd()">+ Add Property</button>
+          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+            <svg id="themeIconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+            <svg id="themeIconMoon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8.5a5.5 5.5 0 01-7.5-7.5 6 6 0 107.5 7.5z"/></svg>
+          </button>
         </div>
       </div>
 
@@ -1271,6 +1293,30 @@ const auth = firebase.auth();
 </script>
 
 <script>
+// ─────────────────────────────────────────────
+// THEME
+// ─────────────────────────────────────────────
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const sun = document.getElementById('themeIconSun');
+  const moon = document.getElementById('themeIconMoon');
+  if(sun && moon){
+    sun.style.display = theme==='light' ? '' : 'none';
+    moon.style.display = theme==='light' ? 'none' : '';
+  }
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = cur==='light' ? 'dark' : 'light';
+  applyTheme(next);
+  localStorage.setItem('pm-theme', next);
+}
+// Apply saved theme immediately to avoid flash
+(function(){
+  const saved = localStorage.getItem('pm-theme');
+  if(saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
 // ─────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────
@@ -5207,6 +5253,7 @@ function refreshAll(){
 function initApp(){
   const MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('viewSub').textContent='Cleveland, OH · '+MNAMES[activeMonth]+' '+activeYear;
+  applyTheme(localStorage.getItem('pm-theme') || 'dark');
   showView('dashboard');
 }
 </script>
