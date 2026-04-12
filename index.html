@@ -5510,18 +5510,19 @@ async function renderUtilityView(){
       </colgroup>
       <thead>
         <tr>
-          <th rowspan="2" style="text-align:left">Address</th>
-          <th rowspan="2" class="util-acct-hdr">Water Acct</th>
-          <th rowspan="2" class="util-acct-hdr">Sewer Acct</th>`;
+          <th style="text-align:left">Address</th>
+          <th class="util-acct-hdr">Water Acct</th>
+          <th class="util-acct-hdr">Sewer Acct</th>`;
 
   months.forEach((m,i) => {
     html += `<th colspan="2" class="util-month-hdr">${monthNames[i]}</th>`;
   });
   html += `<th colspan="2" class="util-total-hdr">Yearly Total</th></tr><tr>`;
+  html += `<th></th><th></th><th></th>`;
   months.forEach(() => {
-    html += `<th style="font-size:8px;color:var(--blue);padding:4px 2px">W</th><th style="font-size:8px;color:var(--amber);padding:4px 2px">S</th>`;
+    html += `<th style="font-size:8px;color:var(--blue);padding:4px 2px;text-align:center">W</th><th style="font-size:8px;color:var(--amber);padding:4px 2px;text-align:center">S</th>`;
   });
-  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue)">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber)">Sewer</th>`;
+  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue);text-align:center">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber);text-align:center">Sewer</th>`;
   html += `</tr></thead><tbody>`;
 
   // Month totals accumulators
