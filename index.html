@@ -674,11 +674,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .util-toolbar select:focus{border-color:var(--accent)}
 .util-stats{font-size:11px;color:var(--muted);margin-left:auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .util-stats strong{color:var(--text);font-weight:600}
-.util-tbl{width:100%;border-collapse:collapse;min-width:1600px}
-.util-tbl thead th{font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 5px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
+.util-tbl{width:100%;border-collapse:collapse;min-width:1600px;table-layout:auto}
+.util-tbl thead th{font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 4px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
 .util-tbl thead th:first-child{text-align:left;padding-left:12px;min-width:150px}
 .util-tbl thead th.util-acct-hdr{min-width:90px;text-align:left}
-.util-tbl thead th.util-month-hdr{}
+.util-tbl thead th.util-month-hdr{padding:6px 4px}
 .util-tbl thead th.util-total-hdr{background:var(--surface2);font-weight:600}
 .util-tbl tbody td{padding:4px 5px;border-bottom:1px solid var(--border);font-size:11px;text-align:center;vertical-align:middle}
 .util-tbl tbody td:first-child{text-align:left;padding-left:12px;font-weight:500;color:var(--text);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
@@ -5445,12 +5445,17 @@ async function loadUtilityData(){
         payments: d.payments || {}
       };
     });
-  } catch(e){ console.error('loadUtilityData', e); }
+  } catch(e){
+    console.error('loadUtilityData', e);
+    // Non-fatal — the table will still render with empty utility data
+  }
 }
 
 async function renderUtilityView(){
-  await loadUtilityData();
   const el = document.getElementById('utilityView');
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  await loadUtilityData();
+  console.log('Utility: rendering', properties.length, 'properties');
   const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const sorted = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
@@ -5507,9 +5512,9 @@ async function renderUtilityView(){
   });
   html += `<th colspan="2" class="util-total-hdr">Yearly Total</th></tr><tr>`;
   months.forEach(() => {
-    html += `<th style="font-size:8px;color:var(--blue)">W</th><th style="font-size:8px;color:var(--amber)">S</th>`;
+    html += `<th style="font-size:8px;color:var(--blue);padding:4px 4px;width:38px">W</th><th style="font-size:8px;color:var(--amber);padding:4px 4px;width:38px">S</th>`;
   });
-  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue)">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber)">Sewer</th>`;
+  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue);width:50px">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber);width:50px">Sewer</th>`;
   html += `</tr></thead><tbody>`;
 
   // Month totals accumulators
