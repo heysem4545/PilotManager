@@ -674,7 +674,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .util-toolbar select:focus{border-color:var(--accent)}
 .util-stats{font-size:11px;color:var(--muted);margin-left:auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .util-stats strong{color:var(--text);font-weight:600}
-.util-tbl{width:100%;border-collapse:collapse;min-width:1600px;table-layout:auto}
+.util-tbl{width:100%;border-collapse:collapse;min-width:1600px;table-layout:fixed}
 .util-tbl thead th{font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 4px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default}
 .util-tbl thead th:first-child{text-align:left;padding-left:12px;min-width:150px}
 .util-tbl thead th.util-acct-hdr{min-width:90px;text-align:left}
@@ -5501,9 +5501,16 @@ async function renderUtilityView(){
     </div>
     <div class="tbl-wrap">
     <table class="util-tbl">
+      <colgroup>
+        <col style="width:160px">
+        <col style="width:95px">
+        <col style="width:95px">
+        <col span="24" style="width:42px">
+        <col span="2" style="width:52px">
+      </colgroup>
       <thead>
         <tr>
-          <th rowspan="2" style="text-align:left;min-width:150px">Address</th>
+          <th rowspan="2" style="text-align:left">Address</th>
           <th rowspan="2" class="util-acct-hdr">Water Acct</th>
           <th rowspan="2" class="util-acct-hdr">Sewer Acct</th>`;
 
@@ -5512,9 +5519,9 @@ async function renderUtilityView(){
   });
   html += `<th colspan="2" class="util-total-hdr">Yearly Total</th></tr><tr>`;
   months.forEach(() => {
-    html += `<th style="font-size:8px;color:var(--blue);padding:4px 4px;width:38px">W</th><th style="font-size:8px;color:var(--amber);padding:4px 4px;width:38px">S</th>`;
+    html += `<th style="font-size:8px;color:var(--blue);padding:4px 2px">W</th><th style="font-size:8px;color:var(--amber);padding:4px 2px">S</th>`;
   });
-  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue);width:50px">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber);width:50px">Sewer</th>`;
+  html += `<th class="util-total-hdr" style="font-size:8px;color:var(--blue)">Water</th><th class="util-total-hdr" style="font-size:8px;color:var(--amber)">Sewer</th>`;
   html += `</tr></thead><tbody>`;
 
   // Month totals accumulators
