@@ -135,7 +135,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .theme-toggle svg{width:16px;height:16px}
 
 /* ── METRICS ── */
-.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
 .mc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
 .mc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .mc.g::after{background:var(--accent)}.mc.r::after{background:var(--red)}
@@ -1532,6 +1532,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   // Load data once, then show app and render
   await loadProperties();
   await loadMonthData(activeKey());
+  try{ await loadUtilityData(); }catch(e){ console.warn('utility preload', e); }
   document.getElementById('loader').style.display='none';
   document.getElementById('loginPage').style.display='none';
   document.getElementById('registerPage').style.display='none';
@@ -1791,13 +1792,28 @@ function renderMetrics(){
   const t=calcTotals();
   const collRate=pct(t.coll,t.rent);
   const occ=pct(t.rented,properties.length);
+
+  // Utility totals for the active month
+  const utilKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
+  let utilWater=0, utilSewer=0, utilProps=0;
+  properties.forEach(p=>{
+    const ud=utilityData[p.id];
+    if(!ud || !ud.payments || !ud.payments[utilKey]) return;
+    const pay=ud.payments[utilKey];
+    if(pay.water) utilWater+=pay.water;
+    if(pay.sewer) utilSewer+=pay.sewer;
+    if(pay.water||pay.sewer) utilProps++;
+  });
+
   document.getElementById('metricsGrid').innerHTML=`
     <div class="mc g"><div class="mc-lbl">Expected rent</div><div class="mc-val g">${fmt(t.rent)}</div><div class="mc-sub">${properties.length} properties · ${mLabel}</div></div>
     <div class="mc g"><div class="mc-lbl">Total collected</div><div class="mc-val">${fmt(t.coll)}</div><div class="mc-pill up">↑ ${collRate}% rate</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)}</span><span class="ts">Tenant ${fmt(t.tp)}</span></div></div>
     <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${properties.filter(p=>getMonthProp(p).status==='RENTED'&&getMonthProp(p).balance>0).length} rented behind</div><div class="mc-split"><span class="cs">CMHA ${fmt(Math.max(0,t.cmhaBal))}</span><span class="tr">Tenant ${fmt(Math.max(0,t.tenantBal))}</span></div></div>
+    <div class="mc a"><div class="mc-lbl">Occupancy</div><div class="mc-val a">${occ}%</div><div class="mc-sub">${t.rented} of ${properties.length} rented</div></div>
     <div class="mc b"><div class="mc-lbl">CMHA paid</div><div class="mc-val b">${fmt(t.cmha)}</div><div class="mc-sub">${pct(t.cmha,t.coll)}% of collections</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">Owed ${fmt(Math.max(0,t.cmhaBal))}</span><span class="cs" style="background:var(--red-dim);color:var(--red)">${t.cmhaBehind} behind</span></div></div>
     <div class="mc g"><div class="mc-lbl">Tenant paid</div><div class="mc-val">${fmt(t.tp)}</div><div class="mc-sub">${pct(t.tp,t.coll)}% of collections</div><div class="mc-split"><span class="ts" style="background:var(--red-dim);color:var(--red)">Owed ${fmt(Math.max(0,t.tenantBal))}</span><span class="ts" style="background:var(--red-dim);color:var(--red)">${t.tenantBehind} behind</span></div></div>
-    <div class="mc a"><div class="mc-lbl">Occupancy</div><div class="mc-val a">${occ}%</div><div class="mc-sub">${t.rented} of ${properties.length} rented</div></div>
+    <div class="mc b"><div class="mc-lbl">Water Bill</div><div class="mc-val b">${fmt(utilWater)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div></div>
+    <div class="mc a"><div class="mc-lbl">Sewer Bill</div><div class="mc-val a">${fmt(utilSewer)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div></div>
   `;
 }
 
