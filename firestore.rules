@@ -47,6 +47,18 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Meeting Templates — authenticated users can read and write.
+    match /meetingTemplates/{templateId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Meetings — authenticated users can read and write.
+    match /meetings/{meetingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // NOTE: Rules for other collections (properties, monthlyData, users,
     // invites, tasks) currently live only in the Firebase console and are
     // not yet mirrored here. Merge them in before deploying this file via

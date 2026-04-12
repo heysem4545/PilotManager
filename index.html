@@ -703,6 +703,40 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   .metrics{grid-template-columns:repeat(2,1fr)}
   .overview-row,.potential-grid{grid-template-columns:1fr}
 }
+
+/* ── MEETING TRACKING ── */
+.mtg-tabs{display:flex;gap:3px;padding:0 18px;background:var(--surface2);border-bottom:1px solid var(--border);border-radius:12px 12px 0 0}
+.mtg-tabs button{padding:10px 18px;font-size:12px;font-weight:500;cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font);transition:all .12s}
+.mtg-tabs button:hover{color:var(--text)}
+.mtg-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.mtg-card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .12s}
+.mtg-card:hover{border-color:var(--muted2)}
+.mtg-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mtg-card-head h4{font-size:13px;font-weight:600;margin:0}
+.mtg-card-meta{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.mtg-card-meta span{display:inline-flex;align-items:center;gap:4px}
+.mtg-attendee-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.mtg-attendee-row:last-child{border-bottom:none}
+.mtg-attendee-row label{font-size:12px;min-width:120px;font-weight:500}
+.mtg-attendee-row input[type="checkbox"]{accent-color:var(--accent);margin:0}
+.mtg-attendee-row input[type="number"],.mtg-attendee-row input[type="text"]{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:4px 7px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;width:70px}
+.mtg-attendee-row input[type="text"]{width:120px}
+.mtg-agenda-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.mtg-agenda-row input[type="checkbox"]{accent-color:var(--accent);margin:0;flex-shrink:0}
+.mtg-agenda-row input[type="text"]{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
+.mtg-agenda-row input[type="text"]:focus{border-color:var(--accent)}
+.mtg-efficiency{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.mtg-efficiency.eff-high{background:var(--accent-dim);color:var(--accent)}
+.mtg-efficiency.eff-mid{background:var(--amber-dim);color:var(--amber)}
+.mtg-efficiency.eff-low{background:var(--red-dim);color:var(--red)}
+.mtg-history-tbl thead th{cursor:default}
+.mtg-history-tbl tbody td{font-size:12px}
+.mtg-stat{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;text-align:center}
+.mtg-stat .stat-val{font-size:20px;font-weight:600;font-family:var(--mono);line-height:1}
+.mtg-stat .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:6px}
+.mtg-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 0}
+.mtg-filter select,.mtg-filter input{background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
+.mtg-filter select:focus,.mtg-filter input:focus{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1344,6 +1378,94 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <button class="btn btn-ghost btn-sm" onclick="closeModal('utilLimitModal')">Cancel</button>
         <button class="btn btn-primary btn-sm" onclick="saveUtilityLimits()">Save</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MEETING TEMPLATE MODAL -->
+<div class="overlay" id="meetingTemplateModal" onclick="if(event.target===this)closeModal('meetingTemplateModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="mtgTemplateModalTitle">Create Template</span>
+      <button class="modal-close" onclick="closeModal('meetingTemplateModal')">&times;</button>
+    </div>
+    <input type="hidden" id="mtgTemplateId">
+    <div class="fg"><label>Template Name</label><input id="mtgTemplateName" placeholder="e.g. Weekly Standup"></div>
+    <div class="frow">
+      <div class="fg"><label>Recurrence</label>
+        <select id="mtgTemplateRecurrence">
+          <option value="Daily">Daily</option>
+          <option value="Weekly" selected>Weekly</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div class="fg"><label>Default Duration</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="mtgTemplateDurH" min="0" max="23" placeholder="Hrs" style="width:50%">
+          <input type="number" id="mtgTemplateDurM" min="0" max="59" placeholder="Min" style="width:50%">
+        </div>
+      </div>
+    </div>
+    <div class="fg"><label>Default Attendees</label>
+      <div id="mtgTemplateAttendees" style="max-height:180px;overflow-y:auto;padding:6px 0"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('meetingTemplateModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTemplate()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEETING LOG MODAL -->
+<div class="overlay" id="meetingLogModal" onclick="if(event.target===this)closeModal('meetingLogModal')">
+  <div class="modal" style="width:700px">
+    <div class="modal-title">
+      <span id="mtgLogModalTitle">Log Meeting</span>
+      <button class="modal-close" onclick="closeModal('meetingLogModal')">&times;</button>
+    </div>
+    <input type="hidden" id="mtgLogId">
+    <div class="frow">
+      <div class="fg"><label>Template</label>
+        <select id="mtgLogTemplate" onchange="onMtgTemplateSelect(this.value)">
+          <option value="">Custom (ad-hoc)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Meeting Name</label><input id="mtgLogName" placeholder="Meeting name"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Target Date</label><input type="date" id="mtgLogTargetDate"></div>
+      <div class="fg"><label>Actual Date</label><input type="date" id="mtgLogActualDate"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Duration</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="mtgLogDurH" min="0" max="23" placeholder="Hrs" style="width:50%">
+          <input type="number" id="mtgLogDurM" min="0" max="59" placeholder="Min" style="width:50%">
+        </div>
+      </div>
+      <div class="fg"><label>Efficiency</label>
+        <select id="mtgLogEfficiency">
+          <option value="">— Select —</option>
+          <option value="1">1 — Poor</option>
+          <option value="2">2 — Fair</option>
+          <option value="3">3 — Average</option>
+          <option value="4">4 — Good</option>
+          <option value="5">5 — Excellent</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Attendees</label>
+      <div id="mtgLogAttendees" style="max-height:200px;overflow-y:auto;padding:4px 0"></div>
+    </div>
+    <div class="fg"><label>Agenda</label>
+      <div id="mtgLogAgenda"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px;width:auto" onclick="addAgendaItem()">+ Add agenda item</button>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="mtgLogNotes" rows="3" placeholder="Meeting notes..."></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('meetingLogModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMeetingLog()">Save</button>
     </div>
   </div>
 </div>
@@ -5373,7 +5495,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['meetings','notices','leads','available','tenants','inspections'];
+  const comingSoon = ['notices','leads','available','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -5406,6 +5528,7 @@ function showView(v){
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
   if(v==='utility') renderUtilityView();
+  if(v==='meetings') renderMeetingsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -5690,6 +5813,442 @@ function saveUtilityLimits(){
   closeModal('utilLimitModal');
   toast('Limits saved');
   if(currentView==='utility') renderUtilityView();
+}
+
+// ─────────────────────────────────────────────
+// MEETING TRACKING
+// ─────────────────────────────────────────────
+let meetingTemplates = [];
+let meetingsData = [];
+let meetingsTab = 'upcoming';
+let meetingLogDraft = null;
+let meetingAgendaDraft = [];
+let meetingAttendeesDraft = [];
+let mtgHistoryFilter = '';
+let mtgHistoryDateFrom = '';
+let mtgHistoryDateTo = '';
+
+async function loadMeetingTemplates(){
+  try {
+    const snap = await db.collection('meetingTemplates').orderBy('createdAt','desc').get();
+    meetingTemplates = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ console.error('loadMeetingTemplates',e); meetingTemplates=[]; }
+}
+
+async function loadMeetings(){
+  try {
+    const snap = await db.collection('meetings').orderBy('targetDate','desc').get();
+    meetingsData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ console.error('loadMeetings',e); meetingsData=[]; }
+}
+
+function mtgEffClass(n){
+  if(n>=4) return 'eff-high';
+  if(n===3) return 'eff-mid';
+  return 'eff-low';
+}
+function mtgEffLabel(n){
+  return ['','Poor','Fair','Average','Good','Excellent'][n]||'';
+}
+
+async function renderMeetingsView(){
+  await Promise.all([loadMeetingTemplates(), loadMeetings()]);
+  const el = document.getElementById('meetingsView');
+  let html = `<div class="table-card">
+    <div class="mtg-tabs">
+      <button class="${meetingsTab==='upcoming'?'active':''}" onclick="switchMeetingsTab('upcoming')">Upcoming</button>
+      <button class="${meetingsTab==='templates'?'active':''}" onclick="switchMeetingsTab('templates')">Templates</button>
+      <button class="${meetingsTab==='history'?'active':''}" onclick="switchMeetingsTab('history')">History</button>
+    </div>
+    <div style="padding:16px 18px" id="mtgTabContent"></div>
+  </div>`;
+  el.innerHTML = html;
+  if(meetingsTab==='upcoming') renderUpcomingTab();
+  else if(meetingsTab==='templates') renderTemplatesTab();
+  else renderHistoryTab();
+}
+
+function switchMeetingsTab(tab){
+  meetingsTab = tab;
+  renderMeetingsView();
+}
+
+function renderUpcomingTab(){
+  const container = document.getElementById('mtgTabContent');
+  const today = new Date().toISOString().slice(0,10);
+  // Show meetings with targetDate >= today-30 (recent + upcoming)
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const upcoming = meetingsData.filter(m=> (m.targetDate||'')>=cutoffStr).sort((a,b)=>(a.targetDate||'').localeCompare(b.targetDate||''));
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:12px;color:var(--muted)">${upcoming.length} meeting${upcoming.length!==1?'s':''}</div>
+    ${canEdit()?'<button class="btn btn-primary btn-sm" onclick="openMeetingLogModal()">+ Log Meeting</button>':''}
+  </div>`;
+
+  if(!upcoming.length){
+    html += '<div style="text-align:center;color:var(--muted);padding:40px 0">No meetings yet. Click "+ Log Meeting" to get started.</div>';
+  } else {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
+    upcoming.forEach(m=>{
+      const attCount = (m.attendees||[]).length;
+      const absentCount = (m.attendees||[]).filter(a=>!a.attended).length;
+      const eff = m.efficiency ? `<span class="mtg-efficiency ${mtgEffClass(m.efficiency)}">${m.efficiency}/5</span>` : '';
+      const durH = Math.floor((m.duration||0)/60);
+      const durM = (m.duration||0)%60;
+      const durStr = durH ? `${durH}h ${durM}m` : `${durM}m`;
+      const isPast = (m.targetDate||'') < today;
+      html += `<div class="mtg-card" onclick="openMeetingLogModal('${m.id}')" style="${isPast?'opacity:.7':''}">
+        <div class="mtg-card-head">
+          <h4>${escapeHtml(m.name||'Untitled')}</h4>
+          ${eff}
+        </div>
+        <div class="mtg-card-meta">
+          <span>📅 ${escapeHtml(m.targetDate||'—')}</span>
+          <span>⏱ ${durStr}</span>
+          <span>👥 ${attCount}${absentCount?' ('+absentCount+' absent)':''}</span>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function renderTemplatesTab(){
+  const container = document.getElementById('mtgTabContent');
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:12px;color:var(--muted)">${meetingTemplates.length} template${meetingTemplates.length!==1?'s':''}</div>
+    ${canEdit()?'<button class="btn btn-primary btn-sm" onclick="openTemplateModal()">+ Create Template</button>':''}
+  </div>`;
+  if(!meetingTemplates.length){
+    html += '<div style="text-align:center;color:var(--muted);padding:40px 0">No templates yet.</div>';
+  } else {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
+    meetingTemplates.forEach(t=>{
+      const durH = Math.floor((t.defaultDuration||0)/60);
+      const durM = (t.defaultDuration||0)%60;
+      const durStr = durH ? `${durH}h ${durM}m` : `${durM}m`;
+      const attNames = (t.defaultAttendees||[]).length + ' attendee' + ((t.defaultAttendees||[]).length!==1?'s':'');
+      html += `<div class="mtg-card" style="cursor:default">
+        <div class="mtg-card-head">
+          <h4>${escapeHtml(t.name||'Untitled')}</h4>
+          <span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue)">${escapeHtml(t.recurrence||'')}</span>
+        </div>
+        <div class="mtg-card-meta">
+          <span>⏱ ${durStr}</span>
+          <span>👥 ${attNames}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end">
+          ${canEdit()?`<button class="btn btn-ghost btn-sm" onclick="openTemplateModal('${t.id}')">Edit</button>`:''}
+          ${canEdit()?`<button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.id}')">Delete</button>`:''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function renderHistoryTab(){
+  const container = document.getElementById('mtgTabContent');
+  // Filter
+  let filtered = meetingsData.slice();
+  if(mtgHistoryFilter) filtered = filtered.filter(m=>(m.templateId||'')===mtgHistoryFilter || (m.name||'').toLowerCase().includes(mtgHistoryFilter.toLowerCase()));
+  if(mtgHistoryDateFrom) filtered = filtered.filter(m=>(m.targetDate||'')>=mtgHistoryDateFrom);
+  if(mtgHistoryDateTo) filtered = filtered.filter(m=>(m.targetDate||'')<=mtgHistoryDateTo);
+  filtered.sort((a,b)=>(b.targetDate||'').localeCompare(a.targetDate||''));
+
+  // Stats
+  const totalMtgs = filtered.length;
+  const avgEff = totalMtgs ? (filtered.reduce((s,m)=>s+(m.efficiency||0),0)/totalMtgs).toFixed(1) : '—';
+  // Most absent
+  const absentMap = {};
+  filtered.forEach(m=>{
+    (m.attendees||[]).forEach(a=>{
+      if(!a.attended){ absentMap[a.name] = (absentMap[a.name]||0)+1; }
+    });
+  });
+  let mostAbsent = '—';
+  let maxAbs = 0;
+  Object.entries(absentMap).forEach(([name,cnt])=>{
+    if(cnt>maxAbs){ maxAbs=cnt; mostAbsent=name+' ('+cnt+')'; }
+  });
+
+  // Template options for filter
+  let tplOpts = '<option value="">All meetings</option>';
+  meetingTemplates.forEach(t=>{ tplOpts += `<option value="${escapeAttr(t.id)}" ${mtgHistoryFilter===t.id?'selected':''}>${escapeHtml(t.name)}</option>`; });
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+    <div class="mtg-stat"><div class="stat-val">${totalMtgs}</div><div class="stat-lbl">Total Meetings</div></div>
+    <div class="mtg-stat"><div class="stat-val">${avgEff}</div><div class="stat-lbl">Avg Efficiency</div></div>
+    <div class="mtg-stat"><div class="stat-val" style="font-size:13px">${escapeHtml(mostAbsent)}</div><div class="stat-lbl">Most Absent</div></div>
+  </div>
+  <div class="mtg-filter">
+    <select onchange="mtgHistoryFilter=this.value;renderHistoryTab()">${tplOpts}</select>
+    <input type="date" value="${mtgHistoryDateFrom}" onchange="mtgHistoryDateFrom=this.value;renderHistoryTab()" title="From date">
+    <input type="date" value="${mtgHistoryDateTo}" onchange="mtgHistoryDateTo=this.value;renderHistoryTab()" title="To date">
+  </div>`;
+
+  if(!filtered.length){
+    html += '<div style="text-align:center;color:var(--muted);padding:30px 0">No meetings match filters.</div>';
+  } else {
+    html += `<div class="tbl-wrap"><table class="mtg-history-tbl"><thead><tr>
+      <th>Date</th><th>Meeting Name</th><th>Duration</th><th>Attendees</th><th>Absent</th><th>Efficiency</th><th></th>
+    </tr></thead><tbody>`;
+    filtered.forEach(m=>{
+      const attCount = (m.attendees||[]).length;
+      const absentCount = (m.attendees||[]).filter(a=>!a.attended).length;
+      const durH = Math.floor((m.duration||0)/60);
+      const durM = (m.duration||0)%60;
+      const durStr = durH ? `${durH}h ${durM}m` : `${durM}m`;
+      const eff = m.efficiency ? `<span class="mtg-efficiency ${mtgEffClass(m.efficiency)}">${m.efficiency}/5 ${mtgEffLabel(m.efficiency)}</span>` : '—';
+      html += `<tr>
+        <td style="font-family:var(--mono);white-space:nowrap">${escapeHtml(m.targetDate||'—')}</td>
+        <td style="font-weight:500;cursor:pointer" onclick="openMeetingLogModal('${m.id}')">${escapeHtml(m.name||'Untitled')}</td>
+        <td>${durStr}</td>
+        <td>${attCount}</td>
+        <td>${absentCount?'<span style="color:var(--red)">'+absentCount+'</span>':'0'}</td>
+        <td>${eff}</td>
+        <td>${canEdit()?'<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMeeting(\''+m.id+'\')">Delete</button>':''}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  container.innerHTML = html;
+}
+
+async function openTemplateModal(id){
+  const users = await getUsers();
+  const attContainer = document.getElementById('mtgTemplateAttendees');
+  let tpl = null;
+  if(id){
+    tpl = meetingTemplates.find(t=>t.id===id);
+  }
+  document.getElementById('mtgTemplateId').value = id||'';
+  document.getElementById('mtgTemplateModalTitle').textContent = tpl ? 'Edit Template' : 'Create Template';
+  document.getElementById('mtgTemplateName').value = tpl ? tpl.name||'' : '';
+  document.getElementById('mtgTemplateRecurrence').value = tpl ? tpl.recurrence||'Weekly' : 'Weekly';
+  const durTotal = tpl ? (tpl.defaultDuration||0) : 60;
+  document.getElementById('mtgTemplateDurH').value = Math.floor(durTotal/60);
+  document.getElementById('mtgTemplateDurM').value = durTotal%60;
+  const defaultAtt = tpl ? (tpl.defaultAttendees||[]) : [];
+  let attHtml = '';
+  users.forEach(u=>{
+    const checked = defaultAtt.includes(u.uid) ? 'checked' : '';
+    attHtml += `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
+      <input type="checkbox" value="${escapeAttr(u.uid)}" ${checked} style="accent-color:var(--accent)">
+      ${escapeHtml(u.name||u.email||u.uid)}
+    </label>`;
+  });
+  attContainer.innerHTML = attHtml;
+  document.getElementById('meetingTemplateModal').classList.add('open');
+}
+
+async function saveTemplate(){
+  const id = document.getElementById('mtgTemplateId').value;
+  const name = document.getElementById('mtgTemplateName').value.trim();
+  if(!name){ toast('Template name is required'); return; }
+  const recurrence = document.getElementById('mtgTemplateRecurrence').value;
+  const durH = parseInt(document.getElementById('mtgTemplateDurH').value)||0;
+  const durM = parseInt(document.getElementById('mtgTemplateDurM').value)||0;
+  const defaultDuration = durH*60+durM;
+  const checkboxes = document.querySelectorAll('#mtgTemplateAttendees input[type="checkbox"]');
+  const defaultAttendees = [];
+  checkboxes.forEach(cb=>{ if(cb.checked) defaultAttendees.push(cb.value); });
+
+  const data = { name, recurrence, defaultDuration, defaultAttendees, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid };
+  try {
+    if(id){
+      await db.collection('meetingTemplates').doc(id).update({name, recurrence, defaultDuration, defaultAttendees});
+    } else {
+      await db.collection('meetingTemplates').add(data);
+    }
+    closeModal('meetingTemplateModal');
+    toast(id?'Template updated':'Template created');
+    await renderMeetingsView();
+  } catch(e){ console.error('saveTemplate',e); toast('Error saving template'); }
+}
+
+async function deleteTemplate(id){
+  if(!confirm('Delete this template?')) return;
+  try {
+    await db.collection('meetingTemplates').doc(id).delete();
+    toast('Template deleted');
+    await renderMeetingsView();
+  } catch(e){ console.error('deleteTemplate',e); toast('Error deleting template'); }
+}
+
+async function openMeetingLogModal(meetingId, templateId){
+  const users = await getUsers();
+  const tplSelect = document.getElementById('mtgLogTemplate');
+  let tplOpts = '<option value="">Custom (ad-hoc)</option>';
+  meetingTemplates.forEach(t=>{ tplOpts += `<option value="${escapeAttr(t.id)}">${escapeHtml(t.name)}</option>`; });
+  tplSelect.innerHTML = tplOpts;
+
+  meetingAgendaDraft = [];
+  meetingAttendeesDraft = [];
+
+  let mtg = null;
+  if(meetingId){
+    mtg = meetingsData.find(m=>m.id===meetingId);
+  }
+
+  document.getElementById('mtgLogId').value = meetingId||'';
+  document.getElementById('mtgLogModalTitle').textContent = mtg ? 'Edit Meeting' : 'Log Meeting';
+
+  if(mtg){
+    tplSelect.value = mtg.templateId||'';
+    document.getElementById('mtgLogName').value = mtg.name||'';
+    document.getElementById('mtgLogTargetDate').value = mtg.targetDate||'';
+    document.getElementById('mtgLogActualDate').value = mtg.actualDate||'';
+    const dur = mtg.duration||0;
+    document.getElementById('mtgLogDurH').value = Math.floor(dur/60);
+    document.getElementById('mtgLogDurM').value = dur%60;
+    document.getElementById('mtgLogEfficiency').value = mtg.efficiency||'';
+    document.getElementById('mtgLogNotes').value = mtg.notes||'';
+    meetingAgendaDraft = (mtg.agenda||[]).map(a=>({...a}));
+    meetingAttendeesDraft = (mtg.attendees||[]).map(a=>({...a}));
+    // Ensure all users are in attendees list
+    users.forEach(u=>{
+      if(!meetingAttendeesDraft.find(a=>a.uid===u.uid)){
+        meetingAttendeesDraft.push({uid:u.uid, name:u.name||u.email||u.uid, attended:false, late:false, lateMinutes:0, absenceReason:''});
+      }
+    });
+  } else {
+    tplSelect.value = templateId||'';
+    document.getElementById('mtgLogName').value = '';
+    document.getElementById('mtgLogTargetDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('mtgLogActualDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('mtgLogDurH').value = '1';
+    document.getElementById('mtgLogDurM').value = '0';
+    document.getElementById('mtgLogEfficiency').value = '';
+    document.getElementById('mtgLogNotes').value = '';
+    meetingAgendaDraft = [];
+    meetingAttendeesDraft = users.map(u=>({uid:u.uid, name:u.name||u.email||u.uid, attended:true, late:false, lateMinutes:0, absenceReason:''}));
+    if(templateId){
+      onMtgTemplateSelect(templateId);
+    }
+  }
+
+  renderMtgLogAttendees();
+  renderMtgLogAgenda();
+  document.getElementById('meetingLogModal').classList.add('open');
+}
+
+function onMtgTemplateSelect(tplId){
+  if(!tplId) return;
+  const tpl = meetingTemplates.find(t=>t.id===tplId);
+  if(!tpl) return;
+  document.getElementById('mtgLogName').value = tpl.name||'';
+  const dur = tpl.defaultDuration||60;
+  document.getElementById('mtgLogDurH').value = Math.floor(dur/60);
+  document.getElementById('mtgLogDurM').value = dur%60;
+  // Check default attendees
+  const defaults = tpl.defaultAttendees||[];
+  meetingAttendeesDraft.forEach(a=>{
+    a.attended = defaults.includes(a.uid);
+  });
+  renderMtgLogAttendees();
+}
+
+function renderMtgLogAttendees(){
+  const container = document.getElementById('mtgLogAttendees');
+  let html = '';
+  meetingAttendeesDraft.forEach((a,i)=>{
+    html += `<div class="mtg-attendee-row">
+      <label>${escapeHtml(a.name)}</label>
+      <label style="min-width:auto;font-weight:400;font-size:11px"><input type="checkbox" ${a.attended?'checked':''} onchange="meetingAttendeesDraft[${i}].attended=this.checked;renderMtgLogAttendees()"> Attended</label>
+      ${a.attended?`
+        <label style="min-width:auto;font-weight:400;font-size:11px"><input type="checkbox" ${a.late?'checked':''} onchange="meetingAttendeesDraft[${i}].late=this.checked;renderMtgLogAttendees()"> Late</label>
+        ${a.late?`<input type="number" min="0" placeholder="min" value="${a.lateMinutes||''}" onchange="meetingAttendeesDraft[${i}].lateMinutes=parseInt(this.value)||0">`:''}
+      `:`
+        <input type="text" placeholder="Reason" value="${escapeAttr(a.absenceReason||'')}" onchange="meetingAttendeesDraft[${i}].absenceReason=this.value">
+      `}
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderMtgLogAgenda(){
+  const container = document.getElementById('mtgLogAgenda');
+  let html = '';
+  meetingAgendaDraft.forEach((item,i)=>{
+    html += `<div class="mtg-agenda-row">
+      <input type="checkbox" ${item.checked?'checked':''} onchange="meetingAgendaDraft[${i}].checked=this.checked">
+      <input type="text" value="${escapeAttr(item.text||'')}" onchange="meetingAgendaDraft[${i}].text=this.value" placeholder="Agenda item...">
+      <button class="btn btn-danger btn-sm" style="padding:4px 8px;width:auto" onclick="removeAgendaItem(${i})">×</button>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function addAgendaItem(){
+  meetingAgendaDraft.push({text:'', checked:false});
+  renderMtgLogAgenda();
+  // Focus last input
+  setTimeout(()=>{
+    const inputs = document.querySelectorAll('#mtgLogAgenda .mtg-agenda-row input[type="text"]');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  },50);
+}
+
+function removeAgendaItem(i){
+  meetingAgendaDraft.splice(i,1);
+  renderMtgLogAgenda();
+}
+
+async function saveMeetingLog(){
+  const id = document.getElementById('mtgLogId').value;
+  const name = document.getElementById('mtgLogName').value.trim();
+  if(!name){ toast('Meeting name is required'); return; }
+  const templateId = document.getElementById('mtgLogTemplate').value||'';
+  const targetDate = document.getElementById('mtgLogTargetDate').value;
+  const actualDate = document.getElementById('mtgLogActualDate').value;
+  const durH = parseInt(document.getElementById('mtgLogDurH').value)||0;
+  const durM = parseInt(document.getElementById('mtgLogDurM').value)||0;
+  const duration = durH*60+durM;
+  const efficiency = parseInt(document.getElementById('mtgLogEfficiency').value)||0;
+  const notes = document.getElementById('mtgLogNotes').value.trim();
+
+  // Sync attendee data from DOM inputs (lateMinutes and absenceReason may not have triggered onchange)
+  const attRows = document.querySelectorAll('#mtgLogAttendees .mtg-attendee-row');
+  attRows.forEach((row,i)=>{
+    const numInput = row.querySelector('input[type="number"]');
+    if(numInput) meetingAttendeesDraft[i].lateMinutes = parseInt(numInput.value)||0;
+    const textInput = row.querySelector('input[type="text"]');
+    if(textInput) meetingAttendeesDraft[i].absenceReason = textInput.value;
+  });
+  // Sync agenda text
+  const agendaInputs = document.querySelectorAll('#mtgLogAgenda .mtg-agenda-row input[type="text"]');
+  agendaInputs.forEach((inp,i)=>{ if(meetingAgendaDraft[i]) meetingAgendaDraft[i].text = inp.value; });
+
+  const attendees = meetingAttendeesDraft.map(a=>({uid:a.uid, name:a.name, attended:!!a.attended, late:!!a.late, lateMinutes:a.lateMinutes||0, absenceReason:a.absenceReason||''}));
+  const agenda = meetingAgendaDraft.filter(a=>a.text.trim()).map(a=>({text:a.text.trim(), checked:!!a.checked}));
+
+  const data = { templateId, name, targetDate, actualDate, duration, attendees, agenda, notes, efficiency };
+
+  try {
+    if(id){
+      await db.collection('meetings').doc(id).update(data);
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.createdBy = currentUser.uid;
+      await db.collection('meetings').add(data);
+    }
+    closeModal('meetingLogModal');
+    toast(id?'Meeting updated':'Meeting logged');
+    await renderMeetingsView();
+  } catch(e){ console.error('saveMeetingLog',e); toast('Error saving meeting'); }
+}
+
+async function deleteMeeting(id){
+  if(!confirm('Delete this meeting?')) return;
+  try {
+    await db.collection('meetings').doc(id).delete();
+    toast('Meeting deleted');
+    await renderMeetingsView();
+  } catch(e){ console.error('deleteMeeting',e); toast('Error deleting meeting'); }
 }
 </script>
 </body>
