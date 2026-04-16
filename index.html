@@ -1705,28 +1705,45 @@ function showRegister(){
   document.getElementById('registerPage').style.display='';
 }
 
+// Cache the invite token in memory so registerEmail can still find it
+// after we clean the URL bar.
+let pendingInviteToken = null;
+
 async function handleInvitePrefill(){
   try{
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
     if(!token) return;
+    pendingInviteToken = token;
+
     const snap = await db.collection('invites').where('token','==',token).limit(1).get();
-    if(snap.empty) return;
+    if(snap.empty){
+      // Invalid token — clean the URL and let the normal register page show
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
     const data = snap.docs[0].data();
     if(data.email){
       const emailInput = document.getElementById('regEmail');
       emailInput.value = data.email;
       emailInput.readOnly = true;
     }
+    // Update the sub-heading to a friendly welcome message
+    const sub = document.querySelector('#registerPage .login-sub');
+    if(sub) sub.textContent = "You've been invited to join PilotManager";
+
     // Show a banner on the register card
     const card = document.querySelector('#registerPage .login-card');
     if(card && !document.getElementById('inviteBanner')){
       const b = document.createElement('div');
       b.id = 'inviteBanner';
-      b.style.cssText = 'background:var(--accent-dim);color:var(--accent);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;border:1px solid var(--accent-dim)';
-      b.innerHTML = `You're invited as <strong>${data.role||'agent'}</strong>. Finish signing up below.`;
+      b.style.cssText = 'background:var(--accent-dim);color:var(--accent);padding:12px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;border:1px solid var(--accent-dim);line-height:1.5';
+      b.innerHTML = `Welcome! Complete the form below to create your account and get started.`;
       card.insertBefore(b, card.querySelector('.fg'));
     }
+    // Clean the token from the URL bar so the user never sees the raw code.
+    // The token is kept in pendingInviteToken for the register flow.
+    window.history.replaceState({}, '', window.location.pathname);
   }catch(e){ console.warn('invite prefill', e); }
 }
 
@@ -1754,11 +1771,11 @@ async function registerEmail(){
   document.getElementById('regErr').textContent='';
   if(!name){document.getElementById('regErr').textContent='Please enter your name';return;}
 
-  // Check for invite token in URL
+  // Check for invite token — either still in URL or cached after handleInvitePrefill cleaned it
   let inviteToken = null, inviteDoc = null;
   try{
     const params = new URLSearchParams(window.location.search);
-    inviteToken = params.get('invite');
+    inviteToken = params.get('invite') || pendingInviteToken;
     if(inviteToken){
       const snap = await db.collection('invites').where('token','==',inviteToken).limit(1).get();
       if(!snap.empty){
