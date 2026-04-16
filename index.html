@@ -1895,9 +1895,10 @@ function subscribeToUserDoc(uid){
 
       refreshSidebarAfterPermissionChange(true);
 
-      // Re-subscribe to the new role doc (or drop the subscription if
-      // the user no longer has a roleId).
-      subscribeToRoleDoc(data.roleId);
+      // Re-subscribe to the new role doc — use the resolved ID (which
+      // handles the legacy case where the user has a role name but no
+      // roleId, resolved by name lookup inside loadUserPermissions).
+      subscribeToRoleDoc(data.roleId || currentUser._resolvedRoleId);
     }
   }, err=>{
     console.warn('user doc listener', err?.message);
@@ -1905,8 +1906,9 @@ function subscribeToUserDoc(uid){
 
   // Initial subscription to the user's role doc so that permission
   // edits to the role itself propagate instantly.
-  if(currentUser && currentUser.roleId){
-    subscribeToRoleDoc(currentUser.roleId);
+  const initialRoleId = (currentUser && (currentUser.roleId || currentUser._resolvedRoleId));
+  if(initialRoleId){
+    subscribeToRoleDoc(initialRoleId);
   }
 }
 
@@ -2118,15 +2120,40 @@ async function loadUserPermissions(){
     currentPermissions=allPermsTrue();
     return;
   }
-  // Try loading by roleId
+  // Try loading by roleId first
   if(currentUser.roleId){
     try{
       const roleDoc=await db.collection('roles').doc(currentUser.roleId).get();
       if(roleDoc.exists){
         currentPermissions=roleDoc.data().permissions||allPermsTrue();
+        currentUser._resolvedRoleId = currentUser.roleId;
         return;
       }
     }catch(e){console.error('loadUserPermissions',e);}
+  }
+  // No roleId (or stale) — resolve by matching role name against the
+  // roles collection so admin edits to a role doc take effect for
+  // legacy users that only have `role: 'editor'` etc.
+  if(currentUser.role){
+    try{
+      const snap = await db.collection('roles').get();
+      const match = snap.docs.find(d => {
+        const n = (d.data().name||'').toLowerCase();
+        return n === currentUser.role.toLowerCase();
+      });
+      if(match){
+        const data = match.data();
+        if(data.permissions){
+          currentPermissions = data.permissions;
+          currentUser._resolvedRoleId = match.id;
+          // Keep rolesCache in sync
+          const idx = rolesCache.findIndex(r=>r.id===match.id);
+          if(idx>=0) rolesCache[idx] = {id:match.id, ...data};
+          else rolesCache.push({id:match.id, ...data});
+          return;
+        }
+      }
+    }catch(e){ console.warn('role-name lookup', e?.message); }
   }
   // Helper: start with all sections locked down, then whitelist specific ones.
   const deny = () => {
