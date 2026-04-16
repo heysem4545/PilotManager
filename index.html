@@ -6850,7 +6850,7 @@ async function renderCallLogView(){
 
   let body;
   if(callLogData.length === 0){
-    body = `<tbody><tr><td colspan="9"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="10"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + callLogData.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
@@ -6869,6 +6869,8 @@ async function renderCallLogView(){
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l8 8M12 4l-8 8"/></svg>
         </button>` : ''}
       </div>`;
+      const addedBy = c.createdBy || c.updatedBy || '';
+      const addedByDisp = addedBy ? escapeHtml(addedBy) : '<span class="cl-empty-val">—</span>';
       return `<tr>
         <td class="cl-date">${fmtCallDate(c.date)}</td>
         <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction || 'Inbound')}</span></td>
@@ -6878,6 +6880,7 @@ async function renderCallLogView(){
         <td class="cl-name">${nameDisp}</td>
         <td class="cl-number">${numDisp}</td>
         <td>${renderCallNotesCell(c, editable)}</td>
+        <td style="font-size:11px;color:var(--muted)">${addedByDisp}</td>
         <td style="text-align:right">${actions}</td>
       </tr>`;
     }).join('') + '</tbody>';
@@ -6900,6 +6903,7 @@ async function renderCallLogView(){
             <th>Name</th>
             <th>Number</th>
             <th>Notes</th>
+            <th>Added By</th>
             <th style="text-align:right">Actions</th>
           </tr></thead>
           ${body}
@@ -6989,14 +6993,15 @@ async function saveCallLogEntry(){
   };
   if(!data.date){ toast('Please pick a date'); return; }
   try{
+    const userLabel = (currentUser && (currentUser.name || currentUser.email)) || '';
     if(editCallId){
       data.updatedAt = new Date();
-      data.updatedBy = (currentUser && currentUser.name) || '';
+      data.updatedBy = userLabel;
       await db.collection('callLog').doc(editCallId).update(data);
       toast('Call updated');
     } else {
       data.createdAt = new Date();
-      data.createdBy = (currentUser && currentUser.name) || '';
+      data.createdBy = userLabel;
       await db.collection('callLog').add(data);
       toast('Call logged');
     }
