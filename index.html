@@ -371,6 +371,44 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .lc-detail-table tfoot td{background:var(--surface2);font-weight:600;border-top:2px solid var(--border)}
 .lc-detail-empty{font-size:11px;color:var(--muted);font-style:italic}
 
+/* ── CALL LOG ── */
+.call-log-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.call-log-toolbar-left{font-size:12px;color:var(--muted)}
+.call-log-tbl thead th{cursor:default;font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:left;background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
+.call-log-tbl tbody td{font-size:12px;vertical-align:middle;padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.call-log-tbl tbody tr:hover td{background:var(--surface2)}
+.call-log-tbl .cl-date{font-family:var(--mono);white-space:nowrap;color:var(--text)}
+.call-log-tbl .cl-name{font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.call-log-tbl .cl-number{font-family:var(--mono);color:var(--muted);white-space:nowrap;font-size:11px}
+.call-log-tbl .cl-addr{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.call-log-tbl .cl-reason{font-size:11px;color:var(--muted)}
+.call-log-tbl .cl-empty-val{color:var(--muted2);font-style:italic;font-size:11px}
+.call-direction{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.call-direction.inbound{background:var(--blue-dim);color:var(--blue)}
+.call-direction.outbound{background:var(--purple-dim);color:var(--purple)}
+.call-status{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.call-status.completed{background:var(--accent-dim);color:var(--accent)}
+.call-status.needs-attention{background:var(--amber-dim);color:var(--amber)}
+.call-status.emergency{background:var(--red-dim);color:var(--red)}
+.call-status .cs-dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+.call-notes-cell{display:flex;align-items:center;gap:6px;min-width:130px;max-width:180px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--text);transition:all .12s;line-height:1.3}
+.call-notes-cell:hover{border-color:var(--muted);background:var(--surface3)}
+.call-notes-cell.empty{color:var(--muted2);font-style:italic}
+.call-notes-cell.disabled{cursor:not-allowed;opacity:.55}
+.call-notes-cell.disabled:hover{border-color:var(--border2);background:var(--surface2)}
+.call-notes-cell .call-notes-preview{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.call-notes-cell .call-notes-icon{flex-shrink:0;width:11px;height:11px;color:var(--muted)}
+.call-notes-cell.has-note .call-notes-icon{color:var(--accent)}
+.call-actions{display:flex;gap:6px;justify-content:flex-end}
+.call-icon-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);width:26px;height:26px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .12s;padding:0}
+.call-icon-btn:hover{color:var(--text);background:var(--surface3);border-color:var(--border2)}
+.call-icon-btn.danger:hover{background:var(--red-dim);color:var(--red);border-color:var(--red-dim)}
+.call-empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
+.call-empty-title{color:var(--text);font-size:15px;font-weight:500;margin-bottom:6px}
+.cl-status-select option.opt-completed{color:var(--accent)}
+.cl-status-select option.opt-needs{color:var(--amber)}
+.cl-status-select option.opt-emergency{color:var(--red)}
+
 /* ── ALL BALANCES INLINE EDITS ── */
 .ab-input{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 7px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .12s;width:100%;min-width:0}
 .ab-input:focus{border-color:var(--accent)}
@@ -879,6 +917,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><path d="M10.5 10.5l3 3"/></svg>
         Inspection Tracker
       </button>
+      <button class="nav-item" id="nav-callLog" onclick="showView('callLog')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 2.5h2.2l1 3-1.5 1a8 8 0 004.3 4.3l1-1.5 3 1v2.2a1 1 0 01-1.1 1A11 11 0 012.5 3.6a1 1 0 011-1.1z"/></svg>
+        Call Log
+      </button>
             <div class="sidebar-bottom">
         <div class="user-row">
           <div class="u-avatar" id="sidebarAvatar">?</div>
@@ -1043,6 +1085,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
+      <div id="callLogView" style="display:none"></div>
 
     </main>
   </div>
@@ -1341,6 +1384,76 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('legalModal')">Cancel</button>
       <button class="btn btn-danger btn-sm" id="deleteLegalBtn" style="display:none" onclick="deleteLegalCase()">Delete</button>
       <button class="btn btn-primary btn-sm" onclick="saveLegalCase()">Save case</button>
+    </div>
+  </div>
+</div>
+
+<!-- CALL LOG ADD / EDIT MODAL -->
+<div class="overlay" id="callLogModal" onclick="if(event.target===this)closeModal('callLogModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="callLogModalTitle">Add Call</span>
+      <button class="modal-close" onclick="closeModal('callLogModal')">&times;</button>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Date</label><input type="date" id="cl_date"></div>
+      <div class="fg"><label>Direction</label>
+        <select id="cl_direction">
+          <option value="Inbound">Inbound</option>
+          <option value="Outbound">Outbound</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Property Address</label>
+      <select id="cl_property"></select>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Call Reason</label>
+        <select id="cl_reason">
+          <option value="Maintenance">Maintenance</option>
+          <option value="For Rent">For Rent</option>
+          <option value="Payments">Payments</option>
+          <option value="Paperwork">Paperwork</option>
+          <option value="Maintenance Follow Up">Maintenance Follow Up</option>
+          <option value="Appointment">Appointment</option>
+        </select>
+      </div>
+      <div class="fg"><label>Status</label>
+        <select id="cl_status" class="cl-status-select">
+          <option value="Completed" class="opt-completed">Completed</option>
+          <option value="Needs Attention" class="opt-needs">Needs Attention</option>
+          <option value="Emergency" class="opt-emergency">Emergency</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Name</label><input id="cl_name" placeholder="Caller name"></div>
+      <div class="fg"><label>Number</label><input type="tel" id="cl_number" placeholder="(555) 123-4567"></div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="cl_notes" rows="4" placeholder="Call details, follow-ups…"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('callLogModal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="deleteCallLogBtn" style="display:none" onclick="deleteCallLogEntryFromModal()">Delete</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCallLogEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- CALL LOG NOTE POPUP MODAL -->
+<div class="overlay" id="callLogNoteModal" onclick="if(event.target===this)closeModal('callLogNoteModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="callLogNoteModalTitle">Notes</span>
+      <button class="modal-close" onclick="closeModal('callLogNoteModal')">&times;</button>
+    </div>
+    <div class="notes-modal-meta" id="callLogNoteModalAddr"></div>
+    <div class="fg">
+      <label>Notes</label>
+      <textarea id="callLogNoteModalText" class="notes-area" placeholder="Type call notes here…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('callLogNoteModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCallLogNote()">Save</button>
     </div>
   </div>
 </div>
@@ -5463,7 +5576,8 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', inspections:'inspectionsView'
+    tenants:'tenantsView', inspections:'inspectionsView',
+    callLog:'callLogView'
   };
 
   // Hide all views
@@ -5490,7 +5604,8 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', inspections:'Inspection Tracker'
+    tenants:'Tenant Info', inspections:'Inspection Tracker',
+    callLog:'Call Log'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -5529,6 +5644,7 @@ function showView(v){
   if(v==='technician') renderTechnicianView();
   if(v==='utility') renderUtilityView();
   if(v==='meetings') renderMeetingsView();
+  if(v==='callLog') renderCallLogView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -6249,6 +6365,280 @@ async function deleteMeeting(id){
     toast('Meeting deleted');
     await renderMeetingsView();
   } catch(e){ console.error('deleteMeeting',e); toast('Error deleting meeting'); }
+}
+
+// ─────────────────────────────────────────────
+// CALL LOG
+// ─────────────────────────────────────────────
+let callLogData = [];
+let editCallId = null;
+let activeCallNoteId = null;
+
+async function loadCallLog(){
+  try {
+    const snap = await db.collection('callLog').get();
+    callLogData = [];
+    snap.forEach(doc => {
+      callLogData.push({ id: doc.id, ...doc.data() });
+    });
+    callLogData.sort((a,b)=>{
+      const ad = a.date || '';
+      const bd = b.date || '';
+      if(ad !== bd) return bd.localeCompare(ad);
+      const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+      const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+      return bt - at;
+    });
+  } catch(e){
+    console.error('loadCallLog', e);
+    callLogData = [];
+  }
+}
+
+function fmtCallDate(dateStr){
+  if(!dateStr) return '<span class="cl-empty-val">—</span>';
+  const d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d)) return escapeHtml(dateStr);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+function renderCallNotesCell(call, editable){
+  const value = call.notes || '';
+  const has = !!(value && String(value).trim());
+  const preview = has
+    ? escapeHtml(String(value).trim().split(/\s+/).slice(0,3).join(' '))
+    : 'Add note…';
+  const cls = `call-notes-cell${has?' has-note':''}${has?'':' empty'}${editable?'':' disabled'}`;
+  const onclick = editable ? `onclick="openCallLogNote('${call.id}')"` : '';
+  const icon = has
+    ? `<svg class="call-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3h7l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M5 8h6M5 11h4"/></svg>`
+    : `<svg class="call-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>`;
+  const tip = has ? escapeAttr(String(value)) : 'Click to add notes';
+  return `<div class="${cls}" ${onclick} title="${tip}">
+    <span class="call-notes-preview">${preview}</span>${icon}
+  </div>`;
+}
+
+async function renderCallLogView(){
+  const el = document.getElementById('callLogView');
+  if(!el) return;
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  await loadCallLog();
+
+  const editable = canEdit() || (currentUser && currentUser.role === 'admin') || true; // any auth user per rules
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  const addBtn = `<button class="btn btn-primary btn-sm" onclick="openCallLogAdd()">+ Add Call</button>`;
+
+  let body;
+  if(callLogData.length === 0){
+    body = `<tbody><tr><td colspan="9"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+  } else {
+    body = '<tbody>' + callLogData.map(c => {
+      const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
+      const statusKey = (c.status || 'Completed');
+      const statusCls = statusKey === 'Needs Attention' ? 'needs-attention'
+                       : statusKey === 'Emergency' ? 'emergency' : 'completed';
+      const addrDisp = c.propertyAddress ? escapeHtml(c.propertyAddress) : '<span class="cl-empty-val">—</span>';
+      const reasonDisp = c.reason ? escapeHtml(c.reason) : '<span class="cl-empty-val">—</span>';
+      const nameDisp = c.name ? escapeHtml(c.name) : '<span class="cl-empty-val">—</span>';
+      const numDisp = c.number ? escapeHtml(c.number) : '<span class="cl-empty-val">—</span>';
+      const actions = `<div class="call-actions">
+        ${editable ? `<button class="call-icon-btn" title="Edit" onclick="openCallLogEdit('${c.id}')">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>
+        </button>` : ''}
+        ${isAdmin ? `<button class="call-icon-btn danger" title="Delete" onclick="deleteCallLogEntry('${c.id}')">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>` : ''}
+      </div>`;
+      return `<tr>
+        <td class="cl-date">${fmtCallDate(c.date)}</td>
+        <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction || 'Inbound')}</span></td>
+        <td class="cl-addr" title="${escapeAttr(c.propertyAddress || '')}">${addrDisp}</td>
+        <td class="cl-reason">${reasonDisp}</td>
+        <td><span class="call-status ${statusCls}"><span class="cs-dot"></span>${escapeHtml(statusKey)}</span></td>
+        <td class="cl-name">${nameDisp}</td>
+        <td class="cl-number">${numDisp}</td>
+        <td>${renderCallNotesCell(c, editable)}</td>
+        <td style="text-align:right">${actions}</td>
+      </tr>`;
+    }).join('') + '</tbody>';
+  }
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left">${callLogData.length} call${callLogData.length===1?'':'s'} logged</div>
+        <div style="display:flex;gap:8px;align-items:center">${addBtn}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>Date</th>
+            <th>Direction</th>
+            <th>Property Address</th>
+            <th>Call Reason</th>
+            <th>Status</th>
+            <th>Name</th>
+            <th>Number</th>
+            <th>Notes</th>
+            <th style="text-align:right">Actions</th>
+          </tr></thead>
+          ${body}
+        </table>
+      </div>
+    </div>`;
+}
+
+function populateCallLogPropertyDropdown(selectedId){
+  const sel = document.getElementById('cl_property');
+  if(!sel) return;
+  const sorted = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  let opts = '<option value="">— Select property —</option>';
+  sorted.forEach(p => {
+    const id = p.id || '';
+    const addr = p.addr || '(no address)';
+    opts += `<option value="${escapeAttr(id)}"${id===selectedId?' selected':''}>${escapeHtml(addr)}</option>`;
+  });
+  sel.innerHTML = opts;
+}
+
+function clearCallLogForm(){
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('cl_date').value = `${yyyy}-${mm}-${dd}`;
+  document.getElementById('cl_direction').value = 'Inbound';
+  document.getElementById('cl_reason').value = 'Maintenance';
+  document.getElementById('cl_status').value = 'Completed';
+  document.getElementById('cl_name').value = '';
+  document.getElementById('cl_number').value = '';
+  document.getElementById('cl_notes').value = '';
+  populateCallLogPropertyDropdown('');
+}
+
+function openCallLogAdd(){
+  editCallId = null;
+  document.getElementById('callLogModalTitle').textContent = 'Add Call';
+  document.getElementById('deleteCallLogBtn').style.display = 'none';
+  clearCallLogForm();
+  document.getElementById('callLogModal').classList.add('open');
+}
+
+function openCallLogEdit(id){
+  const c = callLogData.find(x => x.id === id);
+  if(!c) return;
+  editCallId = id;
+  document.getElementById('callLogModalTitle').textContent = 'Edit Call';
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  document.getElementById('deleteCallLogBtn').style.display = isAdmin ? '' : 'none';
+  document.getElementById('cl_date').value = c.date || '';
+  document.getElementById('cl_direction').value = c.direction || 'Inbound';
+  document.getElementById('cl_reason').value = c.reason || 'Maintenance';
+  document.getElementById('cl_status').value = c.status || 'Completed';
+  document.getElementById('cl_name').value = c.name || '';
+  document.getElementById('cl_number').value = c.number || '';
+  document.getElementById('cl_notes').value = c.notes || '';
+  populateCallLogPropertyDropdown(c.propertyId || '');
+  document.getElementById('callLogModal').classList.add('open');
+}
+
+async function saveCallLogEntry(){
+  const propertyId = document.getElementById('cl_property').value;
+  const prop = properties.find(p => p.id === propertyId);
+  const data = {
+    date: document.getElementById('cl_date').value || '',
+    direction: document.getElementById('cl_direction').value || 'Inbound',
+    propertyId: propertyId || '',
+    propertyAddress: prop ? (prop.addr || '') : '',
+    reason: document.getElementById('cl_reason').value || '',
+    status: document.getElementById('cl_status').value || 'Completed',
+    name: document.getElementById('cl_name').value.trim(),
+    number: document.getElementById('cl_number').value.trim(),
+    notes: document.getElementById('cl_notes').value
+  };
+  if(!data.date){ toast('Please pick a date'); return; }
+  try{
+    if(editCallId){
+      data.updatedAt = new Date();
+      data.updatedBy = (currentUser && currentUser.name) || '';
+      await db.collection('callLog').doc(editCallId).update(data);
+      toast('Call updated');
+    } else {
+      data.createdAt = new Date();
+      data.createdBy = (currentUser && currentUser.name) || '';
+      await db.collection('callLog').add(data);
+      toast('Call logged');
+    }
+    closeModal('callLogModal');
+    await renderCallLogView();
+  }catch(e){
+    console.error('saveCallLogEntry', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+async function deleteCallLogEntry(id){
+  if(!(currentUser && currentUser.role === 'admin')){ toast('Admin only'); return; }
+  if(!confirm('Delete this call log entry? This cannot be undone.')) return;
+  try{
+    await db.collection('callLog').doc(id).delete();
+    toast('Call deleted');
+    await renderCallLogView();
+  }catch(e){
+    console.error('deleteCallLogEntry', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+async function deleteCallLogEntryFromModal(){
+  if(!editCallId) return;
+  if(!(currentUser && currentUser.role === 'admin')){ toast('Admin only'); return; }
+  if(!confirm('Delete this call log entry? This cannot be undone.')) return;
+  try{
+    await db.collection('callLog').doc(editCallId).delete();
+    closeModal('callLogModal');
+    toast('Call deleted');
+    await renderCallLogView();
+  }catch(e){
+    console.error('deleteCallLogEntryFromModal', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+function openCallLogNote(id){
+  const c = callLogData.find(x => x.id === id);
+  if(!c) return;
+  activeCallNoteId = id;
+  document.getElementById('callLogNoteModalTitle').textContent = 'Call Notes';
+  document.getElementById('callLogNoteModalAddr').textContent = c.propertyAddress || '';
+  document.getElementById('callLogNoteModalText').value = c.notes || '';
+  document.getElementById('callLogNoteModal').classList.add('open');
+  setTimeout(()=>{
+    const ta = document.getElementById('callLogNoteModalText');
+    if(ta) ta.focus();
+  }, 50);
+}
+
+async function saveCallLogNote(){
+  if(!activeCallNoteId) return;
+  const value = document.getElementById('callLogNoteModalText').value;
+  try{
+    await db.collection('callLog').doc(activeCallNoteId).update({
+      notes: value,
+      updatedAt: new Date(),
+      updatedBy: (currentUser && currentUser.name) || ''
+    });
+    closeModal('callLogNoteModal');
+    toast('Saved');
+    activeCallNoteId = null;
+    await renderCallLogView();
+  }catch(e){
+    console.error('saveCallLogNote', e);
+    toast('Error: ' + e.message);
+  }
 }
 </script>
 </body>
