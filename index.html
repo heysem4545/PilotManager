@@ -1478,6 +1478,29 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- INVITE LINK MODAL -->
+<div class="overlay" id="inviteLinkModal" onclick="if(event.target===this)closeModal('inviteLinkModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-title">
+      Invite ready
+      <button class="modal-close" onclick="closeModal('inviteLinkModal')">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+      Share this signup link with <strong style="color:var(--text)" id="inviteLinkEmail"></strong>. It carries their role and expires in 7 days.
+    </div>
+    <div class="fg"><label>Signup link</label>
+      <input id="inviteLinkInput" readonly style="font-family:var(--mono);font-size:11px" onclick="this.select()">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="copyInviteLink()">Copy link</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="openInviteMailto()">Open email client</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted2);margin-top:12px;line-height:1.5">
+      Clicking "Open email client" drafts a message in your default mail app. If it doesn't open, copy the link and paste it into any email, text, or chat.
+    </div>
+  </div>
+</div>
+
 <!-- UTILITY LIMIT MODAL -->
 <div class="overlay" id="utilLimitModal" onclick="if(event.target===this)closeModal('utilLimitModal')">
   <div class="modal" style="width:340px">
@@ -1667,12 +1690,44 @@ let monthlyMode='balance';
 // AUTH
 // ─────────────────────────────────────────────
 function showLogin(){
+  // If the URL has an invite token, auto-direct to register and pre-fill email
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('invite')){
+    showRegister();
+    handleInvitePrefill();
+    return;
+  }
   document.getElementById('loginPage').style.display='';
   document.getElementById('registerPage').style.display='none';
 }
 function showRegister(){
   document.getElementById('loginPage').style.display='none';
   document.getElementById('registerPage').style.display='';
+}
+
+async function handleInvitePrefill(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('invite');
+    if(!token) return;
+    const snap = await db.collection('invites').where('token','==',token).limit(1).get();
+    if(snap.empty) return;
+    const data = snap.docs[0].data();
+    if(data.email){
+      const emailInput = document.getElementById('regEmail');
+      emailInput.value = data.email;
+      emailInput.readOnly = true;
+    }
+    // Show a banner on the register card
+    const card = document.querySelector('#registerPage .login-card');
+    if(card && !document.getElementById('inviteBanner')){
+      const b = document.createElement('div');
+      b.id = 'inviteBanner';
+      b.style.cssText = 'background:var(--accent-dim);color:var(--accent);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;border:1px solid var(--accent-dim)';
+      b.innerHTML = `You're invited as <strong>${data.role||'agent'}</strong>. Finish signing up below.`;
+      card.insertBefore(b, card.querySelector('.fg'));
+    }
+  }catch(e){ console.warn('invite prefill', e); }
 }
 
 async function signInEmail(){
@@ -1698,14 +1753,51 @@ async function registerEmail(){
   const pass=document.getElementById('regPass').value;
   document.getElementById('regErr').textContent='';
   if(!name){document.getElementById('regErr').textContent='Please enter your name';return;}
+
+  // Check for invite token in URL
+  let inviteToken = null, inviteDoc = null;
+  try{
+    const params = new URLSearchParams(window.location.search);
+    inviteToken = params.get('invite');
+    if(inviteToken){
+      const snap = await db.collection('invites').where('token','==',inviteToken).limit(1).get();
+      if(!snap.empty){
+        inviteDoc = snap.docs[0];
+        const data = inviteDoc.data();
+        if(data.consumed){
+          document.getElementById('regErr').textContent='This invite has already been used.';
+          return;
+        }
+        if(data.expiresAt && data.expiresAt.toMillis && data.expiresAt.toMillis() < Date.now()){
+          document.getElementById('regErr').textContent='This invite has expired. Ask your admin for a new one.';
+          return;
+        }
+        // Enforce matching email if present
+        if(data.email && data.email.toLowerCase() !== email.toLowerCase()){
+          document.getElementById('regErr').textContent='This invite was sent to '+data.email+'. Please register with that email.';
+          return;
+        }
+      }
+    }
+  }catch(e){ console.warn('invite lookup', e); }
+
   try{
     const cred=await auth.createUserWithEmailAndPassword(email,pass);
-    // Check if this is first user → make admin
-    const usersSnap=await db.collection('users').get();
-    const role=usersSnap.empty?'admin':'agent';
+    let role = 'agent';
+    if(inviteDoc){
+      role = inviteDoc.data().role || 'agent';
+    } else {
+      // No invite: first user becomes admin, otherwise default agent
+      const usersSnap=await db.collection('users').get();
+      if(usersSnap.empty) role = 'admin';
+    }
     await db.collection('users').doc(cred.user.uid).set({
       name,email,role,createdAt:new Date()
     });
+    // Mark invite as consumed
+    if(inviteDoc){
+      try{ await db.collection('invites').doc(inviteDoc.id).update({consumed:true, consumedAt:new Date(), consumedBy:cred.user.uid}); }catch(e){ console.warn('mark consumed', e); }
+    }
   }catch(e){
     document.getElementById('regErr').textContent=e.message;
   }
@@ -4540,15 +4632,73 @@ async function changeRole(uid,roleId){
   renderTeam();
 }
 
+let currentInviteState = {email:'', link:'', role:''};
+
+function genInviteToken(){
+  const chars='abcdefghijklmnopqrstuvwxyz0123456789';
+  let t='';
+  for(let i=0;i<24;i++) t+=chars[Math.floor(Math.random()*chars.length)];
+  return t;
+}
+
 async function inviteUser(){
   const email=document.getElementById('inviteEmail').value.trim();
   const role=document.getElementById('inviteRole').value;
   if(!email){toast('Enter an email address');return;}
-  // Create a pending user record — they'll get proper uid when they register
-  await db.collection('invites').add({email,role,invitedBy:currentUser.uid,invitedAt:new Date()});
-  toast('Invite sent to '+email+' — they can register and will get '+role+' access');
-  document.getElementById('inviteEmail').value='';
-  renderTeam();
+  try{
+    const token = genInviteToken();
+    const expiresAt = new Date(Date.now() + 7*24*60*60*1000); // 7 days
+    await db.collection('invites').add({
+      email, role, token,
+      invitedBy: currentUser.uid,
+      invitedByName: currentUser.name || '',
+      invitedAt: new Date(),
+      expiresAt,
+      consumed: false
+    });
+    // Build a signup link with the token
+    const base = window.location.origin + window.location.pathname;
+    const link = `${base}?invite=${encodeURIComponent(token)}`;
+    currentInviteState = {email, link, role};
+    document.getElementById('inviteLinkEmail').textContent = email;
+    document.getElementById('inviteLinkInput').value = link;
+    document.getElementById('inviteLinkModal').classList.add('open');
+    document.getElementById('inviteEmail').value='';
+    renderTeam();
+  }catch(e){
+    console.error('inviteUser', e);
+    toast('Error creating invite: ' + e.message);
+  }
+}
+
+function copyInviteLink(){
+  const input = document.getElementById('inviteLinkInput');
+  input.select();
+  input.setSelectionRange(0, 99999);
+  try{
+    navigator.clipboard.writeText(input.value).then(()=>{
+      toast('Link copied to clipboard');
+    }).catch(()=>{
+      document.execCommand('copy');
+      toast('Link copied');
+    });
+  }catch(e){
+    document.execCommand('copy');
+    toast('Link copied');
+  }
+}
+
+function openInviteMailto(){
+  const {email, link, role} = currentInviteState;
+  const subject = encodeURIComponent('You\'re invited to PilotManager');
+  const body = encodeURIComponent(
+    `Hi,\n\n` +
+    `You've been invited to join PilotManager${role ? ' as ' + role : ''}.\n\n` +
+    `Click this link to create your account:\n${link}\n\n` +
+    `This link expires in 7 days.\n\n` +
+    `— Sent via PilotManager`
+  );
+  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
 }
 
 // ─────────────────────────────────────────────
