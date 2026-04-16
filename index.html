@@ -1821,7 +1821,61 @@ async function registerEmail(){
 }
 
 async function signOut(){
+  // Stop the live user-doc listener so it doesn't fire after sign out
+  if(userDocUnsubscribe){ try{ userDocUnsubscribe(); }catch(e){} userDocUnsubscribe = null; }
   await auth.signOut();
+}
+
+// Live subscription to the current user's Firestore doc. Any role or
+// permission change made by an admin propagates instantly to every
+// active session without needing a sign-out or page refresh.
+let userDocUnsubscribe = null;
+
+function subscribeToUserDoc(uid){
+  if(userDocUnsubscribe){ try{ userDocUnsubscribe(); }catch(e){} }
+  userDocUnsubscribe = db.collection('users').doc(uid).onSnapshot(async snap=>{
+    if(!snap.exists) return;
+    const data = snap.data();
+    const prevRole = currentUser?.role;
+    const prevRoleId = currentUser?.roleId;
+    currentUser = {uid, ...data};
+
+    // If role/roleId changed, reload permissions and refresh UI.
+    if(data.role !== prevRole || data.roleId !== prevRoleId){
+      await loadUserPermissions();
+
+      // Update sidebar role badge
+      const roleEl = document.getElementById('sidebarRole');
+      if(roleEl){
+        roleEl.textContent = currentUser.role || '';
+        roleEl.className = 'u-role role-' + (currentUser.role || '');
+      }
+
+      // Show/hide sidebar items. Clear any previous display:none first
+      // so newly-granted sections reappear without a page refresh.
+      document.querySelectorAll('.sidebar .nav-item').forEach(el=>{
+        el.style.display = '';
+      });
+      applySidebarPermissions();
+
+      // If the user lost access to the view they're currently on,
+      // redirect them to the Dashboard so they don't see stale data.
+      const viewToSection = {
+        dashboard:'dashboard', properties:'properties', monthly:'monthly',
+        team:'team', tasks:'tasks', meetings:'meetings',
+        maintenance:'maintenance', technician:'technician'
+      };
+      const section = viewToSection[currentView];
+      if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
+        toast('Your permissions have changed');
+        showView('dashboard');
+      } else {
+        toast('Your role was updated');
+      }
+    }
+  }, err=>{
+    console.warn('user doc listener', err?.message);
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -1885,6 +1939,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   document.getElementById('registerPage').style.display='none';
   document.getElementById('appPage').style.display='block';
   initApp();
+
+  // Start a real-time subscription on the user's doc so role / permission
+  // changes propagate instantly to all active sessions.
+  subscribeToUserDoc(firebaseUser.uid);
 });
 
 // ─────────────────────────────────────────────
