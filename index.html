@@ -1876,8 +1876,19 @@ function subscribeToRoleDoc(roleId){
 function subscribeToUserDoc(uid){
   if(userDocUnsubscribe){ try{ userDocUnsubscribe(); }catch(e){} }
   userDocUnsubscribe = db.collection('users').doc(uid).onSnapshot(async snap=>{
-    if(!snap.exists) return;
+    // If the user doc was deleted (admin removed them), sign them out.
+    if(!snap.exists){
+      toast('Your account has been removed');
+      setTimeout(async()=>{ try{ await auth.signOut(); location.reload(); }catch(e){} }, 800);
+      return;
+    }
     const data = snap.data();
+    // If the user was suspended mid-session, sign them out immediately.
+    if(data.suspended === true){
+      toast('Your account has been suspended');
+      setTimeout(async()=>{ try{ await auth.signOut(); location.reload(); }catch(e){} }, 800);
+      return;
+    }
     const prevRole = currentUser?.role;
     const prevRoleId = currentUser?.roleId;
     currentUser = {uid, ...data};
@@ -1940,6 +1951,18 @@ auth.onAuthStateChanged(async (firebaseUser) => {
     userDoc=await db.collection('users').doc(firebaseUser.uid).get();
   }
   currentUser={uid:firebaseUser.uid,...userDoc.data()};
+
+  // Block suspended users from accessing the app. Sign them out
+  // immediately and show a friendly message on the login page.
+  if(currentUser.suspended === true){
+    await auth.signOut();
+    appInitialized = false;
+    document.getElementById('loader').style.display='none';
+    showLogin();
+    const err = document.getElementById('loginErr');
+    if(err) err.textContent = 'Your account has been suspended. Please contact an admin.';
+    return;
+  }
 
   // Load permissions for this user's role
   await loadUserPermissions();
@@ -4777,16 +4800,81 @@ async function renderTeam(){
     } else {
       selectHtml=`<span class="u-role role-${roleName}">${roleName}</span>`;
     }
-    return `<div class="team-member">
+    const suspended = u.suspended === true;
+    const suspendBadge = suspended
+      ? `<span class="u-role" style="background:var(--red-dim);color:var(--red);margin-left:6px">Suspended</span>`
+      : '';
+    // Admin-only actions: Suspend/Unsuspend + Remove. Never on self.
+    let adminActions = '';
+    if(isAdmin() && !isMe){
+      const suspendLabel = suspended ? 'Unsuspend' : 'Suspend';
+      adminActions = `
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="toggleSuspendUser('${u.uid}',${!suspended})">${suspendLabel}</button>
+        <button class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:10px" onclick="removeUser('${u.uid}')">Remove</button>
+      `;
+    }
+    return `<div class="team-member" ${suspended?'style="opacity:.65"':''}>
       <div class="tm-avatar" style="background:${bg};color:${col}">${initials}</div>
       <div class="tm-info">
-        <div class="tm-name">${u.name}${isMe?' (you)':''}</div>
+        <div class="tm-name">${u.name}${isMe?' (you)':''}${suspendBadge}</div>
         <div class="tm-email">${u.email||''}</div>
       </div>
-      <div class="tm-actions">${selectHtml}</div>
+      <div class="tm-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${selectHtml}${adminActions}</div>
     </div>`;
   }).join('');
   updateInviteRoleDropdown();
+}
+
+async function toggleSuspendUser(uid, suspend){
+  if(!isAdmin()){ toast('Only admins can suspend users'); return; }
+  if(uid === currentUser.uid){ toast('You cannot suspend yourself'); return; }
+  try{
+    const targetDoc = await db.collection('users').doc(uid).get();
+    if(targetDoc.exists && targetDoc.data().role === 'admin' && currentUser.role !== 'admin'){
+      toast('Only an admin can suspend another admin');
+      return;
+    }
+  }catch(e){ /* non-fatal */ }
+  try{
+    await db.collection('users').doc(uid).update({
+      suspended: !!suspend,
+      suspendedAt: suspend ? new Date() : null,
+      suspendedBy: suspend ? (currentUser.name || currentUser.email || '') : null
+    });
+    toast(suspend ? 'User suspended' : 'User reactivated');
+    renderTeam();
+  }catch(e){
+    console.error('toggleSuspendUser', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+async function removeUser(uid){
+  if(!isAdmin()){ toast('Only admins can remove users'); return; }
+  if(uid === currentUser.uid){ toast('You cannot remove yourself'); return; }
+  // Look up the target to show a friendlier confirmation and block
+  // removal of other admins by non-admins (defense-in-depth).
+  let targetName = 'this user';
+  try{
+    const targetDoc = await db.collection('users').doc(uid).get();
+    if(targetDoc.exists){
+      const data = targetDoc.data();
+      targetName = data.name || data.email || 'this user';
+      if(data.role === 'admin' && currentUser.role !== 'admin'){
+        toast('Only an admin can remove another admin');
+        return;
+      }
+    }
+  }catch(e){ /* non-fatal */ }
+  if(!confirm(`Permanently remove ${targetName} from the team? This deletes their user record from Firestore and cannot be undone.\n\n(Note: their Firebase Auth account will remain — they must be removed separately from the Authentication console if needed.)`)) return;
+  try{
+    await db.collection('users').doc(uid).delete();
+    toast('User removed');
+    renderTeam();
+  }catch(e){
+    console.error('removeUser', e);
+    toast('Error: ' + e.message);
+  }
 }
 
 async function changeRole(uid,roleId){
