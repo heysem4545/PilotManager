@@ -2027,13 +2027,15 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 const PERM_SECTIONS = [
   {id:'dashboard',label:'Dashboard'},
   {id:'properties',label:'All Properties'},
+  {id:'propertyFilters',label:'By Status filters'},
   {id:'collection',label:'Collection'},
-  {id:'maintenance',label:'Maintenance'},
-  {id:'technician',label:'Technician'},
+  {id:'monthly',label:'Monthly Report'},
+  {id:'team',label:'Team'},
   {id:'tasks',label:'Task Management'},
   {id:'meetings',label:'Meeting Tracking'},
-  {id:'monthly',label:'Monthly Report'},
-  {id:'team',label:'Team'}
+  {id:'maintenance',label:'Maintenance'},
+  {id:'technician',label:'Technician'},
+  {id:'available',label:'Available Units'}
 ];
 
 function allPermsTrue(){
@@ -2066,7 +2068,12 @@ function canEditSection(sectionId){
 
 function getCurrentSectionId(){
   if(currentFilter==='balance') return 'collection';
-  const map={dashboard:'dashboard',properties:'properties',maintenance:'maintenance',technician:'technician',tasks:'tasks',meetings:'meetings',monthly:'monthly',team:'team'};
+  const map={
+    dashboard:'dashboard', properties:'properties',
+    maintenance:'maintenance', technician:'technician',
+    tasks:'tasks', meetings:'meetings', monthly:'monthly',
+    team:'team', available:'available'
+  };
   return map[currentView]||'dashboard';
 }
 
@@ -2089,53 +2096,74 @@ async function loadUserPermissions(){
       }
     }catch(e){console.error('loadUserPermissions',e);}
   }
-  // Fallback: map old role strings to permissions
+  // Helper: start with all sections locked down, then whitelist specific ones.
+  const deny = () => {
+    const p={};
+    PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});
+    return p;
+  };
+  // Fallback: map legacy role strings to permissions.
+  // Editor: Dashboard, All Properties, Task Management, Maintenance, Technician.
+  // Viewer: Dashboard, All Properties (view only).
   const fallbackPerms={
     manager:()=>{const p=allPermsTrue();p.team.edit=false;return p;},
-    office:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:false});p.properties.edit=true;p.collection.edit=true;p.tasks.edit=true;return p;},
-    technician:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;},
-    agent:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;},
-    editor:()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});p.team.edit=false;return p;}
+    office:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:true};p.collection={view:true,edit:true};p.tasks={view:true,edit:true};p.maintenance={view:true,edit:false};p.technician={view:true,edit:false};p.monthly={view:true,edit:false};p.meetings={view:true,edit:false};return p;},
+    technician:()=>{const p=deny();p.dashboard={view:true,edit:false};p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;},
+    agent:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;},
+    editor:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:true};p.tasks={view:true,edit:true};p.maintenance={view:true,edit:true};p.technician={view:true,edit:true};return p;},
+    viewer:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;}
   };
   if(currentUser.role && fallbackPerms[currentUser.role]){
     currentPermissions=fallbackPerms[currentUser.role]();
   } else {
-    currentPermissions=allPermsTrue();
+    // Unknown role — default to viewer-level access (dashboard + properties view)
+    // rather than full access, as a secure default.
+    currentPermissions=fallbackPerms.viewer();
   }
 }
 
 function applySidebarPermissions(){
-  if(isAdmin()||!currentPermissions) return;
-  const navMappings={
-    'nav-dashboard':'dashboard',
-    'nav-properties':'properties',
-    'nav-maintenance':'maintenance',
-    'nav-technician':'technician',
-    'nav-tasks':'tasks',
-    'nav-meetings':'meetings',
-    'nav-team':'team'
-  };
-  Object.entries(navMappings).forEach(([navId,sectionId])=>{
-    const el=document.getElementById(navId);
-    if(el){
-      if(!canViewSection(sectionId)){
-        el.style.display='none';
-      } else {
-        el.style.display='';
+  // Admin: everything visible, clear any display:none from previous role
+  if(isAdmin()){
+    document.querySelectorAll('.sidebar .nav-item, .sidebar .nav-label').forEach(el=>{el.style.display='';});
+    return;
+  }
+  if(!currentPermissions) return;
+
+  // For every sidebar nav-item, determine its section and gate visibility.
+  document.querySelectorAll('.sidebar .nav-item').forEach(btn=>{
+    const id = btn.id || '';
+    const onclick = btn.getAttribute('onclick') || '';
+    let sectionId = null;
+
+    if(id.startsWith('nav-')){
+      sectionId = id.replace(/^nav-/,'');
+    } else if(onclick === "setFilter('balance')"){
+      sectionId = 'collection';
+    } else if(onclick === "showView('monthly')"){
+      sectionId = 'monthly';
+    } else if(onclick.startsWith('setFilter(')){
+      // By Status filters: Rented/Vacant/Eviction/Construction
+      sectionId = 'propertyFilters';
+    }
+
+    if(sectionId){
+      btn.style.display = canViewSection(sectionId) ? '' : 'none';
+    }
+  });
+
+  // Hide section labels (.nav-label) when no visible items follow until
+  // the next label. This removes empty "Finance" / "Admin" etc. headers.
+  document.querySelectorAll('.sidebar .nav-label').forEach(label=>{
+    let el = label.nextElementSibling;
+    let hasVisible = false;
+    while(el && !el.classList.contains('nav-label')){
+      if(el.classList.contains('nav-item') && el.style.display !== 'none'){
+        hasVisible = true; break;
       }
+      el = el.nextElementSibling;
     }
-  });
-  // Collection nav item (no id, uses setFilter('balance'))
-  document.querySelectorAll('.sidebar .nav-item').forEach(btn=>{
-    if(btn.getAttribute('onclick')==="setFilter('balance')"){
-      btn.style.display=canViewSection('collection')?'':'none';
-    }
-  });
-  // Monthly Report nav item (no id, uses showView('monthly'))
-  document.querySelectorAll('.sidebar .nav-item').forEach(btn=>{
-    if(btn.getAttribute('onclick')==="showView('monthly')"){
-      btn.style.display=canViewSection('monthly')?'':'none';
-    }
+    label.style.display = hasVisible ? '' : 'none';
   });
 }
 
