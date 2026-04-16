@@ -562,7 +562,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .tech-tooltip .tt-job{padding:9px 14px;border-bottom:1px solid var(--border)}
 .tech-tooltip .tt-job:last-child{border-bottom:none}
 .tech-tooltip .tt-job-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
-.tech-tooltip .tt-addr{font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tech-tooltip .tt-addr{font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:0;word-break:break-word;line-height:1.35}
 .tech-tooltip .tt-rating{font-family:var(--mono);font-size:11px;font-weight:600;flex-shrink:0}
 .tech-tooltip .tt-rating.good{color:var(--accent)}
 .tech-tooltip .tt-rating.mid{color:var(--amber)}
@@ -4223,6 +4223,9 @@ function renderTechDraftList(){
         ? 'background:var(--accent-dim);color:var(--accent)'
         : 'background:var(--blue-dim);color:var(--blue)';
       const lbl = 'font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px';
+      const propTitle = j.propertyAddress ? escapeAttr(j.propertyAddress) : 'Select property';
+      const jobTypeTitle = escapeAttr(j.jobType || 'Select type');
+      const descTitle = j.description ? escapeAttr(j.description) : '';
       return `<div class="tech-job-card" style="border-left:3px solid ${isPest?'var(--accent)':'var(--blue)'}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em;${badgeStyle}">${badgeLbl}</span>
@@ -4234,10 +4237,10 @@ function renderTechDraftList(){
         </div>
         <div style="display:grid;grid-template-columns:1fr 130px 90px 90px;gap:8px;margin-bottom:8px">
           <div><div style="${lbl}">Houses</div>
-            <select onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text)" style="width:100%">${optsWithSelected}</select>
+            <select title="${propTitle}" onchange="techDraftSet(${i},'propertyId',this.value); techDraftSet(${i},'propertyAddress', this.options[this.selectedIndex].text); this.title=this.options[this.selectedIndex].text" style="width:100%">${optsWithSelected}</select>
           </div>
           <div><div style="${lbl}">Job Type</div>
-            <select onchange="techDraftSet(${i},'jobType',this.value)" style="width:100%">
+            <select title="${jobTypeTitle}" onchange="techDraftSet(${i},'jobType',this.value); this.title=this.value" style="width:100%">
               ${typeList.map(t=>`<option value="${t}" ${j.jobType===t?'selected':''}>${t}</option>`).join('')}
             </select>
           </div>
@@ -4258,14 +4261,15 @@ function renderTechDraftList(){
             </div>
           </div>
         </div>
-        <div class="tech-job-card-row">
-          <input type="text" placeholder="Description (what work was done)" value="${escapeAttr(j.description||'')}" oninput="techDraftSet(${i},'description',this.value)">
-          <div class="tech-duration">
-            <input type="number" min="0" max="23" value="${hours||''}" placeholder="0" oninput="techDraftDuration(${i},'h',this.value)">
-            <span>h</span>
-            <input type="number" min="0" max="59" value="${mins||''}" placeholder="0" oninput="techDraftDuration(${i},'m',this.value)">
-            <span>m</span>
-          </div>
+        <div style="margin-bottom:6px"><div style="${lbl}">Description</div>
+          <textarea rows="2" placeholder="What work was done" title="${descTitle}" oninput="techDraftSet(${i},'description',this.value); this.title=this.value" style="width:100%;resize:vertical;min-height:38px">${escapeHtml(j.description||'')}</textarea>
+        </div>
+        <div class="tech-duration" style="margin-top:4px">
+          <span style="${lbl};margin:0 6px 0 0">Duration</span>
+          <input type="number" min="0" max="23" value="${hours||''}" placeholder="0" oninput="techDraftDuration(${i},'h',this.value)">
+          <span>h</span>
+          <input type="number" min="0" max="59" value="${mins||''}" placeholder="0" oninput="techDraftDuration(${i},'m',this.value)">
+          <span>m</span>
         </div>
       </div>`;
     }).join('');
