@@ -4874,16 +4874,38 @@ async function renderRolesTab(){
   }).join('');
 }
 
+// Build the list of permission sections dynamically. Starts with the
+// core PERM_SECTIONS (which covers sections like Collection and Monthly
+// Report that don't have a nav-* id), then scans the sidebar DOM for
+// any nav-<id> button and adds it if not already present. This means
+// new sidebar items appear automatically in the Edit Role modal.
+function getAllPermissionSections(){
+  const sections = [];
+  const seen = new Set();
+  PERM_SECTIONS.forEach(s=>{ sections.push(s); seen.add(s.id); });
+  document.querySelectorAll('.sidebar .nav-item[id^="nav-"]').forEach(btn=>{
+    const id = btn.id.replace(/^nav-/,'');
+    if(!id || seen.has(id)) return;
+    const label = (btn.textContent || id).trim().replace(/\s+/g,' ');
+    sections.push({id, label});
+    seen.add(id);
+  });
+  return sections;
+}
+
 function openRoleModal(roleId){
   editingRoleId=roleId||null;
   const role=roleId?rolesCache.find(r=>r.id===roleId):null;
   document.getElementById('roleModalTitle').textContent=role?'Edit Role':'Create Role';
   document.getElementById('role_name').value=role?role.name:'';
   const tbody=document.getElementById('permTableBody');
-  tbody.innerHTML=PERM_SECTIONS.map(s=>{
-    const p=role?(role.permissions||{})[s.id]||{view:false,edit:false}:{view:false,edit:false};
+  const allSections = getAllPermissionSections();
+  tbody.innerHTML = allSections.map(s=>{
+    // Preserve any existing saved permission for this section; new
+    // sections default to unchecked for both View and Edit.
+    const p = role ? (role.permissions||{})[s.id] || {view:false,edit:false} : {view:false,edit:false};
     return `<tr>
-      <td>${s.label}</td>
+      <td>${escapeHtml(s.label)}</td>
       <td><input type="checkbox" class="perm-check" data-section="${s.id}" data-perm="view" ${p.view?'checked':''}></td>
       <td><input type="checkbox" class="perm-check" data-section="${s.id}" data-perm="edit" ${p.edit?'checked':''}></td>
     </tr>`;
