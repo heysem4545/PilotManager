@@ -1821,15 +1821,57 @@ async function registerEmail(){
 }
 
 async function signOut(){
-  // Stop the live user-doc listener so it doesn't fire after sign out
+  // Stop the live listeners so they don't fire after sign out
   if(userDocUnsubscribe){ try{ userDocUnsubscribe(); }catch(e){} userDocUnsubscribe = null; }
+  if(roleDocUnsubscribe){ try{ roleDocUnsubscribe(); }catch(e){} roleDocUnsubscribe = null; }
   await auth.signOut();
 }
 
-// Live subscription to the current user's Firestore doc. Any role or
-// permission change made by an admin propagates instantly to every
-// active session without needing a sign-out or page refresh.
+// Live subscriptions to the current user's Firestore doc AND their role
+// doc. Any change — role reassignment, or an admin editing the role's
+// permissions — propagates instantly to every active session without
+// needing a sign-out or page refresh.
 let userDocUnsubscribe = null;
+let roleDocUnsubscribe = null;
+
+function refreshSidebarAfterPermissionChange(notify){
+  // Reset sidebar to default-visible before re-applying permissions,
+  // so newly-granted sections reappear and revoked ones hide.
+  document.querySelectorAll('.sidebar .nav-item, .sidebar .nav-label').forEach(el=>{
+    el.style.display = '';
+  });
+  applySidebarPermissions();
+  // Redirect if the current view is now restricted.
+  const viewToSection = {
+    dashboard:'dashboard', properties:'properties', monthly:'monthly',
+    team:'team', tasks:'tasks', meetings:'meetings',
+    maintenance:'maintenance', technician:'technician', available:'available'
+  };
+  const section = viewToSection[currentView];
+  if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
+    if(notify) toast('Your permissions have changed');
+    showView('dashboard');
+  } else if(notify){
+    toast('Your access was updated');
+  }
+}
+
+function subscribeToRoleDoc(roleId){
+  if(roleDocUnsubscribe){ try{ roleDocUnsubscribe(); }catch(e){} roleDocUnsubscribe = null; }
+  if(!roleId) return;
+  roleDocUnsubscribe = db.collection('roles').doc(roleId).onSnapshot(async snap=>{
+    if(!snap.exists) return;
+    // Keep the in-memory rolesCache entry in sync so subsequent
+    // renders pick up the new permissions too.
+    const idx = rolesCache.findIndex(r=>r.id===roleId);
+    const newData = {id:roleId, ...snap.data()};
+    if(idx>=0) rolesCache[idx] = newData; else rolesCache.push(newData);
+    await loadUserPermissions();
+    refreshSidebarAfterPermissionChange(true);
+  }, err=>{
+    console.warn('role doc listener', err?.message);
+  });
+}
 
 function subscribeToUserDoc(uid){
   if(userDocUnsubscribe){ try{ userDocUnsubscribe(); }catch(e){} }
@@ -1851,31 +1893,21 @@ function subscribeToUserDoc(uid){
         roleEl.className = 'u-role role-' + (currentUser.role || '');
       }
 
-      // Show/hide sidebar items. Clear any previous display:none first
-      // so newly-granted sections reappear without a page refresh.
-      document.querySelectorAll('.sidebar .nav-item').forEach(el=>{
-        el.style.display = '';
-      });
-      applySidebarPermissions();
+      refreshSidebarAfterPermissionChange(true);
 
-      // If the user lost access to the view they're currently on,
-      // redirect them to the Dashboard so they don't see stale data.
-      const viewToSection = {
-        dashboard:'dashboard', properties:'properties', monthly:'monthly',
-        team:'team', tasks:'tasks', meetings:'meetings',
-        maintenance:'maintenance', technician:'technician'
-      };
-      const section = viewToSection[currentView];
-      if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
-        toast('Your permissions have changed');
-        showView('dashboard');
-      } else {
-        toast('Your role was updated');
-      }
+      // Re-subscribe to the new role doc (or drop the subscription if
+      // the user no longer has a roleId).
+      subscribeToRoleDoc(data.roleId);
     }
   }, err=>{
     console.warn('user doc listener', err?.message);
   });
+
+  // Initial subscription to the user's role doc so that permission
+  // edits to the role itself propagate instantly.
+  if(currentUser && currentUser.roleId){
+    subscribeToRoleDoc(currentUser.roleId);
+  }
 }
 
 // ─────────────────────────────────────────────
