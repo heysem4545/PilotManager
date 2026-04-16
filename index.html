@@ -4940,11 +4940,25 @@ async function renderRolesTab(){
     return;
   }
   container.innerHTML=rolesCache.map(r=>{
-    const permSummary=PERM_SECTIONS.map(s=>{
-      const p=(r.permissions||{})[s.id];
-      if(!p||(!p.view&&!p.edit)) return '';
-      if(p.view&&p.edit) return `<span class="role-perm-tag edit">${s.label}: Edit</span>`;
-      if(p.view) return `<span class="role-perm-tag view">${s.label}: View</span>`;
+    // Build the full section list: every current sidebar section PLUS any
+    // section that has a saved permission on the role but is no longer
+    // in the sidebar. Ensures every checked permission is displayed.
+    const perms = r.permissions || {};
+    const sidebarSections = getAllPermissionSections();
+    const seen = new Set(sidebarSections.map(s=>s.id));
+    const labelOverrides = Object.fromEntries(sidebarSections.map(s=>[s.id, s.label]));
+    const extraIds = Object.keys(perms).filter(id => !seen.has(id));
+    const fullList = [
+      ...sidebarSections,
+      ...extraIds.map(id => ({id, label: id}))
+    ];
+    const permSummary = fullList.map(s=>{
+      const p = perms[s.id];
+      if(!p || (!p.view && !p.edit)) return '';
+      const label = labelOverrides[s.id] || s.label || s.id;
+      if(p.view && p.edit) return `<span class="role-perm-tag edit">${label}: Edit</span>`;
+      if(p.edit) return `<span class="role-perm-tag edit">${label}: Edit</span>`;
+      if(p.view) return `<span class="role-perm-tag view">${label}: View</span>`;
       return '';
     }).filter(Boolean).join('');
     const noPerms=!permSummary?'<span class="role-perm-tag none">No permissions</span>':'';
