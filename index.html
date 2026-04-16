@@ -1478,23 +1478,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
-<!-- USER SECTIONS MODAL -->
-<div class="overlay" id="userSectionsModal" onclick="if(event.target===this)closeModal('userSectionsModal')">
-  <div class="modal" style="width:440px">
-    <div class="modal-title">
-      <span>Section access</span>
-      <button class="modal-close" onclick="closeModal('userSectionsModal')">×</button>
-    </div>
-    <div id="userSectionsMeta" style="font-size:11px;color:var(--muted);margin-bottom:12px"></div>
-    <div id="userSectionsList" style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto"></div>
-    <input type="hidden" id="userSectionsUid" value="">
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('userSectionsModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveUserSections()">Save access</button>
-    </div>
-  </div>
-</div>
-
 <!-- UTILITY LIMIT MODAL -->
 <div class="overlay" id="utilLimitModal" onclick="if(event.target===this)closeModal('utilLimitModal')">
   <div class="modal" style="width:340px">
@@ -1882,9 +1865,7 @@ const PERM_SECTIONS = [
   {id:'tasks',label:'Task Management'},
   {id:'meetings',label:'Meeting Tracking'},
   {id:'monthly',label:'Monthly Report'},
-  {id:'outstandingBalance',label:'Outstanding Balance'},
-  {id:'team',label:'Team'},
-  {id:'available',label:'Available Units'}
+  {id:'team',label:'Team'}
 ];
 
 function allPermsTrue(){
@@ -1930,17 +1911,6 @@ async function loadUserPermissions(){
     currentPermissions=allPermsTrue();
     return;
   }
-  // Per-user allowedSections array (new per-user override system).
-  // If present, it defines exactly which sections the user can view.
-  if(Array.isArray(currentUser.allowedSections)){
-    const p={};
-    PERM_SECTIONS.forEach(s=>{
-      const allowed = currentUser.allowedSections.includes(s.id);
-      p[s.id]={view:allowed, edit:allowed};
-    });
-    currentPermissions=p;
-    return;
-  }
   // Try loading by roleId
   if(currentUser.roleId){
     try{
@@ -1975,8 +1945,7 @@ function applySidebarPermissions(){
     'nav-technician':'technician',
     'nav-tasks':'tasks',
     'nav-meetings':'meetings',
-    'nav-team':'team',
-    'nav-available':'available'
+    'nav-team':'team'
   };
   Object.entries(navMappings).forEach(([navId,sectionId])=>{
     const el=document.getElementById(navId);
@@ -4551,16 +4520,13 @@ async function renderTeam(){
     } else {
       selectHtml=`<span class="u-role role-${roleName}">${roleName}</span>`;
     }
-    const sectionsBtn = (isAdmin()&&!isMe)
-      ? `<button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="openUserSections('${u.uid}')">Sections</button>`
-      : '';
     return `<div class="team-member">
       <div class="tm-avatar" style="background:${bg};color:${col}">${initials}</div>
       <div class="tm-info">
         <div class="tm-name">${u.name}${isMe?' (you)':''}</div>
         <div class="tm-email">${u.email||''}</div>
       </div>
-      <div class="tm-actions" style="display:flex;gap:6px;align-items:center">${selectHtml}${sectionsBtn}</div>
+      <div class="tm-actions">${selectHtml}</div>
     </div>`;
   }).join('');
   updateInviteRoleDropdown();
@@ -4572,45 +4538,6 @@ async function changeRole(uid,roleId){
   await db.collection('users').doc(uid).update({roleId,role:roleName});
   toast('Role updated');
   renderTeam();
-}
-
-async function openUserSections(uid){
-  if(!isAdmin()) return;
-  const users = await getUsers();
-  const u = users.find(x=>x.uid===uid);
-  if(!u) return;
-  document.getElementById('userSectionsUid').value = uid;
-  document.getElementById('userSectionsMeta').textContent = `${u.name||u.email} — check sections this user can access. Leave all unchecked to use the role's default permissions.`;
-  const allowed = Array.isArray(u.allowedSections) ? u.allowedSections : null;
-  const list = document.getElementById('userSectionsList');
-  list.innerHTML = PERM_SECTIONS.map(s=>{
-    const checked = allowed ? allowed.includes(s.id) : false;
-    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;cursor:pointer;font-size:12px">
-      <input type="checkbox" value="${s.id}" ${checked?'checked':''} style="accent-color:var(--accent);width:14px;height:14px">
-      <span>${escapeHtml(s.label)}</span>
-    </label>`;
-  }).join('');
-  document.getElementById('userSectionsModal').classList.add('open');
-}
-
-async function saveUserSections(){
-  const uid = document.getElementById('userSectionsUid').value;
-  if(!uid) return;
-  const checks = document.querySelectorAll('#userSectionsList input[type="checkbox"]');
-  const allowedSections = [...checks].filter(c=>c.checked).map(c=>c.value);
-  try{
-    if(allowedSections.length === 0){
-      await db.collection('users').doc(uid).update({allowedSections: firebase.firestore.FieldValue.delete()});
-    } else {
-      await db.collection('users').doc(uid).update({allowedSections});
-    }
-    closeModal('userSectionsModal');
-    toast('Section access updated');
-    renderTeam();
-  }catch(e){
-    console.error('saveUserSections', e);
-    toast('Error: '+e.message);
-  }
 }
 
 async function inviteUser(){
@@ -5660,13 +5587,6 @@ function changeCourtAlertDays(){
 let currentView = 'dashboard';
 
 function showView(v){
-  // Block restricted sections for non-admins and redirect to Dashboard
-  const viewToSection = {dashboard:'dashboard',properties:'properties',monthly:'monthly',team:'team',tasks:'tasks',meetings:'meetings',maintenance:'maintenance',technician:'technician',available:'available'};
-  const section = viewToSection[v];
-  if(section && currentPermissions && !isAdmin() && !canViewSection(section)){
-    toast('You don\u2019t have access to this section');
-    if(v !== 'dashboard'){ showView('dashboard'); return; }
-  }
   currentView = v;
 
   // Map view names to their element IDs
