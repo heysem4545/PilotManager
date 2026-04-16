@@ -1389,6 +1389,51 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 </div>
 
 <!-- CALL LOG ADD / EDIT MODAL -->
+<!-- TASK EDIT MODAL -->
+<div class="overlay" id="taskEditModal" onclick="if(event.target===this)closeModal('taskEditModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      <span>Edit Task</span>
+      <button class="modal-close" onclick="closeModal('taskEditModal')">×</button>
+    </div>
+    <div class="fg"><label>Title</label><input id="te_task" placeholder="Task title"></div>
+    <div class="fg"><label>Description</label><textarea id="te_description" rows="3" placeholder="Add more detail (optional)"></textarea></div>
+    <div class="frow">
+      <div class="fg"><label>Difficulty</label>
+        <select id="te_diff">
+          <option value="">—</option>
+          <option value="easy">🟢 Easy (1pt)</option>
+          <option value="medium">🟡 Medium (2pt)</option>
+          <option value="hard">🔴 Hard (3pt)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Status</label>
+        <select id="te_status">
+          <option value="notstarted">Not Started</option>
+          <option value="progressing">Progressing</option>
+          <option value="done">✓ Done</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Assigned to</label>
+        <select id="te_assigned"></select>
+      </div>
+      <div class="fg"><label>Due Date</label>
+        <input type="date" id="te_dueDate">
+      </div>
+    </div>
+    <input type="hidden" id="te_taskId">
+    <input type="hidden" id="te_day">
+    <input type="hidden" id="te_rowIdx">
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('taskEditModal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="te_deleteBtn" style="display:none" onclick="deleteTaskFromModal()">Delete</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTaskFromModal()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="callLogModal" onclick="if(event.target===this)closeModal('callLogModal')">
   <div class="modal">
     <div class="modal-title">
@@ -5455,6 +5500,9 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
       </select>
+      <button class="tm-edit-btn" title="Edit task (full view)" onclick="openTaskEditModal(${day},${i})" style="background:none;border:1px solid var(--border2);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0" onmouseover="this.style.color='var(--text)';this.style.background='var(--surface3)'" onmouseout="this.style.color='var(--muted)';this.style.background='none'">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>
+      </button>
     </div>`;
   }).join('');
 
@@ -5500,6 +5548,117 @@ function onTmAssign(day,rowIdx,sel){
       createdAt:new Date(),updatedAt:new Date()
     });
   });
+}
+
+// ─────────────────────────────────────────────
+// TASK EDIT MODAL — full-detail edit for a task
+// ─────────────────────────────────────────────
+async function openTaskEditModal(day, rowIdx){
+  // Load any existing task doc for this (monthKey, day, rowIdx)
+  const key = tmActiveKey();
+  const isGroup = tmTab === 'group';
+  try{
+    let q = db.collection('tasks')
+      .where('monthKey','==',key)
+      .where('day','==',day)
+      .where('rowIdx','==',rowIdx);
+    if(!isGroup) q = q.where('uid','==',currentUser.uid);
+    const snap = await q.get();
+    const docId = snap.empty ? '' : snap.docs[0].id;
+    const t = snap.empty ? {} : snap.docs[0].data();
+
+    document.getElementById('te_taskId').value = docId;
+    document.getElementById('te_day').value = day;
+    document.getElementById('te_rowIdx').value = rowIdx;
+    document.getElementById('te_task').value = t.task || '';
+    document.getElementById('te_description').value = t.description || '';
+    document.getElementById('te_diff').value = t.diff || '';
+    document.getElementById('te_status').value = t.status || 'notstarted';
+
+    // Build due date from existing dueDate field, or derive from day/month
+    const existingDueDate = t.dueDate || '';
+    const derivedDueDate = `${tmYear}-${String(tmMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    document.getElementById('te_dueDate').value = existingDueDate || derivedDueDate;
+
+    // Populate assigned-to dropdown from team users
+    const users = teamUsersCache.length ? teamUsersCache : await getUsers();
+    teamUsersCache = users;
+    const sel = document.getElementById('te_assigned');
+    const currentAssignedUid = t.assignedUid || t.uid || currentUser.uid;
+    sel.innerHTML = `<option value="">Everyone</option>` +
+      users.map(u=>`<option value="${u.uid}" ${u.uid===currentAssignedUid?'selected':''}>${escapeHtml(u.name||u.email||'User')}</option>`).join('');
+
+    // Show delete only for admins or the task owner (when editing an existing task)
+    const canDelete = docId && (isAdmin() || t.uid === currentUser.uid);
+    document.getElementById('te_deleteBtn').style.display = canDelete ? '' : 'none';
+
+    document.getElementById('taskEditModal').classList.add('open');
+  }catch(e){
+    console.error('openTaskEditModal', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+async function saveTaskFromModal(){
+  const docId = document.getElementById('te_taskId').value;
+  const day = parseInt(document.getElementById('te_day').value, 10);
+  const rowIdx = parseInt(document.getElementById('te_rowIdx').value, 10);
+  const task = document.getElementById('te_task').value.trim();
+  const description = document.getElementById('te_description').value.trim();
+  const diff = document.getElementById('te_diff').value;
+  const status = document.getElementById('te_status').value;
+  const assignedUid = document.getElementById('te_assigned').value;
+  const dueDate = document.getElementById('te_dueDate').value;
+
+  // Resolve assigned name from cache
+  const assignedUser = teamUsersCache.find(u => u.uid === assignedUid);
+  const assignedName = assignedUser ? (assignedUser.name || assignedUser.email || '') : '';
+
+  const data = {
+    task, description, diff, status,
+    assignedUid: assignedUid || '',
+    assignedName,
+    dueDate: dueDate || '',
+    updatedAt: new Date()
+  };
+
+  try{
+    const key = tmActiveKey();
+    if(docId){
+      await db.collection('tasks').doc(docId).update(data);
+    } else {
+      await db.collection('tasks').add({
+        ...data,
+        monthKey: key, day, rowIdx,
+        uid: assignedUid || currentUser.uid,
+        userName: currentUser.name,
+        userColor: userColor(assignedUid || currentUser.uid),
+        isGroup: tmTab === 'group',
+        createdAt: new Date()
+      });
+    }
+    closeModal('taskEditModal');
+    toast('Task saved');
+    await renderTasksView();
+  }catch(e){
+    console.error('saveTaskFromModal', e);
+    toast('Error: ' + e.message);
+  }
+}
+
+async function deleteTaskFromModal(){
+  const docId = document.getElementById('te_taskId').value;
+  if(!docId) return;
+  if(!confirm('Delete this task? This cannot be undone.')) return;
+  try{
+    await db.collection('tasks').doc(docId).delete();
+    closeModal('taskEditModal');
+    toast('Task deleted');
+    await renderTasksView();
+  }catch(e){
+    console.error('deleteTaskFromModal', e);
+    toast('Error: ' + e.message);
+  }
 }
 
 function tmAddRow(day){
