@@ -4934,33 +4934,47 @@ function switchTeamTab(tab){
 
 async function renderRolesTab(){
   await ensureDefaultRoles();
+  // Always refresh from Firestore so edits made in another session
+  // (or just saved) are reflected immediately.
+  try{ await loadRoles(); }catch(e){ console.warn('loadRoles', e?.message); }
   const container=document.getElementById('roleCardsList');
   if(!rolesCache.length){
     container.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">No roles defined yet</div>';
     return;
   }
   container.innerHTML=rolesCache.map(r=>{
-    // Build the full section list: every current sidebar section PLUS any
-    // section that has a saved permission on the role but is no longer
-    // in the sidebar. Ensures every checked permission is displayed.
+    // Display every permission that's true (view OR edit) in the role's
+    // saved permissions object. Iterate the permissions object directly
+    // so nothing gets dropped, then fall back to label lookup from
+    // current sidebar sections for nicer display text.
     const perms = r.permissions || {};
     const sidebarSections = getAllPermissionSections();
-    const seen = new Set(sidebarSections.map(s=>s.id));
-    const labelOverrides = Object.fromEntries(sidebarSections.map(s=>[s.id, s.label]));
-    const extraIds = Object.keys(perms).filter(id => !seen.has(id));
-    const fullList = [
-      ...sidebarSections,
-      ...extraIds.map(id => ({id, label: id}))
-    ];
-    const permSummary = fullList.map(s=>{
-      const p = perms[s.id];
-      if(!p || (!p.view && !p.edit)) return '';
-      const label = labelOverrides[s.id] || s.label || s.id;
-      if(p.view && p.edit) return `<span class="role-perm-tag edit">${label}: Edit</span>`;
-      if(p.edit) return `<span class="role-perm-tag edit">${label}: Edit</span>`;
-      if(p.view) return `<span class="role-perm-tag view">${label}: View</span>`;
-      return '';
-    }).filter(Boolean).join('');
+    const labelOverrides = {};
+    sidebarSections.forEach(s => { labelOverrides[s.id] = s.label; });
+    // Build ordered id list: sidebar sections first (for consistent
+    // ordering), then any extra IDs that exist in perms but not sidebar.
+    const orderedIds = [];
+    const seenIds = new Set();
+    sidebarSections.forEach(s => { orderedIds.push(s.id); seenIds.add(s.id); });
+    Object.keys(perms).forEach(id => {
+      if(!seenIds.has(id)) { orderedIds.push(id); seenIds.add(id); }
+    });
+    const badges = [];
+    orderedIds.forEach(id => {
+      const p = perms[id];
+      if(!p) return;
+      const hasView = p.view === true;
+      const hasEdit = p.edit === true;
+      if(!hasView && !hasEdit) return;
+      const label = labelOverrides[id] || id;
+      if(hasEdit){
+        badges.push(`<span class="role-perm-tag edit">${escapeHtml(label)}: Edit</span>`);
+      } else if(hasView){
+        badges.push(`<span class="role-perm-tag view">${escapeHtml(label)}: View</span>`);
+      }
+    });
+    const permSummary = badges.join('');
+    console.log('[renderRolesTab]', r.name, 'permissions:', perms, '→ badges:', badges.length);
     const noPerms=!permSummary?'<span class="role-perm-tag none">No permissions</span>':'';
     return `<div class="role-card">
       <div class="role-card-head">
