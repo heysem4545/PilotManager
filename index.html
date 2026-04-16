@@ -1405,7 +1405,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
     </div>
     <div class="fg"><label>Property Address</label>
-      <select id="cl_property"></select>
+      <input id="cl_property" list="cl_propertyList" placeholder="Type to search address…" autocomplete="off">
+      <datalist id="cl_propertyList"></datalist>
     </div>
     <div class="frow">
       <div class="fg"><label>Call Reason</label>
@@ -6492,16 +6493,28 @@ async function renderCallLogView(){
 }
 
 function populateCallLogPropertyDropdown(selectedId){
-  const sel = document.getElementById('cl_property');
-  if(!sel) return;
+  const input = document.getElementById('cl_property');
+  const list = document.getElementById('cl_propertyList');
+  if(!input || !list) return;
   const sorted = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
-  let opts = '<option value="">— Select property —</option>';
-  sorted.forEach(p => {
-    const id = p.id || '';
+  list.innerHTML = sorted.map(p=>{
     const addr = p.addr || '(no address)';
-    opts += `<option value="${escapeAttr(id)}"${id===selectedId?' selected':''}>${escapeHtml(addr)}</option>`;
-  });
-  sel.innerHTML = opts;
+    return `<option value="${escapeAttr(addr)}">`;
+  }).join('');
+  // Pre-fill with the address of the selected property (when editing)
+  const selected = properties.find(p => p.id === selectedId);
+  input.value = selected ? (selected.addr || '') : '';
+}
+
+function resolveCallLogProperty(){
+  const input = document.getElementById('cl_property');
+  const typed = (input?.value || '').trim();
+  if(!typed) return {propertyId:'', propertyAddress:''};
+  // Case-insensitive match against known addresses
+  const match = properties.find(p => (p.addr||'').toLowerCase() === typed.toLowerCase());
+  if(match) return {propertyId: match.id, propertyAddress: match.addr || ''};
+  // Allow free text for addresses not in the properties list
+  return {propertyId:'', propertyAddress: typed};
 }
 
 function clearCallLogForm(){
@@ -6546,13 +6559,12 @@ function openCallLogEdit(id){
 }
 
 async function saveCallLogEntry(){
-  const propertyId = document.getElementById('cl_property').value;
-  const prop = properties.find(p => p.id === propertyId);
+  const resolved = resolveCallLogProperty();
   const data = {
     date: document.getElementById('cl_date').value || '',
     direction: document.getElementById('cl_direction').value || 'Inbound',
-    propertyId: propertyId || '',
-    propertyAddress: prop ? (prop.addr || '') : '',
+    propertyId: resolved.propertyId,
+    propertyAddress: resolved.propertyAddress,
     reason: document.getElementById('cl_reason').value || '',
     status: document.getElementById('cl_status').value || 'Completed',
     name: document.getElementById('cl_name').value.trim(),
