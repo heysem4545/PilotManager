@@ -6343,7 +6343,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['notices','leads','tenants','inspections'];
+  const comingSoon = ['notices','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -6379,6 +6379,7 @@ function showView(v){
   if(v==='meetings') renderMeetingsView();
   if(v==='callLog') renderCallLogView();
   if(v==='available') renderAvailableView();
+  if(v==='leads') renderLeadsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -6401,6 +6402,129 @@ function setFilter(f){
 
 function refreshAll(){
   showView(currentView);
+}
+
+// ─────────────────────────────────────────────
+// ASSIGN CALL TO USER / LEADS
+// ─────────────────────────────────────────────
+async function assignCallTo(callId, uid){
+  try{
+    const user = allUsersCache.find(u=>u.uid===uid);
+    await db.collection('callLog').doc(callId).update({
+      assignedToUid: uid || '',
+      assignedToName: user ? (user.name||user.email||'') : '',
+      assignedAt: uid ? new Date() : null
+    });
+    toast(uid ? 'Assigned to ' + (user?.name||'user') : 'Unassigned');
+  }catch(e){
+    console.error('assignCallTo', e);
+    toast('Error: '+e.message);
+  }
+}
+
+let leadsEditId = null;
+
+async function renderLeadsView(skipLoad){
+  const el = document.getElementById('leadsView');
+  if(!el) return;
+  if(!skipLoad){
+    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+    await loadCallLog();
+    startCallLogListener();
+  }
+
+  // Filter to calls assigned to the current user
+  const myLeads = callLogData.filter(c => c.assignedToUid === currentUser.uid);
+
+  let body;
+  if(myLeads.length === 0){
+    body = `<tbody><tr><td colspan="9"><div class="call-empty">
+      <div class="call-empty-title">No leads assigned to you</div>
+      When someone assigns a call to you in Call Log, it will appear here.
+    </div></td></tr></tbody>`;
+  } else {
+    body = '<tbody>' + myLeads.map(c => {
+      const dirCls = (c.direction||'').toLowerCase()==='outbound' ? 'outbound' : 'inbound';
+      const statusKey = c.status || 'Completed';
+      const statusCls = statusKey==='Needs Attention'?'needs-attention':statusKey==='Emergency'?'emergency':'completed';
+      // Editable inline dropdowns for status and reason
+      const statusSel = `<select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);cursor:pointer" onchange="updateLeadField('${c.id}','status',this.value)">
+        <option value="Completed" ${statusKey==='Completed'?'selected':''}>Completed</option>
+        <option value="Needs Attention" ${statusKey==='Needs Attention'?'selected':''}>Needs Attention</option>
+        <option value="Emergency" ${statusKey==='Emergency'?'selected':''}>Emergency</option>
+      </select>`;
+      const reasonSel = `<select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);cursor:pointer" onchange="updateLeadField('${c.id}','reason',this.value)">
+        <option value="Maintenance" ${c.reason==='Maintenance'?'selected':''}>Maintenance</option>
+        <option value="For Rent" ${c.reason==='For Rent'?'selected':''}>For Rent</option>
+        <option value="Payments" ${c.reason==='Payments'?'selected':''}>Payments</option>
+        <option value="Paperwork" ${c.reason==='Paperwork'?'selected':''}>Paperwork</option>
+        <option value="Maintenance Follow Up" ${c.reason==='Maintenance Follow Up'?'selected':''}>Maint Follow Up</option>
+        <option value="Appointment" ${c.reason==='Appointment'?'selected':''}>Appointment</option>
+      </select>`;
+      const nameVal = escapeAttr(c.name||'');
+      const numVal = escapeAttr(c.number||'');
+      const notesPreview = c.notes ? escapeHtml(c.notes.split(/\s+/).slice(0,3).join(' '))+(c.notes.split(/\s+/).length>3?'…':'') : '<span class="cl-empty-val">—</span>';
+      const addrDisp = c.propertyAddress ? escapeHtml(c.propertyAddress) : '<span class="cl-empty-val">—</span>';
+      const assignedBy = c.createdBy || '';
+      return `<tr>
+        <td class="cl-date">${fmtCallDate(c.date)}</td>
+        <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction||'Inbound')}</span></td>
+        <td class="cl-addr" title="${escapeAttr(c.propertyAddress||'')}">${addrDisp}</td>
+        <td>${reasonSel}</td>
+        <td>${statusSel}</td>
+        <td><input type="text" value="${nameVal}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:100px" onblur="updateLeadField('${c.id}','name',this.value)"></td>
+        <td><input type="tel" value="${numVal}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);width:110px" onblur="updateLeadField('${c.id}','number',this.value)"></td>
+        <td style="cursor:pointer" onclick="openLeadNote('${c.id}')" title="${escapeAttr(c.notes||'Click to edit notes')}">${notesPreview}</td>
+        <td style="font-size:11px;color:var(--muted)">${assignedBy?renderUserBadge(assignedBy):'<span class="cl-empty-val">—</span>'}</td>
+      </tr>`;
+    }).join('') + '</tbody>';
+  }
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${myLeads.length}</strong> lead${myLeads.length===1?'':'s'} assigned to you</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>Date</th>
+            <th>Direction</th>
+            <th>Property Address</th>
+            <th>Call Reason</th>
+            <th>Status</th>
+            <th>Name</th>
+            <th>Number</th>
+            <th>Notes</th>
+            <th>Assigned By</th>
+          </tr></thead>
+          ${body}
+        </table>
+      </div>
+    </div>`;
+}
+
+async function updateLeadField(callId, field, value){
+  try{
+    await db.collection('callLog').doc(callId).update({
+      [field]: value,
+      updatedAt: new Date(),
+      updatedBy: currentUser?.name || currentUser?.email || ''
+    });
+    // No re-render needed — the onSnapshot listener handles it.
+  }catch(e){
+    console.error('updateLeadField', e);
+    toast('Error: '+e.message);
+  }
+}
+
+function openLeadNote(callId){
+  // Reuse the callLogNoteModal
+  activeCallNoteId = callId;
+  const c = callLogData.find(x=>x.id===callId);
+  document.getElementById('callLogNoteText').value = c ? (c.notes||'') : '';
+  document.getElementById('callLogNoteModal').classList.add('open');
+  setTimeout(()=>document.getElementById('callLogNoteText').focus(), 50);
 }
 
 // ─────────────────────────────────────────────
@@ -7179,6 +7303,19 @@ async function deleteMeeting(id){
 let callLogData = [];
 let editCallId = null;
 let activeCallNoteId = null;
+let callLogUnsubscribe = null;
+let allUsersCache = [];
+
+function sortCallLogData(){
+  callLogData.sort((a,b)=>{
+    const ad = a.date || '';
+    const bd = b.date || '';
+    if(ad !== bd) return bd.localeCompare(ad);
+    const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return bt - at;
+  });
+}
 
 async function loadCallLog(){
   try {
@@ -7187,18 +7324,39 @@ async function loadCallLog(){
     snap.forEach(doc => {
       callLogData.push({ id: doc.id, ...doc.data() });
     });
-    callLogData.sort((a,b)=>{
-      const ad = a.date || '';
-      const bd = b.date || '';
-      if(ad !== bd) return bd.localeCompare(ad);
-      const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-      const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-      return bt - at;
-    });
+    sortCallLogData();
   } catch(e){
     console.error('loadCallLog', e);
     callLogData = [];
   }
+}
+
+// Real-time listener for two-way sync between Call Log and Leads.
+function startCallLogListener(){
+  if(callLogUnsubscribe) return; // already listening
+  callLogUnsubscribe = db.collection('callLog').onSnapshot(snap=>{
+    callLogData = [];
+    snap.forEach(doc => {
+      callLogData.push({ id: doc.id, ...doc.data() });
+    });
+    sortCallLogData();
+    // Re-render whichever view is active
+    if(currentView === 'callLog'){
+      renderCallLogView(true); // true = skip reload, data is fresh
+    }
+    if(currentView === 'leads'){
+      renderLeadsView(true);
+    }
+  }, err=>{
+    console.warn('callLog listener', err?.message);
+  });
+}
+
+async function ensureUsersCache(){
+  if(allUsersCache.length === 0){
+    allUsersCache = await getUsers();
+  }
+  return allUsersCache;
 }
 
 function fmtCallDate(dateStr){
@@ -7226,20 +7384,24 @@ function renderCallNotesCell(call, editable){
   </div>`;
 }
 
-async function renderCallLogView(){
+async function renderCallLogView(skipLoad){
   const el = document.getElementById('callLogView');
   if(!el) return;
-  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
-  await loadCallLog();
+  if(!skipLoad){
+    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+    await loadCallLog();
+    startCallLogListener();
+  }
+  const users = await ensureUsersCache();
 
-  const editable = canEdit() || (currentUser && currentUser.role === 'admin') || true; // any auth user per rules
+  const editable = canEdit() || (currentUser && currentUser.role === 'admin') || true;
   const isAdmin = currentUser && currentUser.role === 'admin';
 
   const addBtn = `<button class="btn btn-primary btn-sm" onclick="openCallLogAdd()">+ Add Call</button>`;
 
   let body;
   if(callLogData.length === 0){
-    body = `<tbody><tr><td colspan="10"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="11"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + callLogData.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
@@ -7260,6 +7422,15 @@ async function renderCallLogView(){
       </div>`;
       const addedBy = c.createdBy || c.updatedBy || '';
       const addedByDisp = addedBy ? renderUserBadge(addedBy) : '<span class="cl-empty-val">—</span>';
+      // Assign To dropdown
+      const assignOpts = users.map(u=>{
+        const sel = (c.assignedToUid === u.uid) ? 'selected' : '';
+        return `<option value="${u.uid}" ${sel}>${escapeHtml(u.name||u.email||'')}</option>`;
+      }).join('');
+      const assignDropdown = `<select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);cursor:pointer;max-width:120px" onchange="assignCallTo('${c.id}',this.value)">
+        <option value="">— Assign —</option>
+        ${assignOpts}
+      </select>`;
       return `<tr>
         <td class="cl-date">${fmtCallDate(c.date)}</td>
         <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction || 'Inbound')}</span></td>
@@ -7270,6 +7441,7 @@ async function renderCallLogView(){
         <td class="cl-number">${numDisp}</td>
         <td>${renderCallNotesCell(c, editable)}</td>
         <td>${addedByDisp}</td>
+        <td>${assignDropdown}</td>
         <td style="text-align:right">${actions}</td>
       </tr>`;
     }).join('') + '</tbody>';
@@ -7293,6 +7465,7 @@ async function renderCallLogView(){
             <th>Number</th>
             <th>Notes</th>
             <th>Added By</th>
+            <th>Assign To</th>
             <th style="text-align:right">Actions</th>
           </tr></thead>
           ${body}
