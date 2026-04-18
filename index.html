@@ -640,6 +640,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .tm-task-input{background:transparent;border:none;font-size:11px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:3px 4px;border-radius:5px;transition:background .12s;word-wrap:break-word;overflow-wrap:break-word;white-space:normal}
 .tm-task-input:focus{background:var(--surface2)}
 .tm-task-input::placeholder{color:var(--muted2)}
+
+/* Task text hover tooltip — spreadsheet-style "insert note" popup */
+.tm-note-tip{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:10px 14px;font-size:12px;color:var(--text);font-family:var(--font);line-height:1.5;max-width:320px;min-width:140px;word-break:break-word;pointer-events:none;opacity:0;transform:translateY(-2px);transition:opacity .12s,transform .12s}
+.tm-note-tip.show{opacity:1;transform:translateY(0)}
+.tm-note-tip::before{content:'';position:absolute;top:-5px;left:16px;width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border2);border-top:1px solid var(--border2);transform:rotate(45deg)}
 .tm-status-sel{background:transparent;border:none;font-size:10px;font-weight:500;font-family:var(--font);cursor:pointer;padding:3px 4px;border-radius:5px;outline:none;width:auto;flex-shrink:0}
 .status-notstarted{color:var(--muted)}
 .status-progressing{color:var(--blue);background:var(--blue-dim)}
@@ -5479,7 +5484,9 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     const assignOpts=isGroup?teamUsersCache.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${u.name}</option>`).join(''):'';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
-      <span class="tm-task-input" style="font-size:11px;padding:3px 4px">${t.task||''}</span>
+      <span class="tm-task-input" style="font-size:11px;padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+        onmouseenter="showTaskNoteTip('${(t.task||'').replace(/'/g,"\\'")}',this)"
+        onmouseleave="hideTaskNoteTip()">${t.task||''}</span>
       ${isGroup?`<span style="font-size:10px;color:var(--muted);padding:2px 4px">${assignLabel||'Everyone'}</span>`:''}
       <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
     </div>`;
@@ -5490,7 +5497,10 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
         <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
         <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
       </select>
-      <div style="display:flex;align-items:center;gap:3px;min-width:0">
+      <div style="display:flex;align-items:center;gap:3px;min-width:0"
+        onmouseenter="showTaskNoteTip(this.querySelector('input').value,this)"
+        onmouseleave="hideTaskNoteTip()"
+        onfocusin="hideTaskNoteTip()">
         ${userDot}
         <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..."
           onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
@@ -5552,6 +5562,44 @@ function onTmAssign(day,rowIdx,sel){
       createdAt:new Date(),updatedAt:new Date()
     });
   });
+}
+
+// ─────────────────────────────────────────────
+// TASK NOTE TOOLTIP — spreadsheet-style popup on hover
+// ─────────────────────────────────────────────
+let tmNoteTipEl = null;
+let tmNoteTipTimer = null;
+
+function showTaskNoteTip(text, anchor){
+  if(!text || !text.trim()) return;
+  if(!tmNoteTipEl){
+    tmNoteTipEl = document.createElement('div');
+    tmNoteTipEl.className = 'tm-note-tip';
+    document.body.appendChild(tmNoteTipEl);
+  }
+  tmNoteTipEl.textContent = text;
+  tmNoteTipEl.style.display = 'block';
+  tmNoteTipEl.classList.remove('show');
+  // Position below the anchor element
+  const rect = anchor.getBoundingClientRect();
+  let x = rect.left;
+  let y = rect.bottom + 6;
+  const tipW = tmNoteTipEl.offsetWidth || 200;
+  if(x + tipW > window.innerWidth - 12) x = Math.max(12, window.innerWidth - tipW - 12);
+  if(y + (tmNoteTipEl.offsetHeight||60) > window.innerHeight - 12) y = rect.top - (tmNoteTipEl.offsetHeight||60) - 6;
+  if(y < 12) y = 12;
+  tmNoteTipEl.style.left = x + 'px';
+  tmNoteTipEl.style.top = y + 'px';
+  clearTimeout(tmNoteTipTimer);
+  tmNoteTipTimer = setTimeout(()=> tmNoteTipEl.classList.add('show'), 10);
+}
+
+function hideTaskNoteTip(){
+  clearTimeout(tmNoteTipTimer);
+  if(tmNoteTipEl){
+    tmNoteTipEl.classList.remove('show');
+    tmNoteTipEl.style.display = 'none';
+  }
 }
 
 // ─────────────────────────────────────────────
