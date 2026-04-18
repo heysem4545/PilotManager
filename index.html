@@ -6343,7 +6343,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['notices','leads','available','tenants','inspections'];
+  const comingSoon = ['notices','leads','tenants','inspections'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -6378,6 +6378,7 @@ function showView(v){
   if(v==='utility') renderUtilityView();
   if(v==='meetings') renderMeetingsView();
   if(v==='callLog') renderCallLogView();
+  if(v==='available') renderAvailableView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -6400,6 +6401,78 @@ function setFilter(f){
 
 function refreshAll(){
   showView(currentView);
+}
+
+// ─────────────────────────────────────────────
+// AVAILABLE UNITS
+// ─────────────────────────────────────────────
+function renderAvailableView(){
+  const el = document.getElementById('availableView');
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mLabel = MNAMES[activeMonth] + ' ' + activeYear;
+
+  // Filter: Vacant, Construction, Unknown, Moving Process, empty/unset status
+  const available = properties.filter(p => {
+    const mp = getMonthProp(p);
+    const s = (mp.status || '').toUpperCase();
+    return s === 'VACANT' || s === 'CONSTRUCTION' || s === 'UNKNOWN' || s === 'MOVING PROCESS' || !s;
+  }).sort((a,b) => (a.rowIndex||0) - (b.rowIndex||0));
+
+  const statusBadge = (s) => {
+    const key = (s || '').toUpperCase();
+    const cls = BC[key] || 'b-unknown';
+    const label = BL[key] || s || 'No Status';
+    return `<span class="badge ${cls}">${label}</span>`;
+  };
+
+  let body;
+  if(available.length === 0){
+    body = `<tbody><tr><td colspan="4"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No available units</div>All properties are currently rented for ${mLabel}.</div></td></tr></tbody>`;
+  } else {
+    body = '<tbody>' + available.map(p => {
+      const mp = getMonthProp(p);
+      return `<tr>
+        <td>${statusBadge(mp.status)}</td>
+        <td style="font-weight:500">${escapeHtml(p.addr || '')}</td>
+        <td class="money" style="font-family:var(--mono);text-align:right">${mp.cmha ? fmt(mp.cmha) : '<span style="color:var(--muted2)">—</span>'}</td>
+        <td class="money" style="font-family:var(--mono);text-align:right">${mp.tenantPortion ? fmt(mp.tenantPortion) : '<span style="color:var(--muted2)">—</span>'}</td>
+      </tr>`;
+    }).join('') + '</tbody>';
+  }
+
+  // Summary counts
+  const counts = {};
+  available.forEach(p => {
+    const s = getMonthProp(p).status || 'No Status';
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const countPills = Object.entries(counts).map(([s,n]) => {
+    const color = SC[s.toUpperCase()] || 'var(--muted)';
+    return `<span style="font-size:11px;color:${color};font-weight:500">${n} ${BL[s.toUpperCase()]||s}</span>`;
+  }).join('<span style="color:var(--muted2)"> · </span>');
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
+        <div style="font-size:12px;color:var(--muted)">
+          <strong style="color:var(--text)">${available.length}</strong> available unit${available.length===1?'':'s'} · ${mLabel}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${countPills}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="width:130px">Status</th>
+              <th>Address</th>
+              <th style="text-align:right;width:120px">CMHA Rent</th>
+              <th style="text-align:right;width:120px">Tenant Rent</th>
+            </tr>
+          </thead>
+          ${body}
+        </table>
+      </div>
+    </div>`;
 }
 
 function initApp(){
