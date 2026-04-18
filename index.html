@@ -7478,7 +7478,7 @@ async function renderCallLogView(skipLoad){
         <td>${renderCallNotesCell(c, editable)}</td>
         <td>${addedByDisp}</td>
         <td>${assignDropdown}</td>
-        <td>${mkSel('followUp',['','Pending','Done','Scheduled'],c.followUp)}</td>
+        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','followUp',this.value)"></td>
         <td>${mkSel('proofVoucher',['','Received','No Proof'],c.proofVoucher)}</td>
         <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','proofNote',this.value)"></td>
         <td><input type="text" value="${escapeAttr(c.landlordName||'')}" placeholder="—" style="${is};width:100px" onblur="updateCallLogField('${c.id}','landlordName',this.value)"></td>
