@@ -6445,49 +6445,94 @@ async function renderLeadsView(skipLoad){
     startCallLogListener();
   }
 
-  // Filter to calls assigned to the current user
   const myLeads = callLogData.filter(c => c.assignedToUid === currentUser.uid);
 
   let body;
   if(myLeads.length === 0){
-    body = `<tbody><tr><td colspan="9"><div class="call-empty">
+    body = `<tbody><tr><td colspan="50"><div class="call-empty">
       <div class="call-empty-title">No leads assigned to you</div>
       When someone assigns a call to you in Call Log, it will appear here.
     </div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + myLeads.map(c => {
-      const dirCls = (c.direction||'').toLowerCase()==='outbound' ? 'outbound' : 'inbound';
-      const statusKey = c.status || 'Completed';
-      const statusCls = statusKey==='Needs Attention'?'needs-attention':statusKey==='Emergency'?'emergency':'completed';
-      // Editable inline dropdowns for status and reason
-      const statusSel = `<select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);cursor:pointer" onchange="updateLeadField('${c.id}','status',this.value)">
-        <option value="Completed" ${statusKey==='Completed'?'selected':''}>Completed</option>
-        <option value="Needs Attention" ${statusKey==='Needs Attention'?'selected':''}>Needs Attention</option>
-        <option value="Emergency" ${statusKey==='Emergency'?'selected':''}>Emergency</option>
-      </select>`;
-      const reasonSel = `<select style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);cursor:pointer" onchange="updateLeadField('${c.id}','reason',this.value)">
-        <option value="Maintenance" ${c.reason==='Maintenance'?'selected':''}>Maintenance</option>
-        <option value="For Rent" ${c.reason==='For Rent'?'selected':''}>For Rent</option>
-        <option value="Payments" ${c.reason==='Payments'?'selected':''}>Payments</option>
-        <option value="Paperwork" ${c.reason==='Paperwork'?'selected':''}>Paperwork</option>
-        <option value="Maintenance Follow Up" ${c.reason==='Maintenance Follow Up'?'selected':''}>Maint Follow Up</option>
-        <option value="Appointment" ${c.reason==='Appointment'?'selected':''}>Appointment</option>
-      </select>`;
-      const nameVal = escapeAttr(c.name||'');
-      const numVal = escapeAttr(c.number||'');
-      const notesPreview = c.notes ? escapeHtml(c.notes.split(/\s+/).slice(0,3).join(' '))+(c.notes.split(/\s+/).length>3?'…':'') : '<span class="cl-empty-val">—</span>';
-      const addrDisp = c.propertyAddress ? escapeHtml(c.propertyAddress) : '<span class="cl-empty-val">—</span>';
-      const assignedBy = c.createdBy || '';
+      const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
+      const isn=is+';width:70px;font-family:var(--mono)';
+      const iss=is+';cursor:pointer;max-width:110px';
+      const EMOJIS={
+        '1BR':'🏠','2BR':'🏠','3BR':'🏡','4BR':'🏡','5BR':'🏘','6BR':'🏘','UP+':'🏢',
+        'Cash':'💵','CMHA':'🏛',
+        'Brochure':'📄','Sign':'🪧','Referral':'🤝','Affordable':'💰','Zillow':'🔍','Facebook':'📱','Other':'📋','Unknown':'❓','CMHA Office':'🏢',
+        'Yes':'⚠️','No':'✅',
+        'Dog':'🐕','Dogs':'🐕🐕','Cat':'🐈','Cats':'🐈🐈',
+        '1 Kid':'👶','2 Kids':'👧👦','3 Kids':'👧👦👶','4 Kids':'👨‍👩‍👧‍👦','5 Kids':'👨‍👩‍👧‍👦+','6 Kids':'👨‍👩‍👧‍👦++',
+        '9-12':'🌅','12-2':'☀️','2-4':'🌤','Evening':'🌙',
+        'Pending':'🔶','Done':'✅','Scheduled':'📅','Lost':'❌',
+        'Received':'✅','No Proof':'🔴',
+        'Confirmed':'✅','No Answer':'📵',
+        'Completed':'✅','No Show':'🚫','Canceled':'❌',
+        'Risk':'⚠️'
+      };
+      const mkSel=(fld,opts,cur)=>{
+        const options=opts.map(o=>{const em=EMOJIS[o]||'';const label=o?(em?em+' ':'')+o:'— select —';return `<option value="${o}"${(cur||'')===o?' selected':''}>${label}</option>`;}).join('');
+        return `<select style="${iss}" onchange="updateLeadField('${c.id}','${fld}',this.value)">${options}</select>`;
+      };
+      const uf=(fld)=>`updateLeadField('${c.id}','${fld}',this.value)`;
+      const uc=(fld)=>`updateLeadField('${c.id}','${fld}',this.checked)`;
+      const dirCls=(c.direction||'').toLowerCase()==='outbound'?'outbound':'inbound';
+      const statusKey=c.status||'Completed';
+      const statusCls=statusKey==='Needs Attention'?'needs-attention':statusKey==='Emergency'?'emergency':'completed';
+      const addrDisp=c.propertyAddress?escapeHtml(c.propertyAddress):'<span class="cl-empty-val">—</span>';
+      const notesPreview=c.notes?escapeHtml(c.notes.split(/\s+/).slice(0,3).join(' '))+(c.notes.split(/\s+/).length>3?'…':''):'<span class="cl-empty-val">—</span>';
+      const assignedBy=c.createdBy||'';
       return `<tr>
         <td class="cl-date">${fmtCallDate(c.date)}</td>
         <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction||'Inbound')}</span></td>
         <td class="cl-addr" title="${escapeAttr(c.propertyAddress||'')}">${addrDisp}</td>
-        <td>${reasonSel}</td>
-        <td>${statusSel}</td>
-        <td><input type="text" value="${nameVal}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:100px" onblur="updateLeadField('${c.id}','name',this.value)"></td>
-        <td><input type="tel" value="${numVal}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);width:110px" onblur="updateLeadField('${c.id}','number',this.value)"></td>
-        <td style="cursor:pointer" onclick="openLeadNote('${c.id}')" title="${escapeAttr(c.notes||'Click to edit notes')}">${notesPreview}</td>
+        <td class="cl-reason">${c.reason?escapeHtml(c.reason):'<span class="cl-empty-val">—</span>'}</td>
+        <td><span class="call-status ${statusCls}"><span class="cs-dot"></span>${escapeHtml(statusKey)}</span></td>
+        <td><input type="text" value="${escapeAttr(c.name||'')}" style="${is};width:100px" onblur="${uf('name')}"></td>
+        <td><input type="tel" value="${escapeAttr(c.number||'')}" style="${isn};width:100px" onblur="${uf('number')}"></td>
+        <td><input type="email" value="${escapeAttr(c.email||'')}" placeholder="✉" style="${is};width:120px" onblur="${uf('email')}"></td>
+        <td>${mkSel('bedroom',['','1BR','2BR','3BR','4BR','5BR','6BR','UP+'],c.bedroom)}</td>
+        <td>${mkSel('tenantType',['','Cash','CMHA'],c.tenantType)}</td>
+        <td>${mkSel('source',['','Brochure','Sign','Referral','Affordable','Zillow','Facebook','Other','Unknown','CMHA Office'],c.source)}</td>
+        <td>${mkSel('anyEviction',['','Yes','No'],c.anyEviction)}</td>
+        <td><input type="text" value="${escapeAttr(c.income||'')}" placeholder="💲" style="${isn}" onblur="${uf('income')}"></td>
+        <td>${mkSel('pets',['','Dog','Dogs','Cat','Cats'],c.pets)}</td>
+        <td>${mkSel('liveMembers',['','1 Kid','2 Kids','3 Kids','4 Kids','5 Kids','6 Kids','UP+'],c.liveMembers)}</td>
+        <td><input type="text" value="${escapeAttr(c.whyLeaving||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('whyLeaving')}"></td>
+        <td><input type="text" value="${escapeAttr(c.howLongStayed||'')}" placeholder="⏳" style="${is};width:80px" onblur="${uf('howLongStayed')}"></td>
+        <td><input type="date" value="${c.whenToMove||''}" style="${is};width:125px" onchange="${uf('whenToMove')}"></td>
+        <td>${mkSel('showingPref',['','9-12','12-2','2-4','Evening'],c.showingPref)}</td>
+        <td style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('stepScript')}"></td>
+        <td style="cursor:pointer" onclick="openLeadNote('${c.id}')" title="${escapeAttr(c.notes||'Click to edit')}">${notesPreview}</td>
         <td style="font-size:11px;color:var(--muted)">${assignedBy?renderUserBadge(assignedBy):'<span class="cl-empty-val">—</span>'}</td>
+        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('followUp')}"></td>
+        <td>${mkSel('proofVoucher',['','Received','No Proof'],c.proofVoucher)}</td>
+        <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('proofNote')}"></td>
+        <td><input type="text" value="${escapeAttr(c.landlordName||'')}" placeholder="—" style="${is};width:100px" onblur="${uf('landlordName')}"></td>
+        <td><input type="tel" value="${escapeAttr(c.landlordNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="${uf('landlordNumber')}"></td>
+        <td><input type="tel" value="${escapeAttr(c.workplaceNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="${uf('workplaceNumber')}"></td>
+        <td>${mkSel('part2Status',['','Pending','Lost'],c.part2Status)}</td>
+        <td>${mkSel('tenantType2',['','Cash','CMHA'],c.tenantType2)}</td>
+        <td style="text-align:center"><input type="checkbox" ${c.selfie?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('selfie')}"></td>
+        <td><input type="time" value="${c.arrivalTime||''}" style="${is};width:100px" onchange="${uf('arrivalTime')}"></td>
+        <td><input type="date" value="${c.appointmentDate||''}" style="${is};width:125px" onchange="${uf('appointmentDate')}"></td>
+        <td><input type="time" value="${c.appointmentTime||''}" style="${is};width:100px" onchange="${uf('appointmentTime')}"></td>
+        <td>${mkSel('verifyAppt',['','Confirmed','No Answer'],c.verifyAppt)}</td>
+        <td>${mkSel('showingStatus',['','Completed','No Show','Canceled'],c.showingStatus)}</td>
+        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('comments')}"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.turboScreening?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('turboScreening')}"></td>
+        <td><input type="text" value="${escapeAttr(c.anyNotes||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('anyNotes')}"></td>
+        <td>${mkSel('moveForward',['','Yes','Risk','No'],c.moveForward)}</td>
+        <td><input type="date" value="${c.leaseEffective||''}" style="${is};width:125px" onchange="${uf('leaseEffective')}"></td>
+        <td><input type="date" value="${c.leaseExpire||''}" style="${is};width:125px" onchange="${uf('leaseExpire')}"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.leaseSigned?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('leaseSigned')}"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.depositReceived?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('depositReceived')}"></td>
+        <td><input type="text" value="${escapeAttr(c.electricNumber||'')}" placeholder="⚡" style="${isn};width:100px" onblur="${uf('electricNumber')}"></td>
+        <td><input type="text" value="${escapeAttr(c.gasNumber||'')}" placeholder="🔥" style="${isn};width:100px" onblur="${uf('gasNumber')}"></td>
+        <td><input type="text" value="${escapeAttr(c.keyHandle||'')}" placeholder="🔑" style="${is};width:80px" onblur="${uf('keyHandle')}"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.moveInPaperSign?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('moveInPaperSign')}"></td>
       </tr>`;
     }).join('') + '</tbody>';
   }
@@ -6499,17 +6544,24 @@ async function renderLeadsView(skipLoad){
       </div>
       <div class="tbl-wrap">
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
-          <thead><tr>
-            <th>Date</th>
-            <th>Direction</th>
-            <th>Property Address</th>
-            <th>Call Reason</th>
-            <th>Status</th>
-            <th>Name</th>
-            <th>Number</th>
-            <th>Notes</th>
-            <th>Assigned By</th>
-          </tr></thead>
+          <thead>
+          <tr>
+            <th colspan="22" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
+            <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
+            <th colspan="8" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
+            <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 4 — Screening</th>
+            <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 5 — Move In</th>
+          </tr>
+          <tr>
+            <th>Date</th><th>Direction</th><th>Property</th><th>Reason</th><th>Status</th><th>Name</th><th>Number</th>
+            <th>✉ Email</th><th>🏠 Bedroom</th><th>💳 Tenant</th><th>📣 Source</th><th>⚖ Eviction</th><th>💲 Income</th><th>🐾 Pets</th><th>👨‍👩‍👧 Members</th><th>📝 Why Leaving</th><th>⏳ How Long</th><th>📅 Move Date</th><th>🕐 Showing</th><th>✅ Script</th>
+            <th>Notes</th><th>Assigned By</th>
+            <th style="border-top:2px solid var(--blue)">🔄 Follow Up</th><th style="border-top:2px solid var(--blue)">📄 Proof</th><th style="border-top:2px solid var(--blue)">📝 Proof Note</th><th style="border-top:2px solid var(--blue)">🏠 Landlord</th><th style="border-top:2px solid var(--blue)">📞 Landlord #</th><th style="border-top:2px solid var(--blue)">💼 Work #</th><th style="border-top:2px solid var(--blue)">📊 Status</th>
+            <th style="border-top:2px solid var(--purple)">💳 Tenant</th><th style="border-top:2px solid var(--purple)">🤳 Selfie</th><th style="border-top:2px solid var(--purple)">🕐 Arrival</th><th style="border-top:2px solid var(--purple)">📅 Appt Date</th><th style="border-top:2px solid var(--purple)">🕑 Appt Time</th><th style="border-top:2px solid var(--purple)">📞 Verify</th><th style="border-top:2px solid var(--purple)">🏠 Showing</th><th style="border-top:2px solid var(--purple)">💬 Comments</th>
+            <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🔍 Turbo</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">📝 Notes</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🚀 Forward</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease Start</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease End</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">✍ Signed</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">💰 Deposit</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">⚡ Electric</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔥 Gas</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔑 Key</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📋 Move In</th>
+          </tr>
+          </thead>
           ${body}
         </table>
       </div>
