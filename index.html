@@ -7401,7 +7401,7 @@ async function renderCallLogView(skipLoad){
 
   let body;
   if(callLogData.length === 0){
-    body = `<tbody><tr><td colspan="43"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="50"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + callLogData.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
@@ -7499,6 +7499,14 @@ async function renderCallLogView(skipLoad){
         <td style="text-align:center"><input type="checkbox" ${c.turboScreening?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','turboScreening',this.checked)"></td>
         <td><input type="text" value="${escapeAttr(c.anyNotes||'')}" placeholder="📝" style="${is};width:120px" onblur="updateCallLogField('${c.id}','anyNotes',this.value)"></td>
         <td>${mkSel('moveForward',['','Yes','Risk','No'],c.moveForward)}</td>
+        <td><input type="date" value="${c.leaseEffective||''}" style="${is};width:125px" onchange="updateCallLogField('${c.id}','leaseEffective',this.value)"></td>
+        <td><input type="date" value="${c.leaseExpire||''}" style="${is};width:125px" onchange="updateCallLogField('${c.id}','leaseExpire',this.value)"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.leaseSigned?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','leaseSigned',this.checked)"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.depositReceived?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','depositReceived',this.checked)"></td>
+        <td><input type="text" value="${escapeAttr(c.electricNumber||'')}" placeholder="⚡" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','electricNumber',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.gasNumber||'')}" placeholder="🔥" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','gasNumber',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.keyHandle||'')}" placeholder="🔑" style="${is};width:80px" onblur="updateCallLogField('${c.id}','keyHandle',this.value)"></td>
+        <td style="text-align:center"><input type="checkbox" ${c.moveInPaperSign?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','moveInPaperSign',this.checked)"></td>
         <td style="text-align:right">${actions}</td>
       </tr>`;
     }).join('') + '</tbody>';
@@ -7518,6 +7526,7 @@ async function renderCallLogView(skipLoad){
             <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
             <th colspan="8" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 4 — Screening</th>
+            <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 5 — Move In</th>
             <th style="background:var(--surface);border-bottom:none"></th>
           </tr>
           <tr>
@@ -7562,6 +7571,14 @@ async function renderCallLogView(skipLoad){
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🔍 Turbo Screening</th>
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">📝 Any Notes</th>
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🚀 Move Forward</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease Effective</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease Expire</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">✍ Lease Signed</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">💰 Deposit Received</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">⚡ Electric #</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔥 Gas #</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔑 Key Handle</th>
+            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📋 Move In Paper</th>
             <th style="text-align:right">Actions</th>
           </tr>
           </thead>
