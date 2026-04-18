@@ -7401,7 +7401,7 @@ async function renderCallLogView(skipLoad){
 
   let body;
   if(callLogData.length === 0){
-    body = `<tbody><tr><td colspan="11"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="24"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + callLogData.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
@@ -7431,6 +7431,10 @@ async function renderCallLogView(skipLoad){
         <option value="">— Assign —</option>
         ${assignOpts}
       </select>`;
+      const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
+      const isn=is+';width:70px;font-family:var(--mono)';
+      const iss=is+';cursor:pointer;max-width:100px';
+      const mkSel=(fld,opts,cur)=>`<select style="${iss}" onchange="updateCallLogField('${c.id}','${fld}',this.value)">${opts.map(o=>`<option${(cur||'')===o?' selected':''}>${o}</option>`).join('')}</select>`;
       return `<tr>
         <td class="cl-date">${fmtCallDate(c.date)}</td>
         <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction || 'Inbound')}</span></td>
@@ -7439,6 +7443,19 @@ async function renderCallLogView(skipLoad){
         <td><span class="call-status ${statusCls}"><span class="cs-dot"></span>${escapeHtml(statusKey)}</span></td>
         <td class="cl-name">${nameDisp}</td>
         <td class="cl-number">${numDisp}</td>
+        <td><input type="email" value="${escapeAttr(c.email||'')}" placeholder="—" style="${is};width:120px" onblur="updateCallLogField('${c.id}','email',this.value)"></td>
+        <td>${mkSel('bedroom',['','1BR','2BR','3BR','4BR','5BR','6BR','UP+'],c.bedroom)}</td>
+        <td>${mkSel('tenantType',['','Cash','CMHA'],c.tenantType)}</td>
+        <td>${mkSel('source',['','Brochure','Sign','Referral','Affordable','Zillow','Facebook','Other','Unknown','CMHA Office'],c.source)}</td>
+        <td>${mkSel('anyEviction',['','Yes','No'],c.anyEviction)}</td>
+        <td><input type="text" value="${escapeAttr(c.income||'')}" placeholder="—" style="${isn}" onblur="updateCallLogField('${c.id}','income',this.value)"></td>
+        <td>${mkSel('pets',['','Dog','Dogs','Cat','Cats'],c.pets)}</td>
+        <td>${mkSel('liveMembers',['','1 Kid','2 Kids','3 Kids','4 Kids','5 Kids','6 Kids','UP+'],c.liveMembers)}</td>
+        <td><input type="text" value="${escapeAttr(c.whyLeaving||'')}" placeholder="—" style="${is};width:100px" onblur="updateCallLogField('${c.id}','whyLeaving',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.howLongStayed||'')}" placeholder="—" style="${is};width:80px" onblur="updateCallLogField('${c.id}','howLongStayed',this.value)"></td>
+        <td><input type="date" value="${c.whenToMove||''}" style="${is};width:120px" onchange="updateCallLogField('${c.id}','whenToMove',this.value)"></td>
+        <td>${mkSel('showingPref',['','9-12','12-2','2-4','Evening'],c.showingPref)}</td>
+        <td style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer" onchange="updateCallLogField('${c.id}','stepScript',this.checked)"></td>
         <td>${renderCallNotesCell(c, editable)}</td>
         <td>${addedByDisp}</td>
         <td>${assignDropdown}</td>
@@ -7463,6 +7480,19 @@ async function renderCallLogView(skipLoad){
             <th>Status</th>
             <th>Name</th>
             <th>Number</th>
+            <th>Email</th>
+            <th>Bedroom</th>
+            <th>Tenant Type</th>
+            <th>Source</th>
+            <th>Eviction</th>
+            <th>Income</th>
+            <th>Pets</th>
+            <th>Live Members</th>
+            <th>Why Leaving</th>
+            <th>How Long Stayed</th>
+            <th>When To Move</th>
+            <th>Showing Pref</th>
+            <th>Step Script</th>
             <th>Notes</th>
             <th>Added By</th>
             <th>Assign To</th>
@@ -7633,6 +7663,19 @@ async function saveCallLogNote(){
   }catch(e){
     console.error('saveCallLogNote', e);
     toast('Error: ' + e.message);
+  }
+}
+
+async function updateCallLogField(callId, field, value){
+  try{
+    await db.collection('callLog').doc(callId).update({
+      [field]: value,
+      updatedAt: new Date(),
+      updatedBy: (currentUser && (currentUser.name||currentUser.email)) || ''
+    });
+  }catch(e){
+    console.error('updateCallLogField', e);
+    toast('Error: '+e.message);
   }
 }
 </script>
