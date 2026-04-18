@@ -2390,7 +2390,19 @@ function renderMetrics(){
     <div class="mc g"><div class="mc-lbl">Expected rent</div><div class="mc-val g">${fmt(t.rent)}</div><div class="mc-sub">${properties.length} properties · ${mLabel}</div></div>
     <div class="mc g"><div class="mc-lbl">Total collected</div><div class="mc-val">${fmt(t.coll)}</div><div class="mc-sub">${collRate}% collection rate · ${mLabel}</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)} · ${properties.filter(p=>getMonthProp(p).cmhaPaid>0).length} properties</span></div><div class="mc-split"><span class="ts">Tenant ${fmt(t.tp)} · ${properties.filter(p=>getMonthProp(p).tenantPaid>0).length} properties</span></div></div>
     <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${t.cmhaBehind+t.tenantBehind} properties behind · ${mLabel}</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">CMHA ${fmt(Math.max(0,t.cmhaBal))} · ${t.cmhaBehind} behind</span></div><div class="mc-split"><span class="tr" style="background:var(--red-dim);color:var(--red)">Tenant ${fmt(Math.max(0,t.tenantBal))} · ${t.tenantBehind} behind</span></div></div>
-    <div class="mc a"><div class="mc-lbl">Occupancy</div><div class="mc-val a">${occ}%</div><div class="mc-sub">${t.rented} of ${properties.length} rented</div></div>
+    <div class="mc a"><div class="mc-lbl">Occupancy</div><div class="mc-val a">${occ}%</div><div class="mc-sub">${properties.length} total units · ${mLabel}</div>${(()=>{
+      const sc={'RENTED':0,'VACANT':0,'EVICTION':0,'MOVING PROCESS':0,'CONSTRUCTION':0};
+      let unknown=0;
+      properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else unknown++;});
+      return `<div class="mc-split" style="flex-wrap:wrap;gap:3px">
+        <span class="cs" style="background:var(--accent-dim);color:var(--accent)">Rented ${sc.RENTED}</span>
+        <span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${sc.VACANT}</span>
+        <span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${sc.EVICTION}</span>
+        <span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${sc['MOVING PROCESS']}</span>
+        <span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${sc.CONSTRUCTION}</span>
+        ${unknown?`<span class="cs" style="background:var(--surface3);color:var(--muted)">Unknown ${unknown}</span>`:''}
+      </div>`;
+    })()}</div>
     <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
     <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
   `;
