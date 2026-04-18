@@ -7401,7 +7401,7 @@ async function renderCallLogView(skipLoad){
 
   let body;
   if(callLogData.length === 0){
-    body = `<tbody><tr><td colspan="31"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="40"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + callLogData.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
@@ -7444,7 +7444,9 @@ async function renderCallLogView(skipLoad){
         '1 Kid':'👶','2 Kids':'👧👦','3 Kids':'👧👦👶','4 Kids':'👨‍👩‍👧‍👦','5 Kids':'👨‍👩‍👧‍👦+','6 Kids':'👨‍👩‍👧‍👦++','UP+':'👨‍👩‍👧‍👦+++',
         '9-12':'🌅','12-2':'☀️','2-4':'🌤','Evening':'🌙',
         'Pending':'🔶','Done':'✅','Scheduled':'📅','Lost':'❌',
-        'Received':'✅','No Proof':'🔴'
+        'Received':'✅','No Proof':'🔴',
+        'Confirmed':'✅','No Answer':'📵',
+        'Completed':'✅','No Show':'🚫','Canceled':'❌'
       };
       const mkSel=(fld,opts,cur)=>{
         const options = opts.map(o=>{
@@ -7485,6 +7487,14 @@ async function renderCallLogView(skipLoad){
         <td><input type="tel" value="${escapeAttr(c.landlordNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','landlordNumber',this.value)"></td>
         <td><input type="tel" value="${escapeAttr(c.workplaceNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','workplaceNumber',this.value)"></td>
         <td>${mkSel('part2Status',['','Pending','Lost'],c.part2Status)}</td>
+        <td>${mkSel('tenantType2',['','Cash','CMHA'],c.tenantType2)}</td>
+        <td style="text-align:center"><input type="checkbox" ${c.selfie?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','selfie',this.checked)"></td>
+        <td><input type="time" value="${c.arrivalTime||''}" style="${is};width:100px" onchange="updateCallLogField('${c.id}','arrivalTime',this.value)"></td>
+        <td><input type="date" value="${c.appointmentDate||''}" style="${is};width:125px" onchange="updateCallLogField('${c.id}','appointmentDate',this.value)"></td>
+        <td><input type="time" value="${c.appointmentTime||''}" style="${is};width:100px" onchange="updateCallLogField('${c.id}','appointmentTime',this.value)"></td>
+        <td>${mkSel('verifyAppt',['','Confirmed','No Answer'],c.verifyAppt)}</td>
+        <td>${mkSel('showingStatus',['','Completed','No Show','Canceled'],c.showingStatus)}</td>
+        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="updateCallLogField('${c.id}','comments',this.value)"></td>
         <td style="text-align:right">${actions}</td>
       </tr>`;
     }).join('') + '</tbody>';
@@ -7502,6 +7512,7 @@ async function renderCallLogView(skipLoad){
           <tr>
             <th colspan="23" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
             <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
+            <th colspan="9" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
             <th style="background:var(--surface);border-bottom:none"></th>
           </tr>
           <tr>
@@ -7535,6 +7546,14 @@ async function renderCallLogView(skipLoad){
             <th style="border-top:2px solid var(--blue)">📞 Landlord #</th>
             <th style="border-top:2px solid var(--blue)">💼 Workplace #</th>
             <th style="border-top:2px solid var(--blue)">📊 Status</th>
+            <th style="border-top:2px solid var(--purple)">💳 Tenant Type</th>
+            <th style="border-top:2px solid var(--purple)">🤳 Selfie</th>
+            <th style="border-top:2px solid var(--purple)">🕐 Arrival Time</th>
+            <th style="border-top:2px solid var(--purple)">📅 Appt Date</th>
+            <th style="border-top:2px solid var(--purple)">🕑 Appt Time</th>
+            <th style="border-top:2px solid var(--purple)">📞 Verify Appt</th>
+            <th style="border-top:2px solid var(--purple)">🏠 Showing Status</th>
+            <th style="border-top:2px solid var(--purple)">💬 Comments</th>
             <th style="text-align:right">Actions</th>
           </tr>
           </thead>
