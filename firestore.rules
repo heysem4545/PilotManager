@@ -89,6 +89,14 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Property History — any authenticated user can create logs,
+    // only admins can read them.
+    match /propertyHistory/{logId} {
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow create: if request.auth != null;
+    }
+
     // NOTE: Rules for other collections (properties, monthlyData, tasks)
     // currently live only in the Firebase console and are not yet mirrored
     // here. Merge them in before deploying this file via the CLI, otherwise

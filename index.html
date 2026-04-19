@@ -1008,7 +1008,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <!-- PROPERTIES VIEW -->
       <div id="propsView" style="display:none">
         <div id="collectionToggle" style="display:none;margin-bottom:12px;gap:8px;align-items:center" class="ftabs"></div>
-        <div class="table-card">
+        <div class="ftabs" id="propsViewTabs" style="margin-bottom:12px"></div>
+        <div id="propertyHistoryView" style="display:none"></div>
+        <div class="table-card" id="propsTableCard">
           <div class="month-bar" id="monthBar"></div>
           <div class="toolbar">
             <div class="search-box">
@@ -1713,6 +1715,7 @@ let editPropId = null;
 let currentFilter = 'all';
 let filterSetByNav = false;
 let collectionViewMode = 'monthly'; // 'monthly' or 'allBalances'
+let propsViewTab = 'table'; // 'table' or 'history'
 let allBalancesRange = 'last6';
 let currentPage = 1;
 let sortField = 'rowIndex';
@@ -2094,6 +2097,9 @@ async function saveMonthField(propertyId, field, value){
   const key = activeKey();
   if(!monthData[propertyId]) monthData[propertyId]={};
   const existing = monthData[propertyId][key]||{};
+  const oldVal = existing[field] !== undefined ? existing[field] : '';
+  const prop = properties.find(x=>x.id===propertyId);
+  logPropertyChange(propertyId, prop ? prop.addr : '', field + ' (' + key + ')', oldVal, value);
   const updated = {...existing, [field]:value, propertyId, monthKey:key};
   if(existing.docId){
     await db.collection('monthlyData').doc(existing.docId).update({[field]:value});
@@ -2153,6 +2159,20 @@ function allPermsTrue(){
 
 function isAdmin(){
   return currentUser && currentUser.role === 'admin';
+}
+
+function logPropertyChange(propertyId, addr, field, oldValue, newValue){
+  if(String(oldValue) === String(newValue)) return;
+  db.collection('propertyHistory').add({
+    propertyId,
+    addr: addr || '',
+    field,
+    oldValue: String(oldValue),
+    newValue: String(newValue),
+    changedBy: (currentUser && (currentUser.name || currentUser.email)) || 'Unknown',
+    changedByUid: (currentUser && currentUser.uid) || '',
+    timestamp: new Date()
+  }).catch(e => console.warn('History log failed:', e));
 }
 
 function isFullAccess(){
@@ -4667,6 +4687,68 @@ function renderTable(){
 }
 function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pages)return;currentPage=p;renderTable();}
 
+function renderPropsViewTabs(){
+  const el=document.getElementById('propsViewTabs');
+  if(!el)return;
+  let html=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">Properties</button>`;
+  if(isAdmin()){
+    html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">History Log</button>`;
+  }
+  el.innerHTML=html;
+}
+
+function switchPropsTab(tab){
+  propsViewTab=tab;
+  renderPropsViewTabs();
+  const tableCard=document.getElementById('propsTableCard');
+  const histView=document.getElementById('propertyHistoryView');
+  if(tab==='history'){
+    if(tableCard)tableCard.style.display='none';
+    if(histView)histView.style.display='';
+    renderPropertyHistory();
+  } else {
+    if(tableCard)tableCard.style.display='';
+    if(histView)histView.style.display='none';
+  }
+}
+
+async function renderPropertyHistory(){
+  const el=document.getElementById('propertyHistoryView');
+  if(!el)return;
+  el.innerHTML='<div style="padding:24px;color:var(--muted);text-align:center">Loading history...</div>';
+  try{
+    const snap=await db.collection('propertyHistory').orderBy('timestamp','desc').limit(500).get();
+    const logs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let html=`<div class="table-card"><div class="toolbar"><div class="search-box"><span class="search-icon">\u2315</span><input type="text" placeholder="Search by address or user\u2026" id="historySearchInput" oninput="filterHistoryLog()"></div></div>`;
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Property Address</th><th>Field</th><th>Old Value</th><th>New Value</th></tr></thead><tbody id="historyLogBody">`;
+    logs.forEach(log=>{
+      const ts=log.timestamp&&log.timestamp.toDate?log.timestamp.toDate():new Date(log.timestamp);
+      const fmtTs=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+      html+=`<tr class="history-row" data-addr="${escapeAttr(log.addr||'')}" data-user="${escapeAttr(log.changedBy||'')}">`;
+      html+=`<td style="white-space:nowrap;font-size:12px;color:var(--muted)">${escapeHtml(fmtTs)}</td>`;
+      html+=`<td>${escapeHtml(log.changedBy||'')}</td>`;
+      html+=`<td>${escapeHtml(log.addr||'')}</td>`;
+      html+=`<td><span style="font-family:var(--mono);font-size:12px">${escapeHtml(log.field||'')}</span></td>`;
+      html+=`<td style="font-size:12px">${escapeHtml(log.oldValue||'')}</td>`;
+      html+=`<td style="font-size:12px">${escapeHtml(log.newValue||'')}</td>`;
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table></div><div class="tbl-footer"><span>${logs.length} log entries</span></div></div>`;
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML=`<div style="padding:24px;color:var(--red);text-align:center">Error loading history: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function filterHistoryLog(){
+  const q=(document.getElementById('historySearchInput').value||'').toLowerCase();
+  document.querySelectorAll('#historyLogBody .history-row').forEach(row=>{
+    const addr=(row.getAttribute('data-addr')||'').toLowerCase();
+    const user=(row.getAttribute('data-user')||'').toLowerCase();
+    row.style.display=(!q||addr.includes(q)||user.includes(q))?'':'none';
+  });
+}
+
 // ─────────────────────────────────────────────
 // INLINE EDITING
 // ─────────────────────────────────────────────
@@ -4739,6 +4821,7 @@ function inlineEditNum(propId, baseField, cell, fieldType){
       const monthField = fieldType==='monthCmhaPaid'?'cmhaPaid':fieldType==='monthTenantPaid'?'tenantPaid':fieldType==='monthCmha'?'cmha':'tenantPortion';
       await saveMonthField(propId, monthField, val);
     } else {
+      logPropertyChange(propId, p.addr||'', baseField, currentVal, val);
       await saveProperty({[baseField]:val}, propId);
       const idx=properties.findIndex(x=>x.id===propId);
       if(idx>=0) properties[idx]={...properties[idx],[baseField]:val};
@@ -5282,6 +5365,17 @@ async function saveProp(){
   };
   pData.collected=pData.cmhaPaid+pData.tenantPaid;
   pData.balance=Math.max(0,pData.cmha-pData.cmhaPaid)+Math.max(0,pData.tenantPortion-pData.tenantPaid);
+  if(editPropId){
+    const oldP=properties.find(x=>x.id===editPropId);
+    if(oldP){
+      const logFields=['addr','unit','tenant','status','rent','cmha','tenantPortion','deposit','cmhaPaid','tenantPaid'];
+      logFields.forEach(f=>{
+        const ov=oldP[f]!==undefined?oldP[f]:'';
+        const nv=pData[f]!==undefined?pData[f]:'';
+        logPropertyChange(editPropId, oldP.addr||pData.addr, f, ov, nv);
+      });
+    }
+  }
   try{
     await saveProperty(pData,editPropId);
     closeModal('addModal');
@@ -6378,9 +6472,19 @@ function showView(v){
   if(v==='properties'){
     if(!filterSetByNav) currentFilter='all';
     filterSetByNav=false;
-    renderMonthBar();
-    renderFilterTabs();
-    renderCollectionView();
+    renderPropsViewTabs();
+    if(propsViewTab==='history' && isAdmin()){
+      document.getElementById('propsTableCard').style.display='none';
+      document.getElementById('propertyHistoryView').style.display='';
+      renderPropertyHistory();
+    } else {
+      propsViewTab='table';
+      document.getElementById('propsTableCard').style.display='';
+      document.getElementById('propertyHistoryView').style.display='none';
+      renderMonthBar();
+      renderFilterTabs();
+      renderCollectionView();
+    }
   }
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
