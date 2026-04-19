@@ -97,9 +97,19 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
 
-    // NOTE: Rules for other collections (properties, monthlyData, tasks)
-    // currently live only in the Firebase console and are not yet mirrored
-    // here. Merge them in before deploying this file via the CLI, otherwise
-    // existing access will be lost.
+    // Properties — any authenticated user can read and write.
+    match /properties/{propId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Monthly Data — any authenticated user can read and write.
+    match /monthlyData/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Tasks — any authenticated user can read and write.
+    match /tasks/{taskId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
