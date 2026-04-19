@@ -2050,6 +2050,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   document.getElementById('appPage').style.display='block';
   initApp();
 
+  // Start real-time listeners so all users see the same property data.
+  startPropertiesListener();
+  startMonthDataListener(activeKey());
+
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
   subscribeToUserDoc(firebaseUser.uid);
@@ -2091,6 +2095,47 @@ async function loadMonthData(key){
       monthData[dat.propertyId][key] = {status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,cmha:dat.cmha||0,tenantPortion:dat.tenantPortion||0,docId:d.id};
     });
   }catch(e){console.error('loadMonthData',e);}
+}
+
+// ─────────────────────────────────────────────
+// REAL-TIME SYNC — keeps all users seeing the same numbers
+// ─────────────────────────────────────────────
+let propertiesUnsub = null;
+let monthDataUnsub = null;
+
+function startPropertiesListener(){
+  if(propertiesUnsub) return;
+  propertiesUnsub = db.collection('properties').onSnapshot(snap=>{
+    properties = snap.docs.map(d=>({id:d.id,...d.data()}));
+    properties.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+    properties = properties.map(p=>({
+      ...p,
+      rent:p.rent||0,cmha:p.cmha||0,tenantPortion:p.tenantPortion||0,
+      cmhaPaid:p.cmhaPaid||0,tenantPaid:p.tenantPaid||0,
+      collected:(p.cmhaPaid||0)+(p.tenantPaid||0),
+      balance:Math.max(0,(p.cmha||0)-(p.cmhaPaid||0))+Math.max(0,(p.tenantPortion||0)-(p.tenantPaid||0))
+    }));
+    // Re-render the active view if it's data-dependent
+    if(currentView==='properties') renderTable();
+    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); renderPotential(); }
+  }, err=>{ console.warn('properties listener', err?.message); });
+}
+
+function startMonthDataListener(key){
+  if(monthDataUnsub){ try{ monthDataUnsub(); }catch(e){} monthDataUnsub = null; }
+  monthDataUnsub = db.collection('monthlyData').where('monthKey','==',key).onSnapshot(snap=>{
+    // Rebuild monthData for this key from the snapshot
+    snap.docs.forEach(d=>{
+      const dat = d.data();
+      if(!monthData[dat.propertyId]) monthData[dat.propertyId]={};
+      monthData[dat.propertyId][key] = {
+        status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,
+        cmha:dat.cmha||0,tenantPortion:dat.tenantPortion||0,docId:d.id
+      };
+    });
+    if(currentView==='properties') renderTable();
+    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); renderPotential(); }
+  }, err=>{ console.warn('monthData listener', err?.message); });
 }
 
 async function saveMonthField(propertyId, field, value){
@@ -4620,10 +4665,11 @@ function renderMonthBar(){
 async function switchMonth(y,m){
   activeYear=y; activeMonth=m;
   renderMonthBar();
-  // Load month data if not already loaded
   const key=activeKey();
   const alreadyLoaded = Object.values(monthData).some(pd=>pd[key]!==undefined);
   if(!alreadyLoaded) await loadMonthData(key);
+  // Re-subscribe the real-time listener to the new month
+  startMonthDataListener(key);
   renderTable();
   renderMetrics();
   renderPotential();
