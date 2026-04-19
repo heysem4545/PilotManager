@@ -2101,12 +2101,17 @@ async function saveMonthField(propertyId, field, value){
   const prop = properties.find(x=>x.id===propertyId);
   logPropertyChange(propertyId, prop ? prop.addr : '', field + ' (' + key + ')', oldVal, value);
   const updated = {...existing, [field]:value, propertyId, monthKey:key};
-  if(existing.docId){
-    await db.collection('monthlyData').doc(existing.docId).update({[field]:value});
-    monthData[propertyId][key] = {...updated, docId:existing.docId};
-  } else {
-    const ref = await db.collection('monthlyData').add(updated);
-    monthData[propertyId][key] = {...updated, docId:ref.id};
+  try{
+    if(existing.docId){
+      await db.collection('monthlyData').doc(existing.docId).update({[field]:value});
+      monthData[propertyId][key] = {...updated, docId:existing.docId};
+    } else {
+      const ref = await db.collection('monthlyData').add(updated);
+      monthData[propertyId][key] = {...updated, docId:ref.id};
+    }
+  }catch(e){
+    console.error('saveMonthField', e);
+    toast('Error saving: ' + e.message);
   }
 }
 
@@ -2261,7 +2266,7 @@ async function loadUserPermissions(){
     manager:()=>{const p=allPermsTrue();p.team.edit=false;return p;},
     office:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:true};p.collection={view:true,edit:true};p.tasks={view:true,edit:true};p.maintenance={view:true,edit:false};p.technician={view:true,edit:false};p.monthly={view:true,edit:false};p.meetings={view:true,edit:false};return p;},
     technician:()=>{const p=deny();p.dashboard={view:true,edit:false};p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;},
-    agent:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;},
+    agent:()=>{const p=deny();p.dashboard={view:true,edit:true};p.properties={view:true,edit:true};p.collection={view:true,edit:true};return p;},
     editor:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:true};p.tasks={view:true,edit:true};p.maintenance={view:true,edit:true};p.technician={view:true,edit:true};return p;},
     viewer:()=>{const p=deny();p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;}
   };
