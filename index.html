@@ -5136,7 +5136,7 @@ const DEFAULT_ROLES=[
   {name:'Manager',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:true});p.team={view:true,edit:false};return p;})()},
   {name:'Office',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:true,edit:false});p.properties={view:true,edit:true};p.collection={view:true,edit:true};p.tasks={view:true,edit:true};return p;})()},
   {name:'Technician',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.maintenance={view:true,edit:false};p.technician={view:true,edit:true};return p;})()},
-  {name:'Agent',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.dashboard={view:true,edit:false};p.properties={view:true,edit:false};return p;})()}
+  {name:'Agent',permissions:(()=>{const p={};PERM_SECTIONS.forEach(s=>p[s.id]={view:false,edit:false});p.dashboard={view:true,edit:true};p.properties={view:true,edit:true};p.collection={view:true,edit:true};return p;})()}
 ];
 
 async function loadRoles(){
@@ -5150,6 +5150,26 @@ async function ensureDefaultRoles(){
   const snap=await db.collection('roles').get();
   if(!snap.empty){
     rolesCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Migrate: ensure existing Agent role has edit permissions on
+    // dashboard/properties/collection. This runs once and is idempotent.
+    if(isAdmin()){
+      const agentRole = rolesCache.find(r=>(r.name||'').toLowerCase()==='agent');
+      if(agentRole && agentRole.permissions){
+        const p = agentRole.permissions;
+        const needsFix = !p.dashboard?.edit || !p.properties?.edit || !p.collection?.edit;
+        if(needsFix){
+          p.dashboard = {view:true, edit:true};
+          p.properties = {view:true, edit:true};
+          p.collection = {view:true, edit:true};
+          try{
+            await db.collection('roles').doc(agentRole.id).update({permissions:p});
+            const idx = rolesCache.findIndex(r=>r.id===agentRole.id);
+            if(idx>=0) rolesCache[idx].permissions = p;
+            console.log('[ensureDefaultRoles] Migrated Agent role to allow property editing');
+          }catch(e){ console.warn('Agent role migration', e?.message); }
+        }
+      }
+    }
     return;
   }
   // Create defaults
