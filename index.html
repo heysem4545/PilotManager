@@ -99,6 +99,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .logout-btn{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;margin-top:6px;transition:all .12s}
 .logout-btn:hover{background:var(--red-dim);color:var(--red)}
 
+/* ── BACKUPS ── */
+.backup-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.backup-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border)}
+.backup-header-title{font-size:14px;font-weight:600}
+.backup-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);transition:background .12s}
+.backup-row:last-child{border-bottom:none}
+.backup-row:hover{background:var(--surface2)}
+.backup-row .backup-date{font-size:13px;font-weight:500;min-width:100px}
+.backup-row .backup-time{font-size:12px;color:var(--muted);font-family:var(--mono);min-width:80px}
+.backup-row .backup-by{font-size:12px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.backup-row .backup-docs{font-size:11px;font-family:var(--mono);color:var(--blue);min-width:70px}
+.backup-row .backup-actions{display:flex;gap:6px;flex-shrink:0}
+.backup-progress{padding:18px;text-align:center}
+.backup-progress .bp-status{font-size:13px;color:var(--muted);margin-bottom:8px}
+.backup-progress .bp-bar-track{width:100%;max-width:400px;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;margin:0 auto}
+.backup-progress .bp-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s ease}
+.backup-empty{padding:40px 18px;text-align:center;color:var(--muted);font-size:13px}
+
 /* ── MAIN ── */
 .main{padding:24px 28px;min-width:0;overflow-x:hidden}
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:16px}
@@ -926,6 +944,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 2.5h2.2l1 3-1.5 1a8 8 0 004.3 4.3l1-1.5 3 1v2.2a1 1 0 01-1.1 1A11 11 0 012.5 3.6a1 1 0 011-1.1z"/></svg>
         Call Log
       </button>
+      <div class="nav-label" id="nav-label-system">System</div>
+      <button class="nav-item" id="nav-backups" onclick="showView('backups')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4.5a2.5 2.5 0 015 0v.5h2v-.5a2.5 2.5 0 015 0V6a2 2 0 01-1 1.73V13a1 1 0 01-1 1H4a1 1 0 01-1-1V7.73A2 2 0 012 6V4.5z"/><path d="M6 9h4M6 11h4"/></svg>
+        Backups
+      </button>
             <div class="sidebar-bottom">
         <div class="user-row">
           <div class="u-avatar" id="sidebarAvatar">?</div>
@@ -1093,6 +1116,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="tenantsView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
+      <div id="backupsView" style="display:none"></div>
 
     </main>
   </div>
@@ -2050,6 +2074,9 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   document.getElementById('appPage').style.display='block';
   initApp();
 
+  // Auto daily backup for admins
+  if(isAdmin()) checkAndRunDailyBackup();
+
   // Start real-time listeners so all users see the same property data.
   startPropertiesListener();
   startMonthDataListener(activeKey());
@@ -2347,6 +2374,12 @@ function applySidebarPermissions(){
     } else if(onclick.startsWith('setFilter(')){
       // By Status filters: Rented/Vacant/Eviction/Construction
       sectionId = 'propertyFilters';
+    }
+
+    // Backups is admin-only, not in the regular permissions system
+    if(sectionId === 'backups'){
+      btn.style.display = 'none';
+      return;
     }
 
     if(sectionId){
@@ -4771,7 +4804,7 @@ async function renderPropertyHistory(){
     const snap=await db.collection('propertyHistory').orderBy('timestamp','desc').limit(500).get();
     const logs=snap.docs.map(d=>({id:d.id,...d.data()}));
     let html=`<div class="table-card"><div class="toolbar"><div class="search-box"><span class="search-icon">\u2315</span><input type="text" placeholder="Search by address or user\u2026" id="historySearchInput" oninput="filterHistoryLog()"></div></div>`;
-    html+=`<div class="tbl-wrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Property Address</th><th>Field</th><th>Old Value</th><th>New Value</th></tr></thead><tbody id="historyLogBody">`;
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Property Address</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th></tr></thead><tbody id="historyLogBody">`;
     logs.forEach(log=>{
       const ts=log.timestamp&&log.timestamp.toDate?log.timestamp.toDate():new Date(log.timestamp);
       const fmtTs=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
@@ -4782,6 +4815,7 @@ async function renderPropertyHistory(){
       html+=`<td><span style="font-family:var(--mono);font-size:12px">${escapeHtml(log.field||'')}</span></td>`;
       html+=`<td style="font-size:12px">${escapeHtml(log.oldValue||'')}</td>`;
       html+=`<td style="font-size:12px">${escapeHtml(log.newValue||'')}</td>`;
+      html+=`<td><button class="btn btn-ghost btn-sm" onclick="restorePropertyChange('${escapeAttr(log.id)}')" title="Restore old value">Restore</button></td>`;
       html+=`</tr>`;
     });
     html+=`</tbody></table></div><div class="tbl-footer"><span>${logs.length} log entries</span></div></div>`;
@@ -6471,7 +6505,8 @@ function showView(v){
   const viewToSection = {
     dashboard:'dashboard', properties:'properties', monthly:'monthly',
     team:'team', tasks:'tasks', meetings:'meetings',
-    maintenance:'maintenance', technician:'technician'
+    maintenance:'maintenance', technician:'technician',
+    backups:'backups'
   };
   const section = viewToSection[v];
   if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
@@ -6487,7 +6522,7 @@ function showView(v){
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', inspections:'inspectionsView',
-    callLog:'callLogView'
+    callLog:'callLogView', backups:'backupsView'
   };
 
   // Hide all views
@@ -6515,7 +6550,7 @@ function showView(v){
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', inspections:'Inspection Tracker',
-    callLog:'Call Log'
+    callLog:'Call Log', backups:'Backups'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -6567,6 +6602,7 @@ function showView(v){
   if(v==='callLog') renderCallLogView();
   if(v==='available') renderAvailableView();
   if(v==='leads') renderLeadsView();
+  if(v==='backups') renderBackupsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -7999,6 +8035,323 @@ async function updateCallLogField(callId, field, value){
   }catch(e){
     console.error('updateCallLogField', e);
     toast('Error: '+e.message);
+  }
+}
+
+// ─────────────────────────────────────────────
+// BACKUP & RESTORE SYSTEM
+// ─────────────────────────────────────────────
+const BACKUP_COLLECTIONS = [
+  'properties','monthlyData','callLog','maintenance',
+  'technicianWork','pestControl','utilityTracking',
+  'meetings','meetingTemplates'
+];
+
+function getTodayDateStr(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,'0');
+  const d=String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function getNowTimeStr(){
+  const now=new Date();
+  return now.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
+}
+
+async function checkAndRunDailyBackup(){
+  try{
+    const today=getTodayDateStr();
+    const metaDoc=await db.collection('backups').doc(today+'_meta').get();
+    if(!metaDoc.exists){
+      await createDailyBackup();
+      toast('Daily backup created');
+    }
+  }catch(e){
+    console.warn('Auto daily backup check failed:', e);
+  }
+}
+
+async function createDailyBackup(){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  const backupId=getTodayDateStr();
+  const time=getNowTimeStr();
+  let totalDocs=0;
+
+  // Show progress if backups view is visible
+  const el=document.getElementById('backupsView');
+  if(el && el.style.display!=='none'){
+    el.innerHTML=`<div class="backup-card"><div class="backup-progress"><div class="bp-status">Creating backup...</div><div class="bp-bar-track"><div class="bp-bar-fill" id="backupProgressBar" style="width:0%"></div></div></div></div>`;
+  }
+
+  try{
+    for(let i=0;i<BACKUP_COLLECTIONS.length;i++){
+      const colName=BACKUP_COLLECTIONS[i];
+      const pBar=document.getElementById('backupProgressBar');
+      if(pBar){
+        const pct=Math.round(((i)/BACKUP_COLLECTIONS.length)*100);
+        pBar.style.width=pct+'%';
+        pBar.parentElement.previousElementSibling.textContent='Backing up '+colName+'...';
+      }
+      const snap=await db.collection(colName).get();
+      const docs=snap.docs.map(d=>({_id:d.id,...d.data()}));
+      totalDocs+=docs.length;
+
+      // Serialize timestamps to avoid Firestore nested timestamp issues
+      const serialized=JSON.parse(JSON.stringify(docs, (key, val)=>{
+        if(val && typeof val==='object' && val.seconds!==undefined && val.nanoseconds!==undefined){
+          return {_ts:true,seconds:val.seconds,nanoseconds:val.nanoseconds};
+        }
+        return val;
+      }));
+
+      await db.collection('backups').doc(backupId+'_'+colName).set({
+        backupId,
+        collection:colName,
+        docs:serialized,
+        docCount:docs.length,
+        createdAt:new Date()
+      });
+    }
+
+    // Write meta doc
+    await db.collection('backups').doc(backupId+'_meta').set({
+      date:backupId,
+      time,
+      timezone:'EST',
+      createdBy:(currentUser&&currentUser.name)||'',
+      collections:BACKUP_COLLECTIONS.slice(),
+      docCount:totalDocs,
+      createdAt:new Date()
+    });
+
+    const pBar=document.getElementById('backupProgressBar');
+    if(pBar){
+      pBar.style.width='100%';
+      pBar.parentElement.previousElementSibling.textContent='Backup complete! '+totalDocs+' documents saved.';
+    }
+    toast('Backup created: '+totalDocs+' docs');
+    // Refresh view after short delay
+    setTimeout(()=>{ if(currentView==='backups') renderBackupsView(); }, 1200);
+  }catch(e){
+    console.error('createDailyBackup error:', e);
+    toast('Backup failed: '+e.message);
+    if(currentView==='backups') renderBackupsView();
+  }
+}
+
+async function renderBackupsView(){
+  if(!isAdmin()){
+    document.getElementById('backupsView').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Admin access required</div>';
+    return;
+  }
+  const el=document.getElementById('backupsView');
+  el.innerHTML='<div style="padding:24px;color:var(--muted);text-align:center">Loading backups...</div>';
+
+  try{
+    const snap=await db.collection('backups').where('collections','!=',null).orderBy('collections').get();
+    const metas=snap.docs.map(d=>({id:d.id,...d.data()})).filter(d=>d.id.endsWith('_meta'));
+    metas.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+    let html=`<div class="backup-card">
+      <div class="backup-header">
+        <div class="backup-header-title">Backup Management</div>
+        <button class="btn btn-primary btn-sm" onclick="createDailyBackup()">Create Backup Now</button>
+      </div>`;
+
+    if(metas.length===0){
+      html+=`<div class="backup-empty">No backups found. Create your first backup above.</div>`;
+    } else {
+      metas.forEach(m=>{
+        html+=`<div class="backup-row">
+          <div class="backup-date">${escapeHtml(m.date||'')}</div>
+          <div class="backup-time">${escapeHtml(m.time||'')}</div>
+          <div class="backup-by">${escapeHtml(m.createdBy||'')}</div>
+          <div class="backup-docs">${m.docCount||0} docs</div>
+          <div class="backup-actions">
+            <button class="btn btn-ghost btn-sm" onclick="restoreFromBackup('${escapeAttr(m.date)}')">Restore</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteBackup('${escapeAttr(m.date)}')">Delete</button>
+          </div>
+        </div>`;
+      });
+    }
+    html+=`</div>`;
+    el.innerHTML=html;
+  }catch(e){
+    console.error('renderBackupsView error:', e);
+    el.innerHTML='<div style="padding:24px;color:var(--red);text-align:center">Error loading backups: '+escapeHtml(e.message)+'</div>';
+  }
+}
+
+async function restoreFromBackup(backupId){
+  if(!isAdmin()){ toast('Admin only'); return; }
+
+  const meta=await db.collection('backups').doc(backupId+'_meta').get();
+  if(!meta.exists){ toast('Backup not found'); return; }
+  const metaData=meta.data();
+
+  if(!confirm('This will restore ALL data to '+metaData.date+' '+metaData.time+'. Current data will be overwritten. Are you sure?')) return;
+
+  const typed=prompt('Type RESTORE to confirm:');
+  if(typed!=='RESTORE'){ toast('Restore cancelled'); return; }
+
+  const el=document.getElementById('backupsView');
+  const collections=metaData.collections||BACKUP_COLLECTIONS;
+
+  el.innerHTML=`<div class="backup-card"><div class="backup-progress"><div class="bp-status">Starting restore...</div><div class="bp-bar-track"><div class="bp-bar-fill" id="restoreProgressBar" style="width:0%"></div></div></div></div>`;
+
+  try{
+    for(let i=0;i<collections.length;i++){
+      const colName=collections[i];
+      const pBar=document.getElementById('restoreProgressBar');
+      if(pBar){
+        pBar.style.width=Math.round((i/collections.length)*100)+'%';
+        pBar.parentElement.previousElementSibling.textContent='Restoring '+colName+'...';
+      }
+
+      // Load backup data for this collection
+      const backupDoc=await db.collection('backups').doc(backupId+'_'+colName).get();
+      if(!backupDoc.exists){ console.warn('No backup data for '+colName); continue; }
+      const backupData=backupDoc.data();
+      const docs=backupData.docs||[];
+
+      // Delete all current docs in the collection
+      const currentSnap=await db.collection(colName).get();
+      const deleteBatch=[];
+      currentSnap.docs.forEach(d=>deleteBatch.push(d.ref.delete()));
+      // Process deletes in batches of 500
+      for(let j=0;j<deleteBatch.length;j+=500){
+        await Promise.all(deleteBatch.slice(j,j+500));
+      }
+
+      // Re-create docs from backup, deserializing timestamps
+      const createBatch=[];
+      docs.forEach(doc=>{
+        const docId=doc._id;
+        const data=Object.assign({},doc);
+        delete data._id;
+        // Restore serialized timestamps
+        deserializeTimestamps(data);
+        createBatch.push(db.collection(colName).doc(docId).set(data));
+      });
+      for(let j=0;j<createBatch.length;j+=500){
+        await Promise.all(createBatch.slice(j,j+500));
+      }
+    }
+
+    const pBar=document.getElementById('restoreProgressBar');
+    if(pBar){
+      pBar.style.width='100%';
+      pBar.parentElement.previousElementSibling.textContent='Restore complete! Reloading...';
+    }
+    toast('Restore complete — reloading');
+    setTimeout(()=>location.reload(), 1500);
+  }catch(e){
+    console.error('Restore error:', e);
+    toast('Restore failed: '+e.message);
+    renderBackupsView();
+  }
+}
+
+function deserializeTimestamps(obj){
+  if(!obj||typeof obj!=='object') return;
+  for(const key of Object.keys(obj)){
+    const val=obj[key];
+    if(val && typeof val==='object'){
+      if(val._ts===true && val.seconds!==undefined){
+        obj[key]=new firebase.firestore.Timestamp(val.seconds, val.nanoseconds||0);
+      } else if(Array.isArray(val)){
+        val.forEach((item,idx)=>{
+          if(item&&typeof item==='object'){
+            if(item._ts===true && item.seconds!==undefined){
+              val[idx]=new firebase.firestore.Timestamp(item.seconds, item.nanoseconds||0);
+            } else {
+              deserializeTimestamps(item);
+            }
+          }
+        });
+      } else {
+        deserializeTimestamps(val);
+      }
+    }
+  }
+}
+
+async function deleteBackup(backupId){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  if(!confirm('Delete backup from '+backupId+'?')) return;
+
+  try{
+    // Delete meta doc
+    await db.collection('backups').doc(backupId+'_meta').delete();
+    // Delete all collection data docs
+    for(const colName of BACKUP_COLLECTIONS){
+      const ref=db.collection('backups').doc(backupId+'_'+colName);
+      const doc=await ref.get();
+      if(doc.exists) await ref.delete();
+    }
+    toast('Backup deleted');
+    renderBackupsView();
+  }catch(e){
+    console.error('deleteBackup error:', e);
+    toast('Delete failed: '+e.message);
+  }
+}
+
+// ─────────────────────────────────────────────
+// RESTORE INDIVIDUAL PROPERTY CHANGE
+// ─────────────────────────────────────────────
+async function restorePropertyChange(logId){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  try{
+    const logDoc=await db.collection('propertyHistory').doc(logId).get();
+    if(!logDoc.exists){ toast('Log entry not found'); return; }
+    const log=logDoc.data();
+    const oldValue=log.oldValue||'';
+    const field=log.field||'';
+    const propertyId=log.propertyId||'';
+
+    if(!propertyId){ toast('No property ID in log entry'); return; }
+    if(!confirm('Restore "'+field+'" to "'+oldValue+'" for '+log.addr+'?')) return;
+
+    // Check if it's a monthly data field (contains a month key like "(2026-04)")
+    const monthMatch=field.match(/\((\d{4}-\d{2})\)$/);
+    if(monthMatch){
+      // Monthly data field: parse field name and month key
+      const monthKey=monthMatch[1];
+      const fieldName=field.replace(/\s*\(\d{4}-\d{2}\)$/,'').trim();
+      const monthDocId=propertyId+'_'+monthKey;
+      const updateData={};
+      // Try to parse as number
+      const numVal=parseFloat(oldValue);
+      updateData[fieldName]=isNaN(numVal)?oldValue:numVal;
+      await db.collection('monthlyData').doc(monthDocId).update(updateData);
+    } else {
+      // Property-level field
+      const updateData={};
+      const numVal=parseFloat(oldValue);
+      updateData[field]=isNaN(numVal)?oldValue:numVal;
+      await db.collection('properties').doc(propertyId).update(updateData);
+    }
+
+    // Log the restoration as a new history entry
+    await db.collection('propertyHistory').add({
+      propertyId,
+      addr:log.addr||'',
+      field,
+      oldValue:log.newValue||'',
+      newValue:oldValue,
+      changedBy:(currentUser&&currentUser.name)||'Unknown',
+      changedByUid:(currentUser&&currentUser.uid)||'',
+      timestamp:new Date(),
+      restoredFromLogId:logId
+    });
+
+    toast('Restored: '+field+' \u2192 '+oldValue);
+    renderPropertyHistory();
+  }catch(e){
+    console.error('restorePropertyChange error:', e);
+    toast('Restore failed: '+e.message);
   }
 }
 </script>

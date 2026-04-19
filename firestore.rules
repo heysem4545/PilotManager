@@ -107,6 +107,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Backups — admin only.
+    match /backups/{backupId} {
+      allow read, write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Tasks — any authenticated user can read and write.
     match /tasks/{taskId} {
       allow read, write: if request.auth != null;
