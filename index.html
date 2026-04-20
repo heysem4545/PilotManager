@@ -5636,24 +5636,21 @@ async function checkTaskDuplicate(taskText, uid, currentDay, currentRowIdx){
   if(!taskText || taskText.trim().length < 5) return false;
   try{
     const key = tmActiveKey();
-    // Load all tasks for this user this month
+    // Single-field query to avoid composite index issues.
+    // Filter by uid client-side.
     const snap = await db.collection('tasks')
       .where('monthKey','==',key)
-      .where('uid','==',uid)
       .get();
-    // Get the week range (Sun-Sat) for the current day
-    const date = new Date(tmYear, tmMonth, currentDay);
-    const weekStart = currentDay - date.getDay();
-    const weekEnd = weekStart + 6;
     for(const doc of snap.docs){
       const t = doc.data();
+      // Only compare tasks from the same user
+      if(t.uid !== uid) continue;
       if(!t.task || t.task.trim().length < 5) continue;
-      // Skip the same row being edited
+      // Skip the exact same row being edited
       if(t.day === currentDay && t.rowIdx === currentRowIdx) continue;
-      // Only compare within the same week
-      if(t.day < weekStart || t.day > weekEnd) continue;
       const score = textSimilarity(taskText, t.task);
-      if(score >= 0.5) return true; // 50%+ similar
+      console.log(`[dup-check] "${taskText}" vs "${t.task}" (day ${t.day}) → ${Math.round(score*100)}%`);
+      if(score >= 0.5) return true;
     }
   }catch(e){ console.warn('checkTaskDuplicate', e); }
   return false;
