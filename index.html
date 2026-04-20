@@ -2170,6 +2170,36 @@ function startMonthDataListener(key){
   }, err=>{ console.warn('monthData listener', err?.message); });
 }
 
+// Real-time listener for tasks — keeps task grid and donut in sync
+// across all users when admin edits difficulty/status/task text.
+let tasksUnsub = null;
+
+function startTasksListener(){
+  if(tasksUnsub){ try{ tasksUnsub(); }catch(e){} tasksUnsub = null; }
+  const key = tmActiveKey();
+  tasksUnsub = db.collection('tasks').where('monthKey','==',key).onSnapshot(snap=>{
+    // Rebuild taskCache for this key
+    const own = {};
+    const all = {};
+    snap.docs.forEach(d=>{
+      const t = d.data();
+      const dk = t.day;
+      // All tasks (for group/admin)
+      if(!all[dk]) all[dk] = [];
+      all[dk].push({id:d.id,...t});
+      // Own tasks
+      if(t.uid === currentUser.uid){
+        if(!own[dk]) own[dk] = [];
+        own[dk].push({id:d.id,...t});
+      }
+    });
+    taskCache[key+'-own'] = own;
+    taskCache[key+'-group'] = all; // group shows all
+    // Re-render task view if active
+    if(currentView === 'tasks') renderTasksView();
+  }, err=>{ console.warn('tasks listener', err?.message); });
+}
+
 async function saveMonthField(propertyId, field, value){
   const key = activeKey();
   if(!monthData[propertyId]) monthData[propertyId]={};
@@ -6072,6 +6102,9 @@ function tmRefreshStats(){
 async function renderTasksView(){
   const el=document.getElementById('tasksView');
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+
+  // Start real-time listener for tasks
+  startTasksListener();
 
   const isAdminUser=currentUser.role==='admin';
   // Count flagged tasks across all users this month (admin only)
