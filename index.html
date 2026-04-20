@@ -5612,6 +5612,53 @@ async function loadTasksForKey(key, uid=null){
   }catch(e){console.error('loadTasks',e);return {};}
 }
 
+// ─────────────────────────────────────────────
+// SILENT DUPLICATE DETECTION
+// Compares task text against all other tasks from the same user
+// that week. Flags suspicious duplicates without alerting the user.
+// ─────────────────────────────────────────────
+function textSimilarity(a, b){
+  if(!a || !b) return 0;
+  const stopWords = new Set(['the','a','an','and','or','to','at','in','on','for','of','is','was','it','i']);
+  const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(w=>w.length>1&&!stopWords.has(w));
+  const wordsA = normalize(a);
+  const wordsB = normalize(b);
+  if(wordsA.length===0 || wordsB.length===0) return 0;
+  const setA = new Set(wordsA);
+  const setB = new Set(wordsB);
+  let matches = 0;
+  setA.forEach(w=>{ if(setB.has(w)) matches++; });
+  const total = Math.max(setA.size, setB.size);
+  return total > 0 ? matches / total : 0;
+}
+
+async function checkTaskDuplicate(taskText, uid, currentDay, currentRowIdx){
+  if(!taskText || taskText.trim().length < 5) return false;
+  try{
+    const key = tmActiveKey();
+    // Load all tasks for this user this month
+    const snap = await db.collection('tasks')
+      .where('monthKey','==',key)
+      .where('uid','==',uid)
+      .get();
+    // Get the week range (Sun-Sat) for the current day
+    const date = new Date(tmYear, tmMonth, currentDay);
+    const weekStart = currentDay - date.getDay();
+    const weekEnd = weekStart + 6;
+    for(const doc of snap.docs){
+      const t = doc.data();
+      if(!t.task || t.task.trim().length < 5) continue;
+      // Skip the same row being edited
+      if(t.day === currentDay && t.rowIdx === currentRowIdx) continue;
+      // Only compare within the same week
+      if(t.day < weekStart || t.day > weekEnd) continue;
+      const score = textSimilarity(taskText, t.task);
+      if(score >= 0.5) return true; // 50%+ similar
+    }
+  }catch(e){ console.warn('checkTaskDuplicate', e); }
+  return false;
+}
+
 async function saveTask(day, rowIdx, field, value, uid=null){
   const key=tmActiveKey();
   const targetUid = uid||currentUser.uid;
@@ -5624,8 +5671,15 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       .where('rowIdx','==',rowIdx);
     if(!isGroup) q=q.where('uid','==',targetUid);
     const snap = await q.get();
+    // Silent duplicate check — only when saving task text
+    let suspiciousFlag = false;
+    if(field === 'task' && value && value.trim().length >= 5){
+      suspiciousFlag = await checkTaskDuplicate(value, targetUid, day, rowIdx);
+    }
     if(!snap.empty){
-      await snap.docs[0].ref.update({[field]:value, updatedAt:new Date()});
+      const updateData = {[field]:value, updatedAt:new Date()};
+      if(field === 'task') updateData.suspiciousFlag = suspiciousFlag;
+      await snap.docs[0].ref.update(updateData);
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -5635,6 +5689,7 @@ async function saveTask(day, rowIdx, field, value, uid=null){
         isGroup: isGroup,
         diff:'', task:'', status:'notstarted',
         [field]:value,
+        suspiciousFlag: suspiciousFlag,
         createdAt:new Date(), updatedAt:new Date()
       });
     }
@@ -5698,7 +5753,9 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     const userDot=isGroup&&t.userColor?`<span class="u-dot" style="background:${t.userColor}" title="${t.userName||''}"></span>`:'';
     const assignLabel=isGroup&&t.assignedName?t.assignedName:'';
     const assignOpts=isGroup?teamUsersCache.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${u.name}</option>`).join(''):'';
+    const flagDot = (t.suspiciousFlag && isAdmin()) ? `<span title="⚠ Suspicious: similar to another task this week" style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;cursor:help"></span>` : '';
     if(readonly) return `<div class="tm-task-row" style="opacity:${t.task?1:0.3}">
+      ${flagDot}
       <span class="tm-diff-sel ${diffClass}" style="padding:3px 4px">${t.diff?DIFF_LABELS[t.diff]:''}</span>
       <span class="tm-task-input" style="font-size:11px;padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
         onmouseenter="showTaskNoteTip('${(t.task||'').replace(/'/g,"\\'")}',this)"
@@ -5707,6 +5764,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       <span class="tm-status-sel ${statusClass}" style="padding:3px 4px">${STATUS_LABELS[t.status||'notstarted']}</span>
     </div>`;
     return `<div class="tm-task-row">
+      ${flagDot}
       <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
         <option value="" ${!t.diff?'selected':''}>Difficulty</option>
         <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
@@ -5882,11 +5940,19 @@ async function saveTaskFromModal(){
   const assignedUser = teamUsersCache.find(u => u.uid === assignedUid);
   const assignedName = assignedUser ? (assignedUser.name || assignedUser.email || '') : '';
 
+  // Silent duplicate check
+  const taskUid = assignedUid || currentUser.uid;
+  let suspiciousFlag = false;
+  if(task && task.length >= 5){
+    suspiciousFlag = await checkTaskDuplicate(task, taskUid, day, rowIdx);
+  }
+
   const data = {
     task, description, diff, status,
     assignedUid: assignedUid || '',
     assignedName,
     dueDate: dueDate || '',
+    suspiciousFlag,
     updatedAt: new Date()
   };
 
@@ -5898,9 +5964,9 @@ async function saveTaskFromModal(){
       await db.collection('tasks').add({
         ...data,
         monthKey: key, day, rowIdx,
-        uid: assignedUid || currentUser.uid,
+        uid: taskUid,
         userName: currentUser.name,
-        userColor: userColor(assignedUid || currentUser.uid),
+        userColor: userColor(taskUid),
         isGroup: tmTab === 'group',
         createdAt: new Date()
       });
