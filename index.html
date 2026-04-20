@@ -6145,10 +6145,54 @@ async function renderTasksView(){
           <div class="tm-lb-pts">${u.stats.pts}pts</div>
         </div>`;
       }).join('')}
-    </div>
-    <div class="tm-user-tabs">${teamUsers.map(u=>{
+    </div>`;
+
+    // Multi-ring donut chart — each user gets a ring, 200pts = full circle
+    const maxTarget = 200;
+    const chartSize = 220;
+    const center = chartSize / 2;
+    const ringWidth = 12;
+    const ringGap = 4;
+    const startRadius = 30;
+    let rings = '';
+    let legend = '';
+    lbData.forEach((u, i) => {
+      const col = userColor(u.uid);
+      const r = startRadius + i * (ringWidth + ringGap);
+      const circumference = 2 * Math.PI * r;
+      const pct = Math.min(u.stats.pts / maxTarget, 1);
+      const filled = circumference * pct;
+      const initials = u.name ? u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '?';
+      rings += `<circle cx="${center}" cy="${center}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="${ringWidth}" opacity="0.4"/>`;
+      rings += `<circle cx="${center}" cy="${center}" r="${r}" fill="none" stroke="${col}" stroke-width="${ringWidth}" stroke-linecap="round" stroke-dasharray="${filled} ${circumference}" style="transition:stroke-dasharray .8s ease"/>`;
+      legend += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+        <span style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></span>
+        <span style="font-size:12px;color:var(--text);font-weight:500;flex:1">${escapeHtml(u.name||'')}</span>
+        <span style="font-size:13px;font-weight:700;font-family:var(--mono);color:${col}">${u.stats.pts}</span>
+        <span style="font-size:10px;color:var(--muted)">/ ${maxTarget}</span>
+      </div>`;
+    });
+    const totalViewBox = center + startRadius + lbData.length * (ringWidth + ringGap) + 10;
+    html += `<div style="display:flex;align-items:center;gap:30px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;flex-wrap:wrap;justify-content:center">
+      <div style="position:relative">
+        <svg viewBox="0 0 ${totalViewBox*2} ${totalViewBox*2}" style="width:${Math.min(280, totalViewBox*2)}px;height:${Math.min(280, totalViewBox*2)}px;transform:rotate(-90deg)">
+          ${rings}
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Goal</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text)">${maxTarget}</div>
+          <div style="font-size:10px;color:var(--muted)">points</div>
+        </div>
+      </div>
+      <div style="min-width:160px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Points Progress</div>
+        ${legend}
+      </div>
+    </div>`;
+
+    html += `<div class="tm-user-tabs">${teamUsers.map(u=>{
       const col=userColor(u.uid);
-      return `<button class="tm-user-tab ${u.uid===tmAdminUser?'active':''}" 
+      return `<button class="tm-user-tab ${u.uid===tmAdminUser?'active':''}"
         style="${u.uid===tmAdminUser?`background:${col};`:''}"
         onclick="switchTmAdminUser('${u.uid}')">${u.name}</button>`;
     }).join('')}</div>`;
