@@ -6155,36 +6155,65 @@ async function renderTasksView(){
   }
 
   if(tmTab==='flagged'){
-    // Show flagged tasks table
     try{
-      const flagSnap = await db.collection('tasks').where('monthKey','==',key).where('suspiciousFlag','==',true).get();
-      const flagged = flagSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0));
+      // Load ALL tasks this month so we can find matches
+      const allSnap = await db.collection('tasks').where('monthKey','==',key).get();
+      const allTasks = allSnap.docs.map(d=>({id:d.id,...d.data()}));
+      const flagged = allTasks.filter(t=>t.suspiciousFlag).sort((a,b)=>(a.day||0)-(b.day||0));
       if(flagged.length === 0){
         html += `<div class="table-card"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No flagged tasks</div>No suspicious duplicates found for ${MNAMES_FULL[tmMonth]} ${tmYear}.</div></div>`;
       } else {
-        html += `<div class="table-card"><div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)"><strong style="color:var(--red)">${flagged.length}</strong> suspicious task${flagged.length===1?'':'s'} found in ${MNAMES_FULL[tmMonth]} ${tmYear}</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>
-          <th style="text-align:left;padding:10px 12px">Day</th>
-          <th style="text-align:left;padding:10px 12px">Employee</th>
-          <th style="text-align:left;padding:10px 12px">Task</th>
-          <th style="text-align:left;padding:10px 12px">Difficulty</th>
-          <th style="text-align:left;padding:10px 12px">Status</th>
-          <th style="text-align:right;padding:10px 12px">Action</th>
-        </tr></thead><tbody>`;
+        html += `<div class="table-card"><div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)"><strong style="color:var(--red)">${flagged.length}</strong> suspicious task${flagged.length===1?'':'s'} found in ${MNAMES_FULL[tmMonth]} ${tmYear}</div>`;
         flagged.forEach(t=>{
+          // Find matching tasks from the same user
+          const matches = allTasks.filter(other=>{
+            if(other.id === t.id) return false;
+            if(other.uid !== t.uid) return false;
+            if(!other.task || other.task.trim().length < 5) return false;
+            return textSimilarity(t.task, other.task) >= 0.5;
+          }).sort((a,b)=>(a.day||0)-(b.day||0));
           const diffLabel = t.diff ? DIFF_LABELS[t.diff] : '—';
           const statusLabel = STATUS_LABELS[t.status||'notstarted'];
           const diffCls = t.diff ? 'diff-'+t.diff : 'diff-none';
           const statusCls = 'status-'+(t.status||'notstarted');
-          html += `<tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:10px 12px;font-family:var(--mono);font-size:12px">${MNAMES_FULL[tmMonth].slice(0,3)} ${t.day||'?'}</td>
-            <td style="padding:10px 12px;font-size:12px">${t.userName ? renderUserBadge(t.userName) : '<span style="color:var(--muted)">—</span>'}</td>
-            <td style="padding:10px 12px;font-size:12px;font-weight:500;color:var(--text);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(t.task||'')}">${escapeHtml(t.task||'')}</td>
-            <td style="padding:10px 12px"><span class="${diffCls}" style="font-size:10px;font-weight:600;padding:3px 6px;border-radius:5px">${diffLabel}</span></td>
-            <td style="padding:10px 12px"><span class="${statusCls}" style="font-size:10px;font-weight:600;padding:3px 6px;border-radius:5px">${statusLabel}</span></td>
-            <td style="padding:10px 12px;text-align:right"><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="clearTaskFlag('${t.id}')">Clear flag</button></td>
-          </tr>`;
+          const similarity = matches.length>0 ? Math.round(textSimilarity(t.task, matches[0].task)*100) : 0;
+          html += `<div style="border-bottom:2px solid var(--border);padding:14px 16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0"></span>
+                ${t.userName ? renderUserBadge(t.userName) : ''}
+                <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${MNAMES_FULL[tmMonth].slice(0,3)} ${t.day||'?'}</span>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--red-dim);color:var(--red);font-weight:600">${similarity}% match</span>
+                <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="clearTaskFlag('${t.id}')">Clear flag</button>
+              </div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--red-dim);border-left:3px solid var(--red);border-radius:6px;padding:10px 12px;margin-bottom:6px">
+              <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🚩 Flagged task</div>
+              <div style="font-size:13px;font-weight:500;color:var(--text)">${escapeHtml(t.task||'')}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px"><span class="${diffCls}" style="padding:2px 5px;border-radius:4px;font-weight:600">${diffLabel}</span> · <span class="${statusCls}" style="padding:2px 5px;border-radius:4px;font-weight:600">${statusLabel}</span></div>
+            </div>`;
+          if(matches.length > 0){
+            html += `<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px;font-weight:500">Similar tasks found:</div>`;
+            matches.forEach(m=>{
+              const mDiff = m.diff ? DIFF_LABELS[m.diff] : '—';
+              const mStatus = STATUS_LABELS[m.status||'notstarted'];
+              const mScore = Math.round(textSimilarity(t.task, m.task)*100);
+              html += `<div style="background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--amber);border-radius:6px;padding:10px 12px;margin-bottom:4px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <div style="font-size:13px;color:var(--text)">${escapeHtml(m.task||'')}</div>
+                  <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--amber-dim);color:var(--amber);font-weight:600;flex-shrink:0">${mScore}%</span>
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-top:4px">📅 ${MNAMES_FULL[tmMonth].slice(0,3)} ${m.day||'?'} · ${mDiff} · ${mStatus}</div>
+              </div>`;
+            });
+          } else {
+            html += `<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:6px">Original matching task may have been edited or removed</div>`;
+          }
+          html += `</div>`;
         });
-        html += `</tbody></table></div></div>`;
+        html += `</div>`;
       }
     }catch(e){
       console.error('flagged tasks', e);
