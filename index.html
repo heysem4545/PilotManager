@@ -2173,29 +2173,33 @@ function startMonthDataListener(key){
 // Real-time listener for tasks — keeps task grid and donut in sync
 // across all users when admin edits difficulty/status/task text.
 let tasksUnsub = null;
+let tasksListenerKey = null;
 
 function startTasksListener(){
-  if(tasksUnsub){ try{ tasksUnsub(); }catch(e){} tasksUnsub = null; }
   const key = tmActiveKey();
+  // Already listening to this month — don't re-subscribe (prevents loop)
+  if(tasksUnsub && tasksListenerKey === key) return;
+  if(tasksUnsub){ try{ tasksUnsub(); }catch(e){} tasksUnsub = null; }
+  tasksListenerKey = key;
+  let isInitial = true;
   tasksUnsub = db.collection('tasks').where('monthKey','==',key).onSnapshot(snap=>{
-    // Rebuild taskCache for this key
     const own = {};
     const all = {};
     snap.docs.forEach(d=>{
       const t = d.data();
       const dk = t.day;
-      // All tasks (for group/admin)
       if(!all[dk]) all[dk] = [];
       all[dk].push({id:d.id,...t});
-      // Own tasks
       if(t.uid === currentUser.uid){
         if(!own[dk]) own[dk] = [];
         own[dk].push({id:d.id,...t});
       }
     });
     taskCache[key+'-own'] = own;
-    taskCache[key+'-group'] = all; // group shows all
-    // Re-render task view if active
+    taskCache[key+'-group'] = all;
+    // Skip the initial snapshot — renderTasksView already rendered the data.
+    // Only re-render on subsequent remote changes.
+    if(isInitial){ isInitial = false; return; }
     if(currentView === 'tasks') renderTasksView();
   }, err=>{ console.warn('tasks listener', err?.message); });
 }
@@ -6390,6 +6394,7 @@ async function tmNavMonth(dir){
   tmMonth+=dir;
   if(tmMonth<0){tmMonth=11;tmYear--;}
   if(tmMonth>11){tmMonth=0;tmYear++;}
+  tasksListenerKey = null; // force re-subscribe to new month
   await renderTasksView();
 }
 // ─────────────────────────────────────────────
