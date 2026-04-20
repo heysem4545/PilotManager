@@ -5809,19 +5809,22 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   </div>`;
 }
 
+function tmTargetUid(){
+  return (tmTab==='admin' && tmAdminUser) ? tmAdminUser : null;
+}
 function onTmDiff(day,rowIdx,sel){
   const cl=sel.className.replace(/diff-\S+/g,'').trim();
   sel.className=cl+' tm-diff-sel diff-'+(sel.value||'none');
-  if(sel.value) saveTask(day,rowIdx,'diff',sel.value);
+  if(sel.value) saveTask(day,rowIdx,'diff',sel.value,tmTargetUid());
 }
 function onTmTask(day,rowIdx,inp){
-  saveTask(day,rowIdx,'task',inp.value);
+  saveTask(day,rowIdx,'task',inp.value,tmTargetUid());
   tmRefreshStats();
 }
 function onTmStatus(day,rowIdx,sel){
   const cl=sel.className.replace(/status-\S+/g,'').trim();
   sel.className=cl+' tm-status-sel status-'+sel.value;
-  saveTask(day,rowIdx,'status',sel.value);
+  saveTask(day,rowIdx,'status',sel.value,tmTargetUid());
   tmRefreshStats();
 }
 function onTmAssign(day,rowIdx,sel){
@@ -6333,7 +6336,7 @@ async function renderTasksView(){
   } else {
     html+=`<div class="tm-grid">${weeks.map(([s,e])=>{
       let weekHtml=`<div class="tm-week${cols===3?' cols-3':''}">`;
-      for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',tmTab==='admin'&&tmAdminUser!==currentUser.uid);
+      for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',false);
       weekHtml+='</div>';
       return weekHtml;
     }).join('')}</div>`;
