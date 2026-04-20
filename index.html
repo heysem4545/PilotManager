@@ -617,9 +617,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .toast-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px}
 
 /* ── TASK MANAGEMENT ── */
-.tm-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;width:fit-content}
-.tm-tab{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:var(--font);transition:all .15s;position:relative}
-.tm-tab.active{background:var(--accent);color:#0d0d10;font-weight:600}
+.tm-bar{display:flex;align-items:center;gap:4px;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:5px;width:fit-content;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.tm-tab{padding:9px 22px;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:var(--font);transition:all .15s;position:relative;letter-spacing:-.01em}
+.tm-tab.active{background:var(--accent);color:#0d0d10;font-weight:700;box-shadow:0 2px 6px rgba(201,245,99,0.3)}
 .tm-tab:hover:not(.active){background:var(--surface2);color:var(--text)}
 
 .tm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
@@ -641,34 +641,39 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .tm-grid{display:flex;flex-direction:column;gap:2px}
 .tm-week{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
 .tm-week.cols-3{grid-template-columns:repeat(3,1fr)}
-.tm-day{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .15s}
-.tm-day:hover{border-color:var(--border2)}
-.tm-day.today{border-color:var(--accent);border-width:2px}
-.tm-day-head{padding:10px 12px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.tm-day-name{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.tm-day-num{font-size:18px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.tm-day{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.tm-day:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.tm-day.today{border-color:var(--accent);border-width:2px;box-shadow:0 0 12px rgba(201,245,99,0.15)}
+.tm-day-head{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2)}
+.tm-day-name{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.tm-day-num{font-size:20px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--text)}
 .tm-day-num.today-num{color:var(--accent)}
-.tm-day-body{padding:6px}
-.tm-task-row{display:flex;flex-wrap:nowrap;gap:4px;margin-bottom:3px;align-items:center}
-.tm-diff-sel{background:transparent;border:none;font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer;padding:3px 4px;border-radius:5px;outline:none;width:auto;flex-shrink:0}
-.diff-easy{color:#4ade80;background:rgba(74,222,128,0.1)}
-.diff-medium{color:var(--amber);background:rgba(245,201,106,0.1)}
-.diff-hard{color:var(--red);background:rgba(245,112,106,0.1)}
-.diff-none{color:var(--muted2);background:transparent}
-.tm-task-input{background:transparent;border:none;font-size:11px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:3px 4px;border-radius:5px;transition:background .12s;word-wrap:break-word;overflow-wrap:break-word;white-space:normal}
-.tm-task-input:focus{background:var(--surface2)}
+.tm-day-body{padding:8px}
+.tm-task-row{display:flex;flex-wrap:nowrap;gap:5px;margin-bottom:4px;align-items:center;padding:3px 4px;border-radius:6px;transition:background .1s}
+.tm-task-row:hover{background:var(--surface2)}
+.tm-diff-sel{border:1px solid var(--border2);font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer;padding:4px 6px;border-radius:6px;outline:none;width:auto;flex-shrink:0;transition:border-color .12s}
+.tm-diff-sel:hover{border-color:var(--muted)}
+.tm-diff-sel:focus{border-color:var(--accent)}
+.diff-easy{color:#4ade80;background:rgba(74,222,128,0.12);border-color:rgba(74,222,128,0.3)}
+.diff-medium{color:var(--amber);background:rgba(245,201,106,0.12);border-color:rgba(245,201,106,0.3)}
+.diff-hard{color:var(--red);background:rgba(245,112,106,0.12);border-color:rgba(245,112,106,0.3)}
+.diff-none{color:var(--muted2);background:var(--surface2);border-color:var(--border2)}
+.tm-task-input{background:var(--surface2);border:1px solid var(--border2);font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:5px 8px;border-radius:6px;transition:all .12s}
+.tm-task-input:focus{background:var(--surface3);border-color:var(--accent)}
 .tm-task-input::placeholder{color:var(--muted2)}
 
 /* Task text hover tooltip — spreadsheet-style "insert note" popup */
 .tm-note-tip{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:10px 14px;font-size:12px;color:var(--text);font-family:var(--font);line-height:1.5;max-width:320px;min-width:140px;word-break:break-word;pointer-events:none;opacity:0;transform:translateY(-2px);transition:opacity .12s,transform .12s}
 .tm-note-tip.show{opacity:1;transform:translateY(0)}
 .tm-note-tip::before{content:'';position:absolute;top:-5px;left:16px;width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border2);border-top:1px solid var(--border2);transform:rotate(45deg)}
-.tm-status-sel{background:transparent;border:none;font-size:10px;font-weight:500;font-family:var(--font);cursor:pointer;padding:3px 4px;border-radius:5px;outline:none;width:auto;flex-shrink:0}
-.status-notstarted{color:var(--muted)}
-.status-progressing{color:var(--blue);background:var(--blue-dim)}
-.status-done{color:var(--accent);background:var(--accent-dim)}
-.tm-add-row{display:flex;align-items:center;gap:4px;padding:4px 6px;cursor:pointer;color:var(--muted2);font-size:10px;border-radius:5px;transition:all .12s;margin-top:2px}
-.tm-add-row:hover{background:var(--surface2);color:var(--muted)}
+.tm-status-sel{border:1px solid var(--border2);font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer;padding:4px 6px;border-radius:6px;outline:none;width:auto;flex-shrink:0;transition:border-color .12s}
+.tm-status-sel:hover{border-color:var(--muted)}
+.tm-status-sel:focus{border-color:var(--accent)}
+.status-notstarted{color:var(--muted);background:var(--surface2);border-color:var(--border2)}
+.status-progressing{color:var(--blue);background:rgba(106,184,245,0.12);border-color:rgba(106,184,245,0.3)}
+.status-done{color:var(--accent);background:rgba(201,245,99,0.12);border-color:rgba(201,245,99,0.3)}
+.tm-add-row{display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;cursor:pointer;color:var(--muted2);font-size:10px;font-weight:500;border-radius:6px;transition:all .12s;margin-top:4px;border:1px dashed var(--border2)}
+.tm-add-row:hover{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
 
 /* Admin user tabs */
 .tm-user-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
