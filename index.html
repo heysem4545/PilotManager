@@ -5659,6 +5659,14 @@ async function checkTaskDuplicate(taskText, uid, currentDay, currentRowIdx){
   return false;
 }
 
+async function clearTaskFlag(taskId){
+  try{
+    await db.collection('tasks').doc(taskId).update({suspiciousFlag:false});
+    toast('Flag cleared');
+    await renderTasksView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
 async function saveTask(day, rowIdx, field, value, uid=null){
   const key=tmActiveKey();
   const targetUid = uid||currentUser.uid;
@@ -6065,11 +6073,20 @@ async function renderTasksView(){
   const el=document.getElementById('tasksView');
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
 
-  const isAdmin=currentUser.role==='admin';
+  const isAdminUser=currentUser.role==='admin';
+  // Count flagged tasks across all users this month (admin only)
+  let flaggedCount = 0;
+  if(isAdminUser){
+    try{
+      const flagSnap = await db.collection('tasks').where('monthKey','==',key).where('suspiciousFlag','==',true).get();
+      flaggedCount = flagSnap.size;
+    }catch(e){ console.warn('flagged count', e); }
+  }
   const tabs=[
     {k:'own',l:'My Tasks'},
     {k:'group',l:'Group Tasks'},
-    ...(isAdmin?[{k:'admin',l:'👑 Team Overview'}]:[])
+    ...(isAdminUser?[{k:'admin',l:'👑 Team Overview'}]:[]),
+    ...(isAdminUser?[{k:'flagged',l:`🚩 Flagged${flaggedCount>0?' ('+flaggedCount+')':''}`}]:[])
   ];
 
   const key=tmActiveKey();
@@ -6140,12 +6157,50 @@ async function renderTasksView(){
     }).join('')}</div>`;
   }
 
-  html+=`<div class="tm-grid">${weeks.map(([s,e])=>{
-    let weekHtml=`<div class="tm-week${cols===3?' cols-3':''}">`;
-    for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',tmTab==='admin'&&tmAdminUser!==currentUser.uid);
-    weekHtml+='</div>';
-    return weekHtml;
-  }).join('')}</div>`;
+  if(tmTab==='flagged'){
+    // Show flagged tasks table
+    try{
+      const flagSnap = await db.collection('tasks').where('monthKey','==',key).where('suspiciousFlag','==',true).get();
+      const flagged = flagSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0));
+      if(flagged.length === 0){
+        html += `<div class="table-card"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No flagged tasks</div>No suspicious duplicates found for ${MNAMES_FULL[tmMonth]} ${tmYear}.</div></div>`;
+      } else {
+        html += `<div class="table-card"><div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)"><strong style="color:var(--red)">${flagged.length}</strong> suspicious task${flagged.length===1?'':'s'} found in ${MNAMES_FULL[tmMonth]} ${tmYear}</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr>
+          <th style="text-align:left;padding:10px 12px">Day</th>
+          <th style="text-align:left;padding:10px 12px">Employee</th>
+          <th style="text-align:left;padding:10px 12px">Task</th>
+          <th style="text-align:left;padding:10px 12px">Difficulty</th>
+          <th style="text-align:left;padding:10px 12px">Status</th>
+          <th style="text-align:right;padding:10px 12px">Action</th>
+        </tr></thead><tbody>`;
+        flagged.forEach(t=>{
+          const diffLabel = t.diff ? DIFF_LABELS[t.diff] : '—';
+          const statusLabel = STATUS_LABELS[t.status||'notstarted'];
+          const diffCls = t.diff ? 'diff-'+t.diff : 'diff-none';
+          const statusCls = 'status-'+(t.status||'notstarted');
+          html += `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px;font-family:var(--mono);font-size:12px">${MNAMES_FULL[tmMonth].slice(0,3)} ${t.day||'?'}</td>
+            <td style="padding:10px 12px;font-size:12px">${t.userName ? renderUserBadge(t.userName) : '<span style="color:var(--muted)">—</span>'}</td>
+            <td style="padding:10px 12px;font-size:12px;font-weight:500;color:var(--text);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(t.task||'')}">${escapeHtml(t.task||'')}</td>
+            <td style="padding:10px 12px"><span class="${diffCls}" style="font-size:10px;font-weight:600;padding:3px 6px;border-radius:5px">${diffLabel}</span></td>
+            <td style="padding:10px 12px"><span class="${statusCls}" style="font-size:10px;font-weight:600;padding:3px 6px;border-radius:5px">${statusLabel}</span></td>
+            <td style="padding:10px 12px;text-align:right"><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="clearTaskFlag('${t.id}')">Clear flag</button></td>
+          </tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+      }
+    }catch(e){
+      console.error('flagged tasks', e);
+      html += `<div class="table-card"><div style="padding:30px;text-align:center;color:var(--red)">${escapeHtml(e.message)}</div></div>`;
+    }
+  } else {
+    html+=`<div class="tm-grid">${weeks.map(([s,e])=>{
+      let weekHtml=`<div class="tm-week${cols===3?' cols-3':''}">`;
+      for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',tmTab==='admin'&&tmAdminUser!==currentUser.uid);
+      weekHtml+='</div>';
+      return weekHtml;
+    }).join('')}</div>`;
+  }
 
   el.innerHTML=html;
 }
