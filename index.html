@@ -2491,6 +2491,17 @@ async function updatePropertyField(id, field, value){
   if(p) p[field] = value;
 }
 
+async function sendToCollection(propertyId){
+  try{
+    await updatePropertyField(propertyId, 'sentToCollection', true);
+    toast('Sent to Collection Houses');
+    renderBalancesOnly();
+  }catch(e){
+    console.error('sendToCollection', e);
+    toast('Error: '+e.message);
+  }
+}
+
 // ─────────────────────────────────────────────
 // CALCULATIONS
 // ─────────────────────────────────────────────
@@ -2856,7 +2867,7 @@ async function renderBalancesOnly(){
       if(cmhaBal>0||tenantBal>0) hasAnyBalance=true;
       return {cmhaBal,tenantBal};
     });
-    if(hasAnyBalance) rows.push({addr:p.addr, balances});
+    if(hasAnyBalance && !p.sentToCollection) rows.push({id:p.id, addr:p.addr, balances, actionNote:p.actionNote||'', balanceUpdate:p.balanceUpdate||''});
   });
   const totals=monthList.map((_,i)=>{
     let cmhaT=0,tenantT=0;
@@ -2883,6 +2894,9 @@ async function renderBalancesOnly(){
               <th style="text-align:left;min-width:140px">Address</th>
               ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📝 Action Note</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📋 Update</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">➡️ Send to Collection</th>
             </tr>
             <tr>
               ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
@@ -2898,6 +2912,9 @@ async function renderBalancesOnly(){
                 ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
+                <td><input type="text" value="${escapeAttr(r.actionNote)}" placeholder="📝" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:120px" onblur="updatePropertyField('${r.id}','actionNote',this.value)"></td>
+                <td><input type="text" value="${escapeAttr(r.balanceUpdate)}" placeholder="📋" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:120px" onblur="updatePropertyField('${r.id}','balanceUpdate',this.value)"></td>
+                <td style="text-align:center"><input type="checkbox" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="sendToCollection('${r.id}')" title="Send this property to Collection Houses"></td>
               </tr>`;
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
@@ -2905,6 +2922,7 @@ async function renderBalancesOnly(){
               ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
+              <td colspan="3"></td>
             </tr>
           </tbody>
         </table>
