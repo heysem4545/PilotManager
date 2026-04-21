@@ -2628,7 +2628,7 @@ function renderFilterTabs(){
     toggleEl.style.display='flex';
     toggleEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
-      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">All Balances</button>
+      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
     return;
@@ -2840,7 +2840,7 @@ async function moveToLegalCase(propertyId){
   if(!p){ console.warn('[moveToLegalCase] property not found', propertyId); return; }
 
   // Build a 24-month window: all of last year + Jan→current month of this
-  // year. The All Balances pivot's "Last N months" filter can span into the
+  // year. The Collection Houses pivot's "Last N months" filter can span into the
   // previous year, so a current-year-only snapshot was missing data — that
   // was the empty-balances bug.
   const now = new Date();
@@ -2862,7 +2862,7 @@ async function moveToLegalCase(propertyId){
   }
 
   // Snapshot every month with an outstanding CMHA or tenant balance for THIS
-  // property, using the same calculation the All Balances view uses.
+  // property, using the same calculation the Collection Houses view uses.
   const balances = [];
   let totalCmhaBal = 0, totalTenantBal = 0;
   for(const {y, m} of monthsToCheck){
@@ -2912,7 +2912,7 @@ async function sendPropertyToHistory(propertyId){
   if(!p){ console.warn('[sendPropertyToHistory] property not found', propertyId); return; }
 
   // Snapshot the same 24-month window we use for legal cases so the
-  // history doc is comprehensive regardless of the All Balances range filter.
+  // history doc is comprehensive regardless of the Collection Houses range filter.
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
@@ -2973,11 +2973,11 @@ async function sendPropertyToHistory(propertyId){
 
 async function restoreFromHistory(propertyId){
   if(!canEdit()){ toast('You don\u2019t have edit access'); return; }
-  if(!confirm('Restore this property to All Balances?')) return;
+  if(!confirm('Restore this property to Collection Houses?')) return;
   try{
     await db.collection('collectionHistory').doc(propertyId).delete();
     await updatePropertyField(propertyId, 'archivedToHistory', false);
-    toast('Restored to All Balances');
+    toast('Restored to Collection Houses');
     renderCollectionHistory();
   }catch(e){
     console.error('restoreFromHistory', e);
@@ -3005,7 +3005,7 @@ async function renderCollectionHistory(){
   if(entries.length===0){
     el.innerHTML = `<div class="table-card"><div class="legal-empty">
       <div class="legal-empty-title">No archived rows</div>
-      Check the "Send to History" box on a row in All Balances to archive it here.
+      Check the "Send to History" box on a row in Collection Houses to archive it here.
     </div></div>`;
     return;
   }
@@ -3072,7 +3072,7 @@ async function renderCollectionHistory(){
         </table>`;
     }
 
-    const restoreBtn = editable ? `<button class="lc-icon-btn" title="Restore to All Balances" onclick="restoreFromHistory('${e.id}')">
+    const restoreBtn = editable ? `<button class="lc-icon-btn" title="Restore to Collection Houses" onclick="restoreFromHistory('${e.id}')">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 8a5 5 0 119.6 2"/><path d="M2 4v4h4"/></svg>
     </button>` : '';
 
@@ -6470,7 +6470,7 @@ async function renderLegalView(){
   if(cases.length===0){
     el.innerHTML = `<div class="table-card"><div class="legal-empty">
       <div class="legal-empty-title">No legal cases</div>
-      Check the "To Legal" box on a property in Collection \u2192 All Balances to move it here.
+      Check the "To Legal" box on a property in Collection \u2192 Collection Houses to move it here.
     </div></div>`;
     return;
   }
