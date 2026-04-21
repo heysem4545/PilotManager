@@ -1775,7 +1775,7 @@ let currentFilter = 'all';
 let filterSetByNav = false;
 let collectionViewMode = 'monthly'; // 'monthly' or 'allBalances'
 let propsViewTab = 'table'; // 'table' or 'history'
-let allBalancesRange = 'last6';
+let allBalancesRange = 'full';
 let currentPage = 1;
 let sortField = 'rowIndex';
 let sortDir = 1;
@@ -2761,14 +2761,7 @@ async function renderAllBalances(){
   abEl.innerHTML=`
     <div class="table-card">
       <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Range:</span>
-        <select style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer" onchange="allBalancesRange=this.value;renderAllBalances()">
-          <option value="last2" ${allBalancesRange==='last2'?'selected':''}>Last 2 months</option>
-          <option value="last6" ${allBalancesRange==='last6'?'selected':''}>Last 6 months</option>
-          <option value="allyear" ${allBalancesRange==='allyear'?'selected':''}>Year to date</option>
-          <option value="full" ${allBalancesRange==='full'?'selected':''}>Full year</option>
-        </select>
-        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances</span>
+        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances · Full Year</span>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -2878,14 +2871,7 @@ async function renderBalancesOnly(){
   boEl.innerHTML=`
     <div class="table-card">
       <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Range:</span>
-        <select style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer" onchange="allBalancesRange=this.value;renderBalancesOnly()">
-          <option value="last2" ${allBalancesRange==='last2'?'selected':''}>Last 2 months</option>
-          <option value="last6" ${allBalancesRange==='last6'?'selected':''}>Last 6 months</option>
-          <option value="allyear" ${allBalancesRange==='allyear'?'selected':''}>Year to date</option>
-          <option value="full" ${allBalancesRange==='full'?'selected':''}>Full year</option>
-        </select>
-        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances</span>
+        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances · Full Year</span>
       </div>
       <div class="tbl-wrap">
         <table>
