@@ -812,6 +812,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .insp-tab{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);transition:all .12s}
 .insp-tab:hover{color:var(--text);background:var(--surface3)}
 .insp-tab.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-dim)}
+
+/* ── CONSTRUCTION TRACKING ── */
+.const-labor{color:var(--blue)}
+.const-material{color:var(--amber)}
+.const-total{color:var(--accent);font-weight:700}
 </style>
 </head>
 <body>
@@ -908,6 +913,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="nav-item" id="nav-technician" onclick="showView('technician')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5"/><path d="M11.5 2.5l1.5 1.5-1.5 1.5"/></svg>
         Technician
+      </button>
+      <button class="nav-item" id="nav-construction" onclick="showView('construction')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12"/><path d="M4 14V6l4-3 4 3v8"/><path d="M7 14v-4h2v4"/><path d="M6 8h4"/></svg>
+        Construction
       </button>
       <button class="nav-item" id="nav-notices" onclick="showView('notices')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M5 6h6M5 9h4"/></svg>
@@ -1116,6 +1125,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
       <div id="backupsView" style="display:none"></div>
+      <div id="constructionView" style="display:none"></div>
 
     </main>
   </div>
@@ -1697,6 +1707,46 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('meetingLogModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveMeetingLog()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONSTRUCTION EXPENSE MODAL -->
+<div class="overlay" id="constructionExpenseModal" onclick="if(event.target===this)closeModal('constructionExpenseModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-title">
+      <span>Add Construction Expense</span>
+      <button class="modal-close" onclick="closeModal('constructionExpenseModal')">&times;</button>
+    </div>
+    <div class="fg"><label>Property Address</label>
+      <input id="constExpAddr" list="constExpAddrList" placeholder="Search property..." autocomplete="off"
+        onfocus="this.dataset.prev=this.value;this.value='';this.style.borderColor='var(--accent)'"
+        onblur="if(!this.value)this.value=this.dataset.prev||'';this.style.borderColor=''">
+      <datalist id="constExpAddrList"></datalist>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Category</label>
+        <select id="constExpCategory">
+          <option value="Labor">&#128119; Labor</option>
+          <option value="Material">&#129521; Material</option>
+        </select>
+      </div>
+      <div class="fg"><label>Amount</label>
+        <div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:0 10px">
+          <span style="color:var(--muted);font-size:13px;font-family:var(--mono)">$</span>
+          <input id="constExpAmount" type="number" min="0" step="0.01" placeholder="0.00" style="background:none;border:none;padding:9px 8px;font-size:13px;color:var(--text);font-family:var(--mono);outline:none;width:100%">
+        </div>
+      </div>
+    </div>
+    <div class="fg"><label>Description</label>
+      <input id="constExpDesc" placeholder="What was this expense for?">
+    </div>
+    <div class="fg"><label>Date</label>
+      <input id="constExpDate" type="date">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('constructionExpenseModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveConstructionExpense()">Save</button>
     </div>
   </div>
 </div>
@@ -6933,7 +6983,8 @@ function showView(v){
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', inspections:'inspectionsView',
-    callLog:'callLogView', backups:'backupsView'
+    callLog:'callLogView', backups:'backupsView',
+    construction:'constructionView'
   };
 
   // Hide all views
@@ -6961,7 +7012,8 @@ function showView(v){
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', inspections:'Inspection Tracker',
-    callLog:'Call Log', backups:'Backups'
+    callLog:'Call Log', backups:'Backups',
+    construction:'Construction Tracking'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -7019,6 +7071,7 @@ function showView(v){
   if(v==='leads') renderLeadsView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
+  if(v==='construction') renderConstructionView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -9188,6 +9241,196 @@ async function renderInspectionAlerts(){
       </div>
       <div class="court-alert-list">${rows}</div>
     </div>`;
+}
+
+// ─────────────────────────────────────────────
+// CONSTRUCTION TRACKING
+// ─────────────────────────────────────────────
+let constructionData = [];
+
+async function loadConstructionData(){
+  try{
+    const snap = await db.collection('constructionTracking').get();
+    constructionData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    console.error('loadConstructionData error:',e);
+    constructionData=[];
+  }
+}
+
+async function renderConstructionView(){
+  const el=document.getElementById('constructionView');
+  if(!el) return;
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadConstructionData();
+
+  const totalSpent=constructionData.reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=constructionData.filter(d=>d.category==='Labor').reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=constructionData.filter(d=>d.category==='Material').reduce((s,d)=>s+(d.amount||0),0);
+
+  // Group by propertyId
+  const grouped={};
+  constructionData.forEach(d=>{
+    const key=d.propertyId||d.propertyAddress||'unknown';
+    if(!grouped[key]) grouped[key]={propertyId:key,propertyAddress:d.propertyAddress||'Unknown',expenses:[],totalSpent:0,totalLabor:0,totalMaterial:0};
+    grouped[key].expenses.push(d);
+    grouped[key].totalSpent+=(d.amount||0);
+    if(d.category==='Labor') grouped[key].totalLabor+=(d.amount||0);
+    if(d.category==='Material') grouped[key].totalMaterial+=(d.amount||0);
+  });
+  const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
+
+  const editable=canEdit()||isAdmin();
+  const addBtn=editable?'<button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Add Expense</button>':'';
+
+  let rows='';
+  propRows.forEach(p=>{
+    const safeId=p.propertyId.replace(/[^a-zA-Z0-9]/g,'_');
+    rows+=`<tr>
+      <td>
+        <span class="lc-chevron" id="const-chev-${safeId}" onclick="toggleConstructionDetail('${escapeAttr(p.propertyId)}')">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg>
+        </span>
+        <span style="font-weight:500">${escapeHtml(p.propertyAddress)}</span>
+      </td>
+      <td class="const-total" style="font-family:var(--mono)">${fmt(p.totalSpent)}</td>
+      <td class="const-labor" style="font-family:var(--mono)">${fmt(p.totalLabor)}</td>
+      <td class="const-material" style="font-family:var(--mono)">${fmt(p.totalMaterial)}</td>
+      <td style="text-align:center;font-size:11px;color:var(--muted)">${p.expenses.length} expense${p.expenses.length===1?'':'s'}</td>
+    </tr>`;
+    // Detail row (hidden)
+    const detailExpenses=p.expenses.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    let detailRows='';
+    detailExpenses.forEach(ex=>{
+      const catEmoji=ex.category==='Labor'?'\u{1F477}':'\u{1F9F1}';
+      const delBtn=isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:10px" onclick="deleteConstructionExpense('${ex.id}')">Delete</button>`:'';
+      detailRows+=`<tr>
+        <td style="font-family:var(--mono);white-space:nowrap">${escapeHtml(ex.date||'—')}</td>
+        <td>${catEmoji} <span class="${ex.category==='Labor'?'const-labor':'const-material'}">${escapeHtml(ex.category||'')}</span></td>
+        <td style="color:var(--text)">${escapeHtml(ex.description||'—')}</td>
+        <td style="font-family:var(--mono);text-align:right;font-weight:500">${fmt(ex.amount||0)}</td>
+        <td style="text-align:center">${delBtn}</td>
+      </tr>`;
+    });
+    const laborSub=p.totalLabor;
+    const matSub=p.totalMaterial;
+    rows+=`<tr class="lc-detail-row" id="const-detail-${safeId}" style="display:none">
+      <td colspan="5">
+        <div class="lc-detail-inner">
+          <div class="lc-detail-title">Expense Details — ${escapeHtml(p.propertyAddress)}</div>
+          <table class="lc-detail-table">
+            <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Category</th><th style="text-align:left">Description</th><th style="text-align:right">Amount</th><th style="text-align:center;width:70px"></th></tr></thead>
+            <tbody>${detailRows}</tbody>
+            <tfoot>
+              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">👷 Labor Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-labor">${fmt(laborSub)}</td><td></td></tr>
+              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">🧱 Material Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-material">${fmt(matSub)}</td><td></td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  const emptyMsg=propRows.length===0?'<div style="padding:40px;text-align:center;color:var(--muted)">No construction expenses yet. Click "+ Add Expense" to get started.</div>':'';
+
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div class="mc b"><div class="mc-lbl">Total Spent</div><div class="mc-val" style="color:var(--accent)">${fmt(totalSpent)}</div></div>
+      <div class="mc b"><div class="mc-lbl">Total Labor</div><div class="mc-val" style="color:var(--blue)">${fmt(totalLabor)}</div></div>
+      <div class="mc b"><div class="mc-lbl">Total Material</div><div class="mc-val" style="color:var(--amber)">${fmt(totalMaterial)}</div></div>
+    </div>
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${propRows.length}</strong> propert${propRows.length===1?'y':'ies'} with expenses</div>
+        ${addBtn}
+      </div>
+      ${propRows.length>0?`<div class="tbl-wrap"><table>
+        <thead><tr>
+          <th>Property Address</th>
+          <th>Total Spent</th>
+          <th>Labor</th>
+          <th>Material</th>
+          <th style="text-align:center">Expenses</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`:''}
+      ${emptyMsg}
+    </div>`;
+}
+
+function toggleConstructionDetail(propertyId){
+  const safeId=propertyId.replace(/[^a-zA-Z0-9]/g,'_');
+  const row=document.getElementById('const-detail-'+safeId);
+  const chev=document.getElementById('const-chev-'+safeId);
+  if(!row) return;
+  if(row.style.display==='none'){
+    row.style.display='';
+    if(chev) chev.classList.add('open');
+  }else{
+    row.style.display='none';
+    if(chev) chev.classList.remove('open');
+  }
+}
+
+function openAddExpense(){
+  const dl=document.getElementById('constExpAddrList');
+  if(dl){
+    dl.innerHTML=(properties||[]).map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
+  }
+  document.getElementById('constExpAddr').value='';
+  document.getElementById('constExpCategory').value='Labor';
+  document.getElementById('constExpAmount').value='';
+  document.getElementById('constExpDesc').value='';
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('constExpDate').value=today;
+  document.getElementById('constructionExpenseModal').classList.add('open');
+}
+
+async function saveConstructionExpense(){
+  const addr=(document.getElementById('constExpAddr').value||'').trim();
+  const category=document.getElementById('constExpCategory').value;
+  const desc=(document.getElementById('constExpDesc').value||'').trim();
+  const amount=parseFloat(document.getElementById('constExpAmount').value)||0;
+  const date=document.getElementById('constExpDate').value||'';
+
+  if(!addr){toast('Please select a property');return;}
+  if(amount<=0){toast('Please enter a valid amount');return;}
+
+  // Find propertyId
+  const prop=(properties||[]).find(p=>p.addr===addr);
+  const propertyId=prop?prop.id:addr;
+
+  try{
+    await db.collection('constructionTracking').add({
+      propertyId:propertyId,
+      propertyAddress:addr,
+      category:category,
+      description:desc,
+      amount:amount,
+      date:date,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy:currentUser?currentUser.email:''
+    });
+    closeModal('constructionExpenseModal');
+    toast('Expense saved');
+    renderConstructionView();
+  }catch(e){
+    console.error('saveConstructionExpense error:',e);
+    toast('Error saving expense');
+  }
+}
+
+async function deleteConstructionExpense(id){
+  if(!isAdmin()){toast('Admin only');return;}
+  if(!confirm('Delete this expense?')) return;
+  try{
+    await db.collection('constructionTracking').doc(id).delete();
+    toast('Expense deleted');
+    renderConstructionView();
+  }catch(e){
+    console.error('deleteConstructionExpense error:',e);
+    toast('Error deleting expense');
+  }
 }
 </script>
 </body>

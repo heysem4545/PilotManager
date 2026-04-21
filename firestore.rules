@@ -126,5 +126,10 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read, write: if request.auth != null;
     }
+
+    // Construction Tracking — authenticated users can read and write.
+    match /constructionTracking/{expId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
