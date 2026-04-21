@@ -8801,7 +8801,7 @@ async function renderInspectionsContent(users){
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
       <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
-      <td><span style="color:var(--muted);font-size:11px">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="${isn}" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></td>
+      <td><input type="number" value="${r.totalCost||''}" placeholder="$ 0" style="${isn}" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></td>
       <td><input type="date" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
       <td><input type="date" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
       <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
