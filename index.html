@@ -2668,6 +2668,7 @@ function renderCollectionView(){
   const abView=document.getElementById('allBalancesView');
   const histView=document.getElementById('historyView');
   const boView=document.getElementById('balancesOnlyView');
+  const monthBarEl=document.getElementById('monthBar');
   const isBalance = currentFilter==='balance';
   const hideAll=()=>{
     if(tblWrap) tblWrap.style.display='none';
@@ -2679,20 +2680,24 @@ function renderCollectionView(){
   };
   if(isBalance && collectionViewMode==='allBalances'){
     hideAll();
+    if(monthBarEl) monthBarEl.style.display='none';
     abView.style.display='block';
     renderAllBalances();
   } else if(isBalance && collectionViewMode==='balancesOnly'){
     hideAll();
+    if(monthBarEl) monthBarEl.style.display='none';
     if(boView) boView.style.display='block';
     renderBalancesOnly();
   } else if(isBalance && collectionViewMode==='history'){
     hideAll();
+    if(monthBarEl) monthBarEl.style.display='none';
     histView.style.display='block';
     renderCollectionHistory();
   } else {
     if(tblWrap) tblWrap.style.display='';
     if(tblFooter) tblFooter.style.display='';
     if(toolbar) toolbar.style.display='';
+    if(monthBarEl) monthBarEl.style.display='';
     abView.style.display='none';
     histView.style.display='none';
     if(boView) boView.style.display='none';
