@@ -1082,6 +1082,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         </div>
         <div id="allBalancesView" style="display:none"></div>
         <div id="historyView" style="display:none"></div>
+        <div id="balancesOnlyView" style="display:none"></div>
       </div>
 
       <!-- TEAM VIEW (admin only) -->
@@ -2629,6 +2630,7 @@ function renderFilterTabs(){
     toggleEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
+      <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
     return;
@@ -2654,19 +2656,26 @@ function renderCollectionView(){
   const toolbar=document.querySelector('#propsView .table-card .toolbar');
   const abView=document.getElementById('allBalancesView');
   const histView=document.getElementById('historyView');
+  const boView=document.getElementById('balancesOnlyView');
   const isBalance = currentFilter==='balance';
-  if(isBalance && collectionViewMode==='allBalances'){
-    if(tblWrap) tblWrap.style.display='none';
-    if(tblFooter) tblFooter.style.display='none';
-    if(toolbar) toolbar.style.display='none';
-    abView.style.display='block';
-    histView.style.display='none';
-    renderAllBalances();
-  } else if(isBalance && collectionViewMode==='history'){
+  const hideAll=()=>{
     if(tblWrap) tblWrap.style.display='none';
     if(tblFooter) tblFooter.style.display='none';
     if(toolbar) toolbar.style.display='none';
     abView.style.display='none';
+    histView.style.display='none';
+    if(boView) boView.style.display='none';
+  };
+  if(isBalance && collectionViewMode==='allBalances'){
+    hideAll();
+    abView.style.display='block';
+    renderAllBalances();
+  } else if(isBalance && collectionViewMode==='balancesOnly'){
+    hideAll();
+    if(boView) boView.style.display='block';
+    renderBalancesOnly();
+  } else if(isBalance && collectionViewMode==='history'){
+    hideAll();
     histView.style.display='block';
     renderCollectionHistory();
   } else {
@@ -2675,6 +2684,7 @@ function renderCollectionView(){
     if(toolbar) toolbar.style.display='';
     abView.style.display='none';
     histView.style.display='none';
+    if(boView) boView.style.display='none';
     renderTable();
   }
 }
@@ -2806,6 +2816,95 @@ async function renderAllBalances(){
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
               <td colspan="13"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function renderBalancesOnly(){
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now=new Date();
+  const curMonth=now.getMonth();
+  const curYear=now.getFullYear();
+  let monthList=[];
+  if(allBalancesRange==='last2'){
+    for(let i=1;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}
+  } else if(allBalancesRange==='last6'){
+    for(let i=5;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}
+  } else if(allBalancesRange==='allyear'){
+    for(let m=0;m<=curMonth;m++) monthList.push({m,y:curYear});
+  } else {
+    for(let m=0;m<=11;m++) monthList.push({m,y:curYear});
+  }
+  for(const {m,y} of monthList){
+    const key=monthKey(y,m);
+    const alreadyLoaded=Object.values(monthData).some(pd=>pd[key]!==undefined);
+    if(!alreadyLoaded) await loadMonthData(key);
+  }
+  const rows=[];
+  properties.forEach(p=>{
+    let hasAnyBalance=false;
+    const balances=monthList.map(({m,y})=>{
+      const key=monthKey(y,m);
+      const md=(monthData[p.id]||{})[key]||{};
+      const cmha=md.cmha||0, cmhaPaid=md.cmhaPaid||0;
+      const tp=md.tenantPortion||0, tPaid=md.tenantPaid||0;
+      const cmhaBal=Math.max(0,cmha-cmhaPaid);
+      const tenantBal=Math.max(0,tp-tPaid);
+      if(cmhaBal>0||tenantBal>0) hasAnyBalance=true;
+      return {cmhaBal,tenantBal};
+    });
+    if(hasAnyBalance) rows.push({addr:p.addr, balances});
+  });
+  const totals=monthList.map((_,i)=>{
+    let cmhaT=0,tenantT=0;
+    rows.forEach(r=>{cmhaT+=r.balances[i].cmhaBal;tenantT+=r.balances[i].tenantBal;});
+    return{cmhaBal:cmhaT,tenantBal:tenantT};
+  });
+  const boEl=document.getElementById('balancesOnlyView');
+  boEl.innerHTML=`
+    <div class="table-card">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em">Range:</span>
+        <select style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer" onchange="allBalancesRange=this.value;renderBalancesOnly()">
+          <option value="last2" ${allBalancesRange==='last2'?'selected':''}>Last 2 months</option>
+          <option value="last6" ${allBalancesRange==='last6'?'selected':''}>Last 6 months</option>
+          <option value="allyear" ${allBalancesRange==='allyear'?'selected':''}>Year to date</option>
+          <option value="full" ${allBalancesRange==='full'?'selected':''}>Full year</option>
+        </select>
+        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;min-width:140px">Address</th>
+              ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
+              <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
+            </tr>
+            <tr>
+              ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
+              <th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r=>{
+              const rowTotalC=r.balances.reduce((s,b)=>s+b.cmhaBal,0);
+              const rowTotalT=r.balances.reduce((s,b)=>s+b.tenantBal,0);
+              return `<tr>
+                <td><div class="addr-main">${r.addr}</div></td>
+                ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
+                <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
+                <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:2px solid var(--border);font-weight:700">
+              <td>Total</td>
+              ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
+              <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
+              <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
             </tr>
           </tbody>
         </table>
