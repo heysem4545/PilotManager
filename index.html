@@ -7036,7 +7036,13 @@ function setFilter(f){
   } else {
     showView('properties');
   }
-  if(f==='balance') document.getElementById('viewTitle').textContent='Collection';
+  if(f==='balance'){
+    document.getElementById('viewTitle').textContent='Collection';
+    // Highlight the Collection nav item instead of All Properties
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    const colNav=document.getElementById('nav-collection');
+    if(colNav) colNav.classList.add('active');
+  }
 }
 
 function refreshAll(){
