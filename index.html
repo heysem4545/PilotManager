@@ -803,6 +803,14 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .mtg-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 0}
 .mtg-filter select,.mtg-filter input{background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
 .mtg-filter select:focus,.mtg-filter input:focus{border-color:var(--accent)}
+/* ── INSPECTION TRACKER ── */
+.insp-status-fail{background:var(--red-dim);color:var(--red);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.insp-status-pass{background:var(--accent-dim);color:var(--accent);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.insp-status-needs{background:var(--amber-dim);color:var(--amber);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.insp-tabs{display:flex;gap:6px;margin-bottom:14px}
+.insp-tab{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);transition:all .12s}
+.insp-tab:hover{color:var(--text);background:var(--surface3)}
+.insp-tab.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-dim)}
 </style>
 </head>
 <body>
@@ -989,6 +997,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <!-- DASHBOARD VIEW -->
       <div id="dashView">
         <div id="courtAlertSection"></div>
+        <div id="inspectionAlertSection"></div>
         <div class="month-bar" id="dashMonthBar"></div>
         <div class="metrics" id="metricsGrid"></div>
         <div class="potential-banner" id="potentialBanner"></div>
@@ -1536,6 +1545,25 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('callLogNoteModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveCallLogNote()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- INSPECTION NOTE POPUP MODAL -->
+<div class="overlay" id="inspectionNoteModal" onclick="if(event.target===this)closeModal('inspectionNoteModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="inspectionNoteModalTitle">Note</span>
+      <button class="modal-close" onclick="closeModal('inspectionNoteModal')">&times;</button>
+    </div>
+    <div class="notes-modal-meta" id="inspectionNoteModalAddr"></div>
+    <div class="fg">
+      <label id="inspectionNoteModalLabel">Note</label>
+      <textarea id="inspectionNoteModalText" class="notes-area" placeholder="Type here…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('inspectionNoteModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveInspectionNote()">Save</button>
     </div>
   </div>
 </div>
@@ -6859,7 +6887,7 @@ function showView(v){
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
   // Render coming soon for new modules
-  const comingSoon = ['notices','tenants','inspections'];
+  const comingSoon = ['notices','tenants'];
   if(comingSoon.includes(v)){
     document.getElementById(v+'View').innerHTML=`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:var(--muted)">
@@ -6873,6 +6901,7 @@ function showView(v){
   // Render
   if(v==='dashboard'){
     renderCourtAlerts();
+    renderInspectionAlerts();
     renderMonthBar();
     renderMetrics();
     renderPotential();
@@ -6907,6 +6936,7 @@ function showView(v){
   if(v==='available') renderAvailableView();
   if(v==='leads') renderLeadsView();
   if(v==='backups') renderBackupsView();
+  if(v==='inspections') renderInspectionsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -7183,6 +7213,7 @@ function initApp(){
   document.getElementById('viewSub').textContent='Cleveland, OH · '+MNAMES[activeMonth]+' '+activeYear;
   applyTheme(localStorage.getItem('pm-theme') || 'dark');
   renderCourtAlerts(); // update badge immediately
+  renderInspectionAlerts();
   showView('dashboard');
 }
 
@@ -8657,6 +8688,296 @@ async function restorePropertyChange(logId){
     console.error('restorePropertyChange error:', e);
     toast('Restore failed: '+e.message);
   }
+}
+
+// ─────────────────────────────────────────────
+// INSPECTION TRACKER
+// ─────────────────────────────────────────────
+let inspectionsTab = 'active';
+let inspectionsData = [];
+
+async function loadInspections(){
+  try {
+    const snap = await db.collection('inspections').get();
+    inspectionsData = [];
+    snap.forEach(doc => {
+      inspectionsData.push({id:doc.id, ...doc.data()});
+    });
+  } catch(e){
+    console.error('loadInspections error:', e);
+    toast('Error loading inspections');
+  }
+}
+
+async function renderInspectionsView(){
+  const el = document.getElementById('inspectionsView');
+  if(!el) return;
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+  await loadInspections();
+  const users = await ensureUsersCache();
+  renderInspectionsContent(users);
+}
+
+async function renderInspectionsContent(users){
+  if(!users) users = await ensureUsersCache();
+  const el = document.getElementById('inspectionsView');
+  if(!el) return;
+
+  const activeData = inspectionsData.filter(d => !d.archived).sort((a,b) => {
+    if(!a.dueDate) return 1;
+    if(!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+  const historyData = inspectionsData.filter(d => d.archived).sort((a,b) => {
+    if(!a.inspectionDate) return 1;
+    if(!b.inspectionDate) return -1;
+    return b.inspectionDate.localeCompare(a.inspectionDate);
+  });
+
+  const data = inspectionsTab === 'active' ? activeData : historyData;
+  const editable = canEdit() || (currentUser && currentUser.role === 'admin');
+
+  const addBtn = inspectionsTab === 'active' && editable
+    ? `<button class="btn btn-primary btn-sm" onclick="addInspection()">+ Add Inspection</button>`
+    : '';
+
+  const tabs = `<div class="insp-tabs">
+    <button class="insp-tab${inspectionsTab==='active'?' active':''}" onclick="inspectionsTab='active';renderInspectionsContent(null)">Active Inspections</button>
+    <button class="insp-tab${inspectionsTab==='history'?' active':''}" onclick="inspectionsTab='history';renderInspectionsContent(null)">Inspection History</button>
+  </div>`;
+
+  if(data.length === 0){
+    el.innerHTML = `${tabs}<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">${addBtn}</div>
+      <div class="table-card"><div style="padding:40px;text-align:center;color:var(--muted)">No inspections found</div></div>`;
+    return;
+  }
+
+  const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
+  const isn=is+';width:90px;font-family:var(--mono)';
+  const iss=is+';cursor:pointer;max-width:130px';
+
+  const propList = (properties||[]).map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
+
+  const rows = data.map(r => {
+    const userOpts = (users||[]).map(u => {
+      const sel = (r.assignedUser === (u.name||u.email)) ? 'selected' : '';
+      return `<option value="${escapeAttr(u.name||u.email||'')}" ${sel}>${escapeHtml(u.name||u.email||'')}</option>`;
+    }).join('');
+
+    const typeOpts = ['','Annual','Initial'].map(o =>
+      `<option value="${o}"${(r.inspectionType||'')===o?' selected':''}>${o||'— select —'}</option>`
+    ).join('');
+
+    const fixOpts = ['','Own Technician','Outsource','Both'].map(o =>
+      `<option value="${o}"${(r.fixingBy||'')===o?' selected':''}>${o||'— select —'}</option>`
+    ).join('');
+
+    const statusOpts = ['','Fail','Pass','Needs Action'].map(o =>
+      `<option value="${o}"${(r.status||'')===o?' selected':''}>${o||'— select —'}</option>`
+    ).join('');
+
+    const statusCls = r.status === 'Fail' ? 'insp-status-fail' : r.status === 'Pass' ? 'insp-status-pass' : r.status === 'Needs Action' ? 'insp-status-needs' : '';
+
+    const archiveCol = inspectionsTab === 'active'
+      ? `<td style="text-align:center"><input type="checkbox" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="archiveInspection('${r.id}',true)" title="Move to History"></td>`
+      : `<td><button class="btn btn-ghost btn-sm" onclick="archiveInspection('${r.id}',false)">Restore</button></td>`;
+
+    const dlId = 'inspPropDl_'+r.id;
+
+    return `<tr>
+      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','assignedUser',this.value)">
+        <option value="Pilot"${(r.assignedUser||'Pilot')==='Pilot'?' selected':''}>Pilot</option>
+        ${userOpts}
+      </select></td>
+      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','inspectionType',this.value)">${typeOpts}</select></td>
+      <td><input type="text" list="${dlId}" value="${escapeAttr(r.propertyAddress||'')}" placeholder="Search address…" style="${is};width:160px" onblur="updateInspectionField('${r.id}','propertyAddress',this.value)"><datalist id="${dlId}">${propList}</datalist></td>
+      <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
+      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
+      <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
+      <td><span style="color:var(--muted);font-size:11px">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="${isn}" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></td>
+      <td><input type="date" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
+      <td><input type="date" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
+      <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
+      <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Additional Note', editable)}</td>
+      <td><select style="${iss}" class="${statusCls}" onchange="updateInspectionField('${r.id}','status',this.value).then(()=>renderInspectionsContent(null))">${statusOpts}</select></td>
+      ${archiveCol}
+    </tr>`;
+  }).join('');
+
+  const archiveHeader = inspectionsTab === 'active' ? 'Archive' : 'Restore';
+
+  el.innerHTML = `${tabs}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">${addBtn}</div>
+    <div class="table-card"><div class="tbl-wrap">
+      <table class="call-log-tbl">
+        <thead><tr>
+          <th>Assigned</th><th>Type</th><th>Address</th><th>Update 1</th><th>Fixing By</th>
+          <th>Cost Notes</th><th>Total Cost</th><th>Due Date</th><th>Insp. Date</th><th>Time</th>
+          <th>Note</th><th>Status</th><th>${archiveHeader}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div></div>`;
+}
+
+function renderInspPopupCell(id, value, field, label, editable){
+  const has = !!(value && String(value).trim());
+  const preview = has ? escapeHtml(String(value).trim().split(/\s+/).slice(0,3).join(' ')) : `Add ${label.toLowerCase()}…`;
+  const cls = `ab-notes-cell${has?' has-note':''}${has?'':' empty'}${editable?'':' disabled'}`;
+  const onclick = editable ? `onclick="openInspectionNote('${id}','${field}','${escapeAttr(label)}')"` : '';
+  const icon = has
+    ? `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3h7l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M5 8h6M5 11h4"/></svg>`
+    : `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>`;
+  return `<div class="${cls}" ${onclick} title="${has?escapeAttr(String(value)):'Click to add '+label.toLowerCase()}">
+    <span class="ab-notes-preview">${preview}</span>${icon}
+  </div>`;
+}
+
+let inspNoteDocId = null;
+let inspNoteField = null;
+
+function openInspectionNote(docId, field, label){
+  if(!canEdit()) return;
+  inspNoteDocId = docId;
+  inspNoteField = field;
+  const r = inspectionsData.find(x=>x.id===docId);
+  document.getElementById('inspectionNoteModalTitle').textContent = label;
+  document.getElementById('inspectionNoteModalLabel').textContent = label;
+  document.getElementById('inspectionNoteModalAddr').textContent = r ? (r.propertyAddress||'') : '';
+  document.getElementById('inspectionNoteModalText').value = r ? (r[field]||'') : '';
+  document.getElementById('inspectionNoteModalText').placeholder = `Type ${label.toLowerCase()} here\u2026`;
+  document.getElementById('inspectionNoteModal').classList.add('open');
+  setTimeout(()=>document.getElementById('inspectionNoteModalText').focus(),50);
+}
+
+async function saveInspectionNote(){
+  if(!inspNoteDocId || !inspNoteField) return;
+  const value = document.getElementById('inspectionNoteModalText').value;
+  try {
+    await db.collection('inspections').doc(inspNoteDocId).update({[inspNoteField]:value});
+    const r = inspectionsData.find(x=>x.id===inspNoteDocId);
+    if(r) r[inspNoteField] = value;
+    closeModal('inspectionNoteModal');
+    toast('Saved');
+    renderInspectionsContent(null);
+  } catch(e){
+    console.error('saveInspectionNote error:', e);
+    toast('Error: '+e.message);
+  }
+}
+
+async function updateInspectionField(docId, field, value){
+  try {
+    await db.collection('inspections').doc(docId).update({[field]:value});
+    const r = inspectionsData.find(x=>x.id===docId);
+    if(r) r[field] = value;
+    // Update propertyId if address changed
+    if(field === 'propertyAddress'){
+      const p = (properties||[]).find(x=>x.addr===value);
+      if(p){
+        await db.collection('inspections').doc(docId).update({propertyId:p.id});
+        if(r) r.propertyId = p.id;
+      }
+    }
+  } catch(e){
+    console.error('updateInspectionField error:', e);
+    toast('Error: '+e.message);
+  }
+}
+
+async function addInspection(){
+  try {
+    const doc = {
+      assignedUser:'Pilot',
+      inspectionType:'',
+      propertyId:'',
+      propertyAddress:'',
+      update1:'',
+      fixingBy:'',
+      costNotes:'',
+      totalCost:0,
+      dueDate:'',
+      inspectionDate:'',
+      inspectionTime:'',
+      additionalNote:'',
+      status:'',
+      archived:false,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: currentUser ? (currentUser.name||currentUser.email||'') : ''
+    };
+    const ref = await db.collection('inspections').add(doc);
+    inspectionsData.push({id:ref.id, ...doc, createdAt:new Date()});
+    renderInspectionsContent(null);
+    toast('Inspection added');
+  } catch(e){
+    console.error('addInspection error:', e);
+    toast('Error: '+e.message);
+  }
+}
+
+async function archiveInspection(docId, archive){
+  try {
+    await db.collection('inspections').doc(docId).update({archived:archive});
+    const r = inspectionsData.find(x=>x.id===docId);
+    if(r) r.archived = archive;
+    renderInspectionsContent(null);
+    toast(archive ? 'Moved to history' : 'Restored');
+  } catch(e){
+    console.error('archiveInspection error:', e);
+    toast('Error: '+e.message);
+  }
+}
+
+// ── INSPECTION ALERTS (Dashboard) ──
+async function renderInspectionAlerts(){
+  const el = document.getElementById('inspectionAlertSection');
+  if(!el) return;
+  if(inspectionsData.length === 0) await loadInspections();
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const upcoming = inspectionsData.filter(r => {
+    if(r.archived) return false;
+    if(!r.dueDate) return false;
+    const due = new Date(r.dueDate+'T00:00:00');
+    const diff = Math.ceil((due - today)/(1000*60*60*24));
+    return diff >= 0 && diff <= 10;
+  }).map(r => {
+    const due = new Date(r.dueDate+'T00:00:00');
+    const diff = Math.ceil((due - today)/(1000*60*60*24));
+    return {addr:r.propertyAddress||'Unknown', dueDate:r.dueDate, days:diff};
+  }).sort((a,b)=>a.days-b.days);
+
+  if(upcoming.length === 0){
+    el.innerHTML = '';
+    return;
+  }
+
+  const rows = upcoming.map(c => {
+    const urgency = c.days <= 3 ? 'red' : c.days <= 7 ? 'amber' : 'yellow';
+    const daysLabel = c.days === 0 ? 'TODAY' : c.days === 1 ? 'Tomorrow' : `${c.days} days`;
+    const dateStr = new Date(c.dueDate+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    return `<div class="court-alert-row">
+      <div class="court-alert-urgency ${urgency}"></div>
+      <div class="court-alert-info">
+        <div class="court-alert-addr">${escapeHtml(c.addr)}</div>
+        <div class="court-alert-meta"><span>${dateStr}</span></div>
+      </div>
+      <div class="court-alert-days ${urgency}">${daysLabel}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="court-alert-card">
+      <div class="court-alert-head">
+        <div class="court-alert-title">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z"/><path d="M6 5h4M6 8h4M6 11h2"/></svg>
+          Upcoming Inspections
+          <span class="court-alert-count">${upcoming.length}</span>
+        </div>
+      </div>
+      <div class="court-alert-list">${rows}</div>
+    </div>`;
 }
 </script>
 </body>

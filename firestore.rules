@@ -64,6 +64,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Inspections — authenticated users can read and write.
+    match /inspections/{inspId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Invites — anyone can read (to validate tokens during signup) and
     // authenticated users can write. In production, consider restricting
     // writes to admins.
