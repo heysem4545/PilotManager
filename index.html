@@ -7912,6 +7912,7 @@ async function deleteMeeting(id){
 // ─────────────────────────────────────────────
 let callLogData = [];
 let editCallId = null;
+let callLogTab = 'log'; // 'log' or 'history'
 let activeCallNoteId = null;
 let callLogUnsubscribe = null;
 let allUsersCache = [];
@@ -8125,7 +8126,20 @@ async function renderCallLogView(skipLoad){
     }).join('') + '</tbody>';
   }
 
-  el.innerHTML = `
+  // Tab bar — History tab only for admin
+  const historyTab = isAdmin ? `<button class="ftab ${callLogTab==='history'?'active':''}" onclick="switchCallLogTab('history')">📜 Edit History</button>` : '';
+  const tabBar = `<div class="ftabs" style="margin-bottom:12px">
+    <button class="ftab ${callLogTab==='log'?'active':''}" onclick="switchCallLogTab('log')">📋 Call Log</button>
+    ${historyTab}
+  </div>`;
+
+  if(callLogTab === 'history' && isAdmin){
+    el.innerHTML = tabBar + `<div id="callLogHistoryWrap"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+    renderCallLogHistory();
+    return;
+  }
+
+  el.innerHTML = tabBar + `
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left">${callLogData.length} call${callLogData.length===1?'':'s'} logged</div>
@@ -8361,6 +8375,76 @@ async function saveCallLogNote(){
     console.error('saveCallLogNote', e);
     toast('Error: ' + e.message);
   }
+}
+
+function switchCallLogTab(tab){
+  callLogTab = tab;
+  renderCallLogView(true);
+}
+
+async function renderCallLogHistory(){
+  const wrap = document.getElementById('callLogHistoryWrap');
+  if(!wrap) return;
+  try{
+    const snap = await db.collection('callLogHistory').orderBy('timestamp','desc').limit(500).get();
+    const logs = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    if(logs.length === 0){
+      wrap.innerHTML = `<div class="table-card"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No edit history yet</div>Changes to Call Log fields will appear here.</div></div>`;
+      return;
+    }
+
+    // Search filter
+    let filtered = logs;
+    const searchId = 'clHistSearch';
+    const searchHandler = `oninput="filterCallLogHistory(this.value)"`;
+
+    const rows = logs.map(l=>{
+      const ts = l.timestamp && l.timestamp.toDate ? l.timestamp.toDate() : (l.timestamp ? new Date(l.timestamp) : null);
+      const timeStr = ts ? ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' ' + ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
+      const userDisp = l.changedBy ? renderUserBadge(l.changedBy) : '<span style="color:var(--muted)">—</span>';
+      return `<tr class="cl-hist-row" data-search="${escapeAttr((l.propertyAddress||'')+(l.changedBy||'')+(l.field||'')).toLowerCase()}">
+        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--text)">${timeStr}</td>
+        <td>${userDisp}</td>
+        <td style="font-size:12px;color:var(--text);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(l.propertyAddress||'')}">${escapeHtml(l.propertyAddress||'—')}</td>
+        <td style="font-size:11px;color:var(--muted)">${escapeHtml(l.field||'—')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--red);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(l.oldValue||'')}">${escapeHtml(l.oldValue||'(empty)')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--accent);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(l.newValue||'')}">${escapeHtml(l.newValue||'(empty)')}</td>
+      </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="table-card">
+        <div class="call-log-toolbar">
+          <div class="call-log-toolbar-left"><strong style="color:var(--text)">${logs.length}</strong> change${logs.length===1?'':'s'} recorded</div>
+          <input type="text" placeholder="🔍 Search by address, user, or field…" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:250px" ${searchHandler}>
+        </div>
+        <div class="tbl-wrap">
+          <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Property Address</th>
+              <th>Field Changed</th>
+              <th>Old Value</th>
+              <th>New Value</th>
+            </tr></thead>
+            <tbody id="clHistBody">${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }catch(e){
+    console.error('renderCallLogHistory', e);
+    wrap.innerHTML = `<div class="table-card"><div style="padding:30px;text-align:center;color:var(--red)">${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+function filterCallLogHistory(query){
+  const q = (query||'').toLowerCase();
+  document.querySelectorAll('.cl-hist-row').forEach(row=>{
+    const data = row.dataset.search || '';
+    row.style.display = !q || data.includes(q) ? '' : 'none';
+  });
 }
 
 function logCallChange(callId, field, newValue, oldValue){
