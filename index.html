@@ -807,6 +807,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .insp-status-fail{background:var(--red-dim);color:var(--red);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-status-pass{background:var(--accent-dim);color:var(--accent);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-status-needs{background:var(--amber-dim);color:var(--amber);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.insp-status-prog{background:var(--blue-dim);color:var(--blue);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-tabs{display:flex;gap:6px;margin-bottom:14px}
 .insp-tab{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);transition:all .12s}
 .insp-tab:hover{color:var(--text);background:var(--surface3)}
@@ -8891,13 +8892,13 @@ async function renderInspectionsContent(users){
       return `<option value="${o}"${(r.fixingBy||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
     }).join('');
 
-    const STATUS_EMOJIS = {'Fail':'❌','Pass':'✅','Needs Action':'⚠️'};
-    const statusOpts = ['','Fail','Pass','Needs Action'].map(o => {
+    const STATUS_EMOJIS = {'Fail':'❌','Pass':'✅','Needs Action':'⚠️','Progressing':'🔄'};
+    const statusOpts = ['','Fail','Pass','Needs Action','Progressing'].map(o => {
       const em = STATUS_EMOJIS[o]||'';
       return `<option value="${o}"${(r.status||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
     }).join('');
 
-    const statusCls = r.status === 'Fail' ? 'insp-status-fail' : r.status === 'Pass' ? 'insp-status-pass' : r.status === 'Needs Action' ? 'insp-status-needs' : '';
+    const statusCls = r.status === 'Fail' ? 'insp-status-fail' : r.status === 'Pass' ? 'insp-status-pass' : r.status === 'Needs Action' ? 'insp-status-needs' : r.status === 'Progressing' ? 'insp-status-prog' : '';
 
     const archiveCol = inspectionsTab === 'active'
       ? `<td style="text-align:center"><input type="checkbox" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="archiveInspection('${r.id}',true)" title="Move to History"></td>`
@@ -8905,7 +8906,7 @@ async function renderInspectionsContent(users){
 
     const dlId = 'inspPropDl_'+r.id;
 
-    const rowBg = r.status==='Pass'?'background:rgba(74,222,128,0.05)':r.status==='Fail'?'background:rgba(245,112,106,0.05)':r.status==='Needs Action'?'background:rgba(245,201,106,0.05)':'';
+    const rowBg = r.status==='Pass'?'background:rgba(74,222,128,0.05)':r.status==='Fail'?'background:rgba(245,112,106,0.05)':r.status==='Needs Action'?'background:rgba(245,201,106,0.05)':r.status==='Progressing'?'background:rgba(106,184,245,0.05)':'';
     return `<tr style="${rowBg}">
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','assignedUser',this.value)">
         <option value="Pilot"${(r.assignedUser||'Pilot')==='Pilot'?' selected':''}>Pilot</option>
