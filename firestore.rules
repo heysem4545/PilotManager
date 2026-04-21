@@ -69,6 +69,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Call Log History — audit trail for call log edits.
+    match /callLogHistory/{logId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Invites — anyone can read (to validate tokens during signup) and
     // authenticated users can write. In production, consider restricting
     // writes to admins.

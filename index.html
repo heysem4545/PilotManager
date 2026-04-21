@@ -8067,14 +8067,17 @@ async function renderCallLogView(skipLoad){
         }).join('');
         return `<select style="${iss}" onchange="updateCallLogField('${c.id}','${fld}',this.value)">${options}</select>`;
       };
+      const dirOpts = ['Inbound','Outbound'].map(o=>`<option value="${o}"${(c.direction||'Inbound')===o?' selected':''}>${o==='Inbound'?'📥':'📤'} ${o}</option>`).join('');
+      const reasonOpts = ['Maintenance','For Rent','Payments','Paperwork','Maintenance Follow Up','Appointment'].map(o=>`<option value="${o}"${(c.reason||'')===o?' selected':''}>${o}</option>`).join('');
+      const statusOpts2 = ['Completed','Needs Attention','Emergency'].map(o=>`<option value="${o}"${(c.status||'Completed')===o?' selected':''}>${o==='Completed'?'✅':o==='Emergency'?'🚨':'⚠️'} ${o}</option>`).join('');
       return `<tr>
-        <td class="cl-date">${fmtCallDate(c.date)}</td>
-        <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction || 'Inbound')}</span></td>
-        <td class="cl-addr" title="${escapeAttr(c.propertyAddress || '')}">${addrDisp}</td>
-        <td class="cl-reason">${reasonDisp}</td>
-        <td><span class="call-status ${statusCls}"><span class="cs-dot"></span>${escapeHtml(statusKey)}</span></td>
-        <td class="cl-name">${nameDisp}</td>
-        <td class="cl-number">${numDisp}</td>
+        <td><input type="date" value="${c.date||''}" style="${is};width:125px" onchange="logCallChange('${c.id}','date',this.value,'${escapeAttr(c.date||'')}');updateCallLogField('${c.id}','date',this.value)"></td>
+        <td><select style="${iss}" onchange="logCallChange('${c.id}','direction',this.value,'${escapeAttr(c.direction||'')}');updateCallLogField('${c.id}','direction',this.value)">${dirOpts}</select></td>
+        <td><input type="text" list="clPropDl_${c.id}" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"><datalist id="clPropDl_${c.id}">${[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||'')).map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist></td>
+        <td><select style="${iss}" onchange="logCallChange('${c.id}','reason',this.value,'${escapeAttr(c.reason||'')}');updateCallLogField('${c.id}','reason',this.value)"><option value="">—</option>${reasonOpts}</select></td>
+        <td><select style="${iss}" onchange="logCallChange('${c.id}','status',this.value,'${escapeAttr(c.status||'')}');updateCallLogField('${c.id}','status',this.value)">${statusOpts2}</select></td>
+        <td><input type="text" value="${escapeAttr(c.name||'')}" placeholder="Name" style="${is};width:100px" onblur="logCallChange('${c.id}','name',this.value,'${escapeAttr(c.name||'')}');updateCallLogField('${c.id}','name',this.value)"></td>
+        <td><input type="tel" value="${escapeAttr(c.number||'')}" placeholder="📞" style="${isn};width:110px" onblur="logCallChange('${c.id}','number',this.value,'${escapeAttr(c.number||'')}');updateCallLogField('${c.id}','number',this.value)"></td>
         <td><input type="email" value="${escapeAttr(c.email||'')}" placeholder="✉ email" style="${is};width:130px" onblur="updateCallLogField('${c.id}','email',this.value)"></td>
         <td>${mkSel('bedroom',['','1BR','2BR','3BR','4BR','5BR','6BR','UP+'],c.bedroom)}</td>
         <td>${mkSel('tenantType',['','Cash','CMHA'],c.tenantType)}</td>
@@ -8358,6 +8361,21 @@ async function saveCallLogNote(){
     console.error('saveCallLogNote', e);
     toast('Error: ' + e.message);
   }
+}
+
+function logCallChange(callId, field, newValue, oldValue){
+  if(String(newValue) === String(oldValue)) return;
+  const c = callLogData.find(x=>x.id===callId);
+  db.collection('callLogHistory').add({
+    callId,
+    propertyAddress: c ? (c.propertyAddress||'') : '',
+    field,
+    oldValue: String(oldValue||''),
+    newValue: String(newValue||''),
+    changedBy: currentUser ? (currentUser.name||currentUser.email||'') : '',
+    changedByUid: currentUser ? currentUser.uid : '',
+    timestamp: new Date()
+  }).catch(e=>console.warn('logCallChange',e));
 }
 
 async function updateCallLogField(callId, field, value){
