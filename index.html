@@ -8797,7 +8797,7 @@ async function renderInspectionsContent(users){
         ${userOpts}
       </select></td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','inspectionType',this.value)">${typeOpts}</select></td>
-      <td><input type="text" list="${dlId}" value="${escapeAttr(r.propertyAddress||'')}" placeholder="Search address…" style="${is};width:160px" onblur="updateInspectionField('${r.id}','propertyAddress',this.value)"><datalist id="${dlId}">${propList}</datalist></td>
+      <td><input type="text" list="${dlId}" value="${escapeAttr(r.propertyAddress||'')}" placeholder="🔍 Search address…" style="${is};width:180px" onfocus="this.dataset.prev=this.value;this.value='';this.style.borderColor='var(--accent)'" onblur="if(!this.value)this.value=this.dataset.prev||'';updateInspectionField('${r.id}','propertyAddress',this.value);this.style.borderColor=''" onkeydown="if(event.key==='Enter')this.blur()"><datalist id="${dlId}">${propList}</datalist></td>
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
       <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
