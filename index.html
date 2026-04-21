@@ -2662,45 +2662,32 @@ function switchCollectionView(mode){
 }
 
 function renderCollectionView(){
-  const tblWrap=document.querySelector('#propsView .table-card .tbl-wrap');
-  const tblFooter=document.querySelector('#propsView .table-card .tbl-footer');
-  const toolbar=document.querySelector('#propsView .table-card .toolbar');
+  const tableCard=document.querySelector('#propsView .table-card');
   const abView=document.getElementById('allBalancesView');
   const histView=document.getElementById('historyView');
   const boView=document.getElementById('balancesOnlyView');
   const monthBarEl=document.getElementById('monthBar');
   const isBalance = currentFilter==='balance';
-  const hideAll=()=>{
-    if(tblWrap) tblWrap.style.display='none';
-    if(tblFooter) tblFooter.style.display='none';
-    if(toolbar) toolbar.style.display='none';
-    abView.style.display='none';
-    histView.style.display='none';
-    if(boView) boView.style.display='none';
-  };
+  // Hide everything first
+  if(tableCard) tableCard.style.display='none';
+  abView.style.display='none';
+  histView.style.display='none';
+  if(boView) boView.style.display='none';
+  if(monthBarEl) monthBarEl.style.display='none';
+
   if(isBalance && collectionViewMode==='allBalances'){
-    hideAll();
-    if(monthBarEl) monthBarEl.style.display='none';
     abView.style.display='block';
     renderAllBalances();
   } else if(isBalance && collectionViewMode==='balancesOnly'){
-    hideAll();
-    if(monthBarEl) monthBarEl.style.display='none';
     if(boView) boView.style.display='block';
     renderBalancesOnly();
   } else if(isBalance && collectionViewMode==='history'){
-    hideAll();
-    if(monthBarEl) monthBarEl.style.display='none';
     histView.style.display='block';
     renderCollectionHistory();
   } else {
-    if(tblWrap) tblWrap.style.display='';
-    if(tblFooter) tblFooter.style.display='';
-    if(toolbar) toolbar.style.display='';
+    // Monthly View — show the properties table + month bar
+    if(tableCard) tableCard.style.display='';
     if(monthBarEl) monthBarEl.style.display='';
-    abView.style.display='none';
-    histView.style.display='none';
-    if(boView) boView.style.display='none';
     renderTable();
   }
 }
