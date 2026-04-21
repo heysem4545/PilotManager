@@ -7951,12 +7951,25 @@ function startCallLogListener(){
       callLogData.push({ id: doc.id, ...doc.data() });
     });
     sortCallLogData();
-    // Re-render whichever view is active
+    // Re-render whichever view is active, preserving scroll position
     if(currentView === 'callLog'){
-      renderCallLogView(true); // true = skip reload, data is fresh
+      const wrap = document.querySelector('#callLogView .tbl-wrap');
+      const scrollX = wrap ? wrap.scrollLeft : 0;
+      const scrollY = wrap ? wrap.scrollTop : 0;
+      renderCallLogView(true);
+      requestAnimationFrame(()=>{
+        const w = document.querySelector('#callLogView .tbl-wrap');
+        if(w){ w.scrollLeft = scrollX; w.scrollTop = scrollY; }
+      });
     }
     if(currentView === 'leads'){
+      const wrap = document.querySelector('#leadsView .tbl-wrap');
+      const scrollX = wrap ? wrap.scrollLeft : 0;
       renderLeadsView(true);
+      requestAnimationFrame(()=>{
+        const w = document.querySelector('#leadsView .tbl-wrap');
+        if(w) w.scrollLeft = scrollX;
+      });
     }
   }, err=>{
     console.warn('callLog listener', err?.message);
