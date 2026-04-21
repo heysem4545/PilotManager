@@ -8742,8 +8742,8 @@ async function renderInspectionsContent(users){
     : '';
 
   const tabs = `<div class="insp-tabs">
-    <button class="insp-tab${inspectionsTab==='active'?' active':''}" onclick="inspectionsTab='active';renderInspectionsContent(null)">Active Inspections</button>
-    <button class="insp-tab${inspectionsTab==='history'?' active':''}" onclick="inspectionsTab='history';renderInspectionsContent(null)">Inspection History</button>
+    <button class="insp-tab${inspectionsTab==='active'?' active':''}" onclick="inspectionsTab='active';renderInspectionsContent(null)">📋 Active Inspections</button>
+    <button class="insp-tab${inspectionsTab==='history'?' active':''}" onclick="inspectionsTab='history';renderInspectionsContent(null)">📁 Inspection History</button>
   </div>`;
 
   if(data.length === 0){
@@ -8764,17 +8764,23 @@ async function renderInspectionsContent(users){
       return `<option value="${escapeAttr(u.name||u.email||'')}" ${sel}>${escapeHtml(u.name||u.email||'')}</option>`;
     }).join('');
 
-    const typeOpts = ['','Annual','Initial'].map(o =>
-      `<option value="${o}"${(r.inspectionType||'')===o?' selected':''}>${o||'— select —'}</option>`
-    ).join('');
+    const TYPE_EMOJIS = {'Annual':'🔄','Initial':'🆕'};
+    const typeOpts = ['','Annual','Initial'].map(o => {
+      const em = TYPE_EMOJIS[o]||'';
+      return `<option value="${o}"${(r.inspectionType||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
+    }).join('');
 
-    const fixOpts = ['','Own Technician','Outsource','Both'].map(o =>
-      `<option value="${o}"${(r.fixingBy||'')===o?' selected':''}>${o||'— select —'}</option>`
-    ).join('');
+    const FIX_EMOJIS = {'Own Technician':'🔧','Outsource':'🏢','Both':'🔧🏢'};
+    const fixOpts = ['','Own Technician','Outsource','Both'].map(o => {
+      const em = FIX_EMOJIS[o]||'';
+      return `<option value="${o}"${(r.fixingBy||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
+    }).join('');
 
-    const statusOpts = ['','Fail','Pass','Needs Action'].map(o =>
-      `<option value="${o}"${(r.status||'')===o?' selected':''}>${o||'— select —'}</option>`
-    ).join('');
+    const STATUS_EMOJIS = {'Fail':'❌','Pass':'✅','Needs Action':'⚠️'};
+    const statusOpts = ['','Fail','Pass','Needs Action'].map(o => {
+      const em = STATUS_EMOJIS[o]||'';
+      return `<option value="${o}"${(r.status||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
+    }).join('');
 
     const statusCls = r.status === 'Fail' ? 'insp-status-fail' : r.status === 'Pass' ? 'insp-status-pass' : r.status === 'Needs Action' ? 'insp-status-needs' : '';
 
@@ -8784,7 +8790,8 @@ async function renderInspectionsContent(users){
 
     const dlId = 'inspPropDl_'+r.id;
 
-    return `<tr>
+    const rowBg = r.status==='Pass'?'background:rgba(74,222,128,0.05)':r.status==='Fail'?'background:rgba(245,112,106,0.05)':r.status==='Needs Action'?'background:rgba(245,201,106,0.05)':'';
+    return `<tr style="${rowBg}">
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','assignedUser',this.value)">
         <option value="Pilot"${(r.assignedUser||'Pilot')==='Pilot'?' selected':''}>Pilot</option>
         ${userOpts}
@@ -8811,9 +8818,9 @@ async function renderInspectionsContent(users){
     <div class="table-card"><div class="tbl-wrap">
       <table class="call-log-tbl">
         <thead><tr>
-          <th>Assigned</th><th>Type</th><th>Address</th><th>Update 1</th><th>Fixing By</th>
-          <th>Cost Notes</th><th>Total Cost</th><th>Due Date</th><th>Insp. Date</th><th>Time</th>
-          <th>Note</th><th>Status</th><th>${archiveHeader}</th>
+          <th>👤 Assigned</th><th>📋 Type</th><th>🏠 Address</th><th>📝 Update</th><th>🔧 Fixing By</th>
+          <th>💬 Cost Notes</th><th>💰 Total Cost</th><th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
+          <th>📎 Note</th><th>📊 Status</th><th>${archiveHeader}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
