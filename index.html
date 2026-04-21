@@ -6988,7 +6988,10 @@ function showView(v){
     renderDonut();
   }
   if(v==='properties'){
-    if(!filterSetByNav) currentFilter='all';
+    if(!filterSetByNav){
+      currentFilter='all';
+      collectionViewMode='monthly';
+    }
     filterSetByNav=false;
     renderPropsViewTabs();
     if(propsViewTab==='history' && isAdmin()){
