@@ -2018,6 +2018,26 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<div class="overlay" id="toItemsModal" onclick="if(event.target===this)closeModal('toItemsModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      <span>🔧 Turnover Items</span>
+      <button class="modal-close" onclick="closeModal('toItemsModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="toItemsModalAddr"></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Add items that need to be fixed for this turnover. Check them off as completed.</div>
+    <div id="toItemsList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:40vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="toNewItem" placeholder="Type item to fix…" style="flex:1;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTurnoverItem()">
+      <button class="btn btn-primary btn-sm" onclick="addTurnoverItem()">Add</button>
+    </div>
+    <input type="hidden" id="toItemsModalProjId" value="">
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('toItemsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <!-- Firebase Config -->
@@ -11327,6 +11347,48 @@ function renderTurnoverProjects(){
       html+=`<div style="font-size:11px;color:var(--muted);margin:6px 0;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">${escapeHtml(proj.currentHomeInfo)}</div>`;
     }
 
+    // Turnover items checklist
+    const toItems = proj.turnoverItems||[];
+    const toItemsDone = toItems.filter(i=>i.checked).length;
+    const toItemsTotal = toItems.length;
+    const toItemsPct = toItemsTotal>0?Math.round(toItemsDone/toItemsTotal*100):0;
+
+    html+=`<div style="margin:8px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔧 Items to Fix${toItemsTotal>0?' — '+toItemsDone+'/'+toItemsTotal+' done ('+toItemsPct+'%)':''}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="openTurnoverItemsModal('${proj.id}')">
+          ${toItemsTotal>0?'Edit Items ('+toItemsTotal+')':'+ Add Items'}
+        </button>
+      </div>`;
+
+    if(toItemsTotal>0){
+      // Items progress bar
+      html+=`<div style="width:100%;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;border-radius:7px;background:#4ade80;width:${toItemsPct}%;transition:width .3s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:${toItemsPct>0?'32px':'0'}">
+          ${toItemsPct>0?`<span style="font-size:9px;font-weight:700;color:#0d0d10">${toItemsPct}%</span>`:''}
+        </div>
+      </div>`;
+      // Inline checklist
+      html+=`<div style="display:flex;flex-direction:column;gap:3px">`;
+      toItems.forEach((item,ii)=>{
+        html+=`<div style="padding:5px 8px;border-radius:6px;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="toggleTurnoverItem('${proj.id}',${ii},this.checked)">
+            <span style="flex:1;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+            ${isAdmin()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 4px" onclick="event.preventDefault();removeTurnoverItem('${proj.id}',${ii})" title="Remove">×</button>`:''}
+          </label>
+          <div style="display:flex;gap:10px;margin-top:2px;padding-left:23px">
+            ${item.addedDate?`<span style="font-size:10px;color:var(--muted)">📅 Added: ${item.addedDate}</span>`:''}
+            ${item.checked&&item.fixedDate?`<span style="font-size:10px;color:#4ade80">✅ Fixed: ${item.fixedDate}</span>`:''}
+          </div>
+        </div>`;
+      });
+      html+=`</div>`;
+    } else {
+      html+=`<div style="font-size:11px;color:var(--muted2);padding:8px 0">No items added yet — click "+ Add Items" to list what needs fixing</div>`;
+    }
+    html+=`</div>`;
+
     // Progress bar
     const fillColor = 'var(--blue)';
     html+=`<div class="to-overall-bar"><div class="to-overall-fill" style="width:${Math.min(prog,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${prog>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${prog>0?prog+'%':''}</span></div></div>`;
@@ -11653,6 +11715,82 @@ async function saveTurnoverSnapshot(docId){
 function toggleTurnoverTimeline(docId){
   const el = document.getElementById('toTimeline_'+docId);
   if(el) el.style.display = el.style.display==='none'?'':'none';
+}
+
+function openTurnoverItemsModal(projId){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  document.getElementById('toItemsModalProjId').value=projId;
+  document.getElementById('toItemsModalAddr').textContent=proj.propertyAddress||'';
+  document.getElementById('toNewItem').value='';
+  renderTurnoverItemsList(proj);
+  document.getElementById('toItemsModal').classList.add('open');
+}
+
+function renderTurnoverItemsList(proj){
+  const list=document.getElementById('toItemsList');
+  const items=proj.turnoverItems||[];
+  if(items.length===0){
+    list.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px">No items yet. Type an item below and click Add.</div>';
+    return;
+  }
+  list.innerHTML=items.map((item,i)=>`
+    <div style="padding:6px 8px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'};border-radius:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+        <span style="flex:1;font-size:12px;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+        <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px" onclick="removeTurnoverItem('${proj.id}',${i})" title="Remove">×</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:3px;padding-left:26px">
+        ${item.addedDate?`<span style="font-size:10px;color:var(--muted)">📅 Added: ${item.addedDate}</span>`:''}
+        ${item.checked&&item.fixedDate?`<span style="font-size:10px;color:#4ade80">✅ Fixed: ${item.fixedDate}</span>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addTurnoverItem(){
+  const projId=document.getElementById('toItemsModalProjId').value;
+  const input=document.getElementById('toNewItem');
+  const text=(input.value||'').trim();
+  if(!text){toast('Type an item');return;}
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.turnoverItems||[];
+  items.push({text, checked:false, addedDate:new Date().toISOString().slice(0,10), fixedDate:''});
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({turnoverItems:items});
+    proj.turnoverItems=items;
+    input.value='';
+    renderTurnoverItemsList(proj);
+    renderTurnoverProjects();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function removeTurnoverItem(projId, idx){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.turnoverItems||[];
+  items.splice(idx,1);
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({turnoverItems:items});
+    proj.turnoverItems=items;
+    renderTurnoverItemsList(proj);
+    renderTurnoverProjects();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function toggleTurnoverItem(projId, idx, checked){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.turnoverItems||[];
+  items[idx].checked=checked;
+  items[idx].fixedDate=checked?new Date().toISOString().slice(0,10):'';
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({turnoverItems:items});
+    proj.turnoverItems=items;
+    renderTurnoverProjects();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function archiveTurnoverProject(docId){
