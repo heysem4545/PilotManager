@@ -822,7 +822,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .cp-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;padding:18px}
 .cp-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .cp-card-addr{font-size:14px;font-weight:600}
-.cp-overall-bar{width:100%;height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;margin-bottom:4px}
+.cp-overall-bar{width:100%;height:22px;background:var(--surface3);border-radius:11px;overflow:hidden;margin-bottom:4px}
 .cp-overall-fill{height:100%;border-radius:5px;background:var(--blue);transition:width .4s ease}
 .cp-overall-pct{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:14px;font-family:var(--mono)}
 .cp-cat-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border)}
@@ -9994,7 +9994,7 @@ async function renderConstProjectsView(){
     }
     html+=`</div>
       </div>
-      <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%"></div></div>
+      <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${tp>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${tp>0?tp+'%':''}</span></div></div>
       <div class="cp-overall-pct">${tp}% complete</div>`;
 
     cats.forEach((cat,idx)=>{
@@ -10005,11 +10005,8 @@ async function renderConstProjectsView(){
       html+=`<div class="cp-cat-row ${cls}">
         <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
         <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
-          <div style="flex:1;height:18px;background:var(--surface3);border-radius:9px;overflow:hidden;position:relative;cursor:pointer" onclick="cycleProgress('${proj.id}',${idx})">
-            <div id="cpBar_${proj.id}_${idx}" style="height:100%;border-radius:9px;background:${fillColor};width:${prog}%;transition:width .3s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:${prog>0?'30px':'0'}">
-              ${prog>0?`<span style="font-size:9px;font-weight:700;color:#0d0d10">${prog}%</span>`:''}
-            </div>
-            ${prog===0?`<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--muted2)">0%</span>`:''}
+          <div style="flex:1;height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;position:relative;cursor:pointer" onclick="cycleProgress('${proj.id}',${idx})">
+            <div id="cpBar_${proj.id}_${idx}" style="height:100%;border-radius:5px;background:${fillColor};width:${prog}%;transition:width .3s ease"></div>
           </div>
           <div style="display:flex;gap:2px">
             <button style="width:22px;height:22px;border-radius:4px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center" onclick="stepProgress('${proj.id}',${idx},-5)">−</button>
