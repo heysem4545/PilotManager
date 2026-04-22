@@ -9944,7 +9944,8 @@ function calcTotalProgress(categories){
   if(!categories||!categories.length) return 0;
   let total=0;
   categories.forEach(c=>{
-    total += (c.progress||0) * (c.weight||0) / 100;
+    const effectiveProgress = c.na ? 100 : (c.progress||0);
+    total += effectiveProgress * (c.weight||0) / 100;
   });
   return Math.round(total*100)/100;
 }
@@ -10099,19 +10100,33 @@ async function renderConstProjectsView(){
       <div class="cp-overall-pct">${tp}% complete</div>`;
 
     cats.forEach((cat,idx)=>{
-      const contrib = Math.round((cat.progress||0)*(cat.weight||0)/100*100)/100;
+      const isNA = cat.na === true;
+      const effectiveProgress = isNA ? 100 : (cat.progress||0);
+      const contrib = Math.round(effectiveProgress*(cat.weight||0)/100*100)/100;
       const prog = cat.progress||0;
-      const cls = prog>=100?'done':prog>0?'partial':'zero';
-      const fillColor = prog>=100?'var(--blue)':'var(--amber)';
-      html+=`<div class="cp-cat-row ${cls}">
-        <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
-        <input type="range" min="0" max="100" step="5" value="${prog}" class="const-proj-slider"
-          style="background:linear-gradient(to right,${fillColor} ${prog}%,var(--surface3) ${prog}%)"
-          oninput="this.style.background='linear-gradient(to right,'+(this.value>=100?'var(--blue)':'var(--amber)')+' '+this.value+'%,var(--surface3) '+this.value+'%)';previewProjectProgress('${proj.id}',${idx},this.value,this)"
-          onchange="updateProjectProgress('${proj.id}',${idx},this.value)">
-        <div class="cp-cat-pct" id="cpPct_${proj.id}_${idx}" style="min-width:32px;text-align:right">${prog}%</div>
-        <div class="cp-cat-contrib" id="cpCon_${proj.id}_${idx}">&rarr; ${contrib}%</div>
-      </div>`;
+      const cls = isNA?'done':prog>=100?'done':prog>0?'partial':'zero';
+      const fillColor = (isNA||prog>=100)?'var(--blue)':'var(--amber)';
+      if(isNA){
+        html+=`<div class="cp-cat-row done" style="opacity:0.6">
+          <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted);font-style:italic;padding:4px 10px;background:var(--surface3);border-radius:5px">N/A — Not needed</span>
+          </div>
+          <div style="font-size:10px;color:var(--blue)">→ ${contrib}%</div>
+          <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:2px 8px;font-size:9px;color:var(--muted);cursor:pointer" onclick="toggleCategoryNA('${proj.id}',${idx},false)">Undo</button>
+        </div>`;
+      } else {
+        html+=`<div class="cp-cat-row ${cls}">
+          <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
+          <input type="range" min="0" max="100" step="5" value="${prog}" class="const-proj-slider"
+            style="background:linear-gradient(to right,${fillColor} ${prog}%,var(--surface3) ${prog}%)"
+            oninput="this.style.background='linear-gradient(to right,'+(this.value>=100?'var(--blue)':'var(--amber)')+' '+this.value+'%,var(--surface3) '+this.value+'%)';previewProjectProgress('${proj.id}',${idx},this.value,this)"
+            onchange="updateProjectProgress('${proj.id}',${idx},this.value)">
+          <div class="cp-cat-pct" id="cpPct_${proj.id}_${idx}" style="min-width:32px;text-align:right">${prog}%</div>
+          <div class="cp-cat-contrib" id="cpCon_${proj.id}_${idx}">→ ${contrib}%</div>
+          <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:2px 6px;font-size:9px;color:var(--muted2);cursor:pointer" onclick="toggleCategoryNA('${proj.id}',${idx},true)" title="Mark as Not Applicable">N/A</button>
+        </div>`;
+      }
     });
 
     // Timeline section (hidden by default)
@@ -10190,6 +10205,27 @@ async function saveProjectSnapshot(docId){
     console.error('saveProjectSnapshot',e);
     toast('Error: '+e.message);
   }
+}
+
+async function toggleCategoryNA(docId, catIndex, setNA){
+  const proj=constProjectsData.find(p=>p.id===docId);
+  if(!proj) return;
+  const cats=proj.categories||[];
+  cats[catIndex].na = setNA;
+  const total = calcTotalProgress(cats);
+  proj.totalProgress = total;
+  const updateData = {categories:cats, totalProgress:total, updatedAt:new Date()};
+  if(total>=100 && !proj.completedDate){
+    updateData.completedDate = new Date().toISOString().slice(0,10);
+    proj.completedDate = updateData.completedDate;
+  } else if(total<100 && proj.completedDate){
+    updateData.completedDate = '';
+    proj.completedDate = '';
+  }
+  try{
+    await db.collection('constructionProjects').doc(docId).update(updateData);
+    await renderConstProjectsView();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function updateProjectDates(docId, field, value){
