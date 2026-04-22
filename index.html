@@ -10496,7 +10496,7 @@ async function renderConstProjectsView(){
       const auditBarColor = auditActive ? '#4ade80' : 'rgba(74,222,128,0.25)';
       const auditTextColor = auditActive ? (auditPct>=100?'#4ade80':'var(--text)') : 'var(--muted2)';
       const auditLabelColor = auditActive ? 'var(--muted)' : 'var(--muted2)';
-      const auditOpacity = auditActive ? '1' : '0.3';
+      const auditOpacity = auditActive ? '1' : '0.7';
       html+=`<div style="margin-top:8px;opacity:${auditOpacity}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span style="font-size:10px;font-weight:600;color:${auditLabelColor};text-transform:uppercase;letter-spacing:.06em">🔍 Audit Progress${!auditActive?' (waiting for renovation)':''}</span>
