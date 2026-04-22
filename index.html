@@ -5205,10 +5205,7 @@ function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pa
 function renderPropsViewTabs(){
   const el=document.getElementById('propsViewTabs');
   if(!el)return;
-  let html=`<button class="ftab ${propsViewTab==='list'?'active':''}" onclick="switchPropsTab('list')">🏠 All Properties</button>`;
-  if(isAdmin()){
-    html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">📜 History Log</button>`;
-  }
+  let html='';
   el.innerHTML=html;
 }
 
