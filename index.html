@@ -11082,9 +11082,126 @@ async function renderTurnoverView(){
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
   await loadTurnoverProjects();
 
-  let html='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
+  if(typeof window._toMainTab==='undefined') window._toMainTab='active';
+
+  const toActive = turnoverData.filter(p=>!p.archived);
+  const toArchived = turnoverData.filter(p=>p.archived);
+
+  let html=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
+    <button onclick="window._toMainTab='active';renderTurnoverView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._toMainTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._toMainTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">🔨 Active Projects (${toActive.length})</button>
+    <button onclick="window._toMainTab='archived';renderTurnoverView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._toMainTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._toMainTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📦 Projects Archived (${toArchived.length})</button>
+  </div>`;
+
+  if(window._toMainTab==='archived'){
+    html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
+    html+='<button class="btn btn-primary btn-sm" onclick="openAddTurnover()">+ Add TurnOver Project</button>';
+    html+='</div>';
+    if(!toArchived.length){
+      html+=`<div class="to-empty">
+        <div class="to-empty-icon">📦</div>
+        <div class="to-empty-text">No archived turnover projects</div>
+        <div class="to-empty-sub">Completed projects you archive will appear here.</div>
+      </div>`;
+      el.innerHTML=html;
+      return;
+    }
+    toArchived.forEach(proj=>{
+      const prog=proj.progress||0;
+      const wt=proj.workType||'';
+      const wtIcon=wt==='Heavy'?'🔴':wt==='Medium'?'🟡':'🟢';
+      html+=`<div class="to-card" style="opacity:0.85;border-color:var(--border2)">
+        <div class="to-card-head">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="to-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
+            <span style="font-size:10px;color:var(--muted)">${wtIcon} ${escapeHtml(wt)}</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="restoreTurnoverProject('${proj.id}')">↩ Restore</button>
+            ${isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteTurnoverProject('${proj.id}')">Delete</button>`:''}
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;font-size:11px;color:var(--muted)">
+          <span>📊 Progress: <strong style="color:var(--text)">${prog}%</strong></span>
+          <span>📅 Start: <strong style="color:var(--text)">${proj.startDate||'—'}</strong></span>
+          <span>✅ Completed: <strong style="color:var(--accent)">${proj.completedDate||'—'}</strong></span>
+          <span>🏡 Ready: <strong style="color:var(--text)">${proj.readyToRentDate||'—'}</strong></span>
+          ${proj.archivedDate?`<span>📦 Archived: <strong style="color:var(--text)">${proj.archivedDate}</strong></span>`:''}
+        </div>
+      </div>`;
+    });
+    el.innerHTML=html;
+    return;
+  }
+
+  html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
   html+='<button class="btn btn-primary btn-sm" onclick="openAddTurnover()">+ Add TurnOver Project</button>';
   html+='</div>';
+
+  // Summary stats for active turnover projects
+  const toInProgress = toActive.filter(p=>(p.progress||0)<100);
+  const toCompleted = toActive.filter(p=>(p.progress||0)>=100);
+  const toReady = toActive.filter(p=>p.status==='Ready to Rent');
+  const toOverdue = toActive.filter(p=>{if((p.progress||0)>=100||!p.targetDate)return false;const t=new Date(p.targetDate+'T00:00:00');const now=new Date();now.setHours(0,0,0,0);return t<now;});
+  const toAvgProgress = toActive.length>0?Math.round(toActive.reduce((s,p)=>s+(p.progress||0),0)/toActive.length):0;
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${toActive.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">Total Active</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--amber)">${toInProgress.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">🔨 In Progress</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--blue)">${toCompleted.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">✅ Completed</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:#4ade80">${toReady.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">🏡 Ready to Rent</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:${toOverdue.length>0?'var(--red)':'var(--accent)'}">${toOverdue.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">⚠️ Overdue</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--text)">${toAvgProgress}%</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">📊 Avg Progress</div>
+    </div>
+  </div>`;
+
+  // Quick-glance progress chart for all active turnover houses
+  if(toActive.length>0){
+    const chartSorted=[...toActive].sort((a,b)=>(a.progress||0)-(b.progress||0));
+    html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📊 All Houses Progress</div>
+      <div style="display:flex;flex-direction:column;gap:5px">`;
+    chartSorted.forEach(p=>{
+      const prog=p.progress||0;
+      const barColor=prog>=100?'var(--blue)':prog>=75?'#4ade80':prog>=50?'var(--amber)':prog>=25?'var(--purple)':'var(--red)';
+      const wt=p.workType||'';
+      const wtIcon=wt==='Heavy'?'🔴':wt==='Medium'?'🟡':'🟢';
+      const addr=(p.propertyAddress||'Unknown').replace(/,.*$/,'');
+      html+=`<div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;color:var(--text);width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0" title="${escapeHtml(p.propertyAddress||'')}">${escapeHtml(addr)}</span>
+        <span style="font-size:10px;flex-shrink:0">${wtIcon}</span>
+        <div style="flex:1;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden">
+          <div style="height:100%;width:${prog}%;background:${barColor};border-radius:7px;transition:width .3s"></div>
+        </div>
+        <span style="font-size:10px;font-weight:700;color:${barColor};width:32px;text-align:right;font-family:var(--mono)">${prog}%</span>
+      </div>`;
+    });
+    html+=`</div>
+      <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border2);font-size:9px;color:var(--muted)">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--red);vertical-align:middle"></span> 0-24%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--purple);vertical-align:middle"></span> 25-49%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--amber);vertical-align:middle"></span> 50-74%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#4ade80;vertical-align:middle"></span> 75-99%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--blue);vertical-align:middle"></span> 100%</span>
+      </div>
+    </div>`;
+  }
 
   html+='<div class="to-tabs">';
   html+='<button class="to-tab'+(turnoverTab==='projects'?' active':'')+'" onclick="turnoverTab=\'projects\';renderTurnoverTabContent()">Projects</button>';
@@ -11108,12 +11225,12 @@ function renderTurnoverProjects(){
   const container = document.getElementById('turnoverTabContent');
   if(!container) return;
 
-  const sorted = [...turnoverData].sort((a,b)=>(a.progress||0)-(b.progress||0));
+  const sorted = [...turnoverData].filter(p=>!p.archived).sort((a,b)=>(a.progress||0)-(b.progress||0));
 
   if(!sorted.length){
     container.innerHTML=`<div class="to-empty">
       <div class="to-empty-icon">🏠</div>
-      <div class="to-empty-text">No turnover projects yet</div>
+      <div class="to-empty-text">No active turnover projects</div>
       <div class="to-empty-sub">Click "+ Add TurnOver Project" to start tracking a unit turnover.</div>
     </div>`;
     return;
@@ -11140,6 +11257,7 @@ function renderTurnoverProjects(){
         <div style="display:flex;gap:6px;align-items:center">`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveTurnoverSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleTurnoverTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+(proj.snapshots||[]).length+')':''}</button>`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTurnoverProject('${proj.id}')">📦 Archive</button>`;
     if(isAdmin()){
       html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteTurnoverProject('${proj.id}')">Delete</button>`;
     }
@@ -11266,7 +11384,7 @@ function renderTurnoverWorkOrders(){
   const container = document.getElementById('turnoverTabContent');
   if(!container) return;
 
-  const completed = turnoverData.filter(p=>(p.progress||0)>=100);
+  const completed = turnoverData.filter(p=>(p.progress||0)>=100&&!p.archived);
   completed.sort((a,b)=>(b.completedDate||'').localeCompare(a.completedDate||''));
 
   if(!completed.length){
@@ -11535,6 +11653,29 @@ async function saveTurnoverSnapshot(docId){
 function toggleTurnoverTimeline(docId){
   const el = document.getElementById('toTimeline_'+docId);
   if(el) el.style.display = el.style.display==='none'?'':'none';
+}
+
+async function archiveTurnoverProject(docId){
+  if(!confirm('Archive this turnover project? It will move to the Projects Archived tab.')) return;
+  try{
+    await db.collection('turnoverProjects').doc(docId).update({archived:true, archivedDate:new Date().toISOString().slice(0,10)});
+    const proj=turnoverData.find(p=>p.id===docId);
+    if(proj){proj.archived=true;proj.archivedDate=new Date().toISOString().slice(0,10);}
+    toast('Project archived');
+    await renderTurnoverView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function restoreTurnoverProject(docId){
+  if(!confirm('Restore this project back to active?')) return;
+  try{
+    await db.collection('turnoverProjects').doc(docId).update({archived:false, archivedDate:''});
+    const proj=turnoverData.find(p=>p.id===docId);
+    if(proj){proj.archived=false;proj.archivedDate='';}
+    toast('Project restored');
+    window._toMainTab='active';
+    await renderTurnoverView();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 async function deleteTurnoverProject(docId){
