@@ -131,5 +131,10 @@ service cloud.firestore {
     match /constructionTracking/{expId} {
       allow read, write: if request.auth != null;
     }
+
+    // Construction Projects — authenticated users can read and write.
+    match /constructionProjects/{projId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

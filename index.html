@@ -817,6 +817,37 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .const-labor{color:var(--blue)}
 .const-material{color:var(--amber)}
 .const-total{color:var(--accent);font-weight:700}
+
+/* ── CONSTRUCTION PROJECTS ── */
+.cp-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;padding:18px}
+.cp-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cp-card-addr{font-size:14px;font-weight:600}
+.cp-overall-bar{width:100%;height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;margin-bottom:4px}
+.cp-overall-fill{height:100%;border-radius:5px;background:var(--accent);transition:width .4s ease}
+.cp-overall-pct{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:14px;font-family:var(--mono)}
+.cp-cat-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border)}
+.cp-cat-name{font-size:12px;font-weight:500;width:140px;flex-shrink:0}
+.cp-cat-weight{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.const-proj-slider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:var(--surface3);outline:none;cursor:pointer;flex:1}
+.const-proj-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
+.const-proj-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+.cp-cat-pct{font-size:11px;font-family:var(--mono);width:36px;text-align:right;flex-shrink:0}
+.cp-cat-contrib{font-size:11px;font-family:var(--mono);width:50px;text-align:right;flex-shrink:0;color:var(--muted)}
+.cp-cat-row.done .cp-cat-name{color:var(--accent)}
+.cp-cat-row.partial .cp-cat-name{color:var(--amber)}
+.cp-cat-row.zero .cp-cat-name{color:var(--muted2)}
+.cp-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.cp-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.cp-empty-text{font-size:14px;margin-bottom:6px;font-weight:500;color:var(--text)}
+.cp-empty-sub{font-size:12px}
+#constProjCatModal .modal{width:520px}
+.cp-cat-edit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cp-cat-edit-row input[type="text"]{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
+.cp-cat-edit-row input[type="number"]{width:70px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--mono);outline:none;text-align:center}
+.cp-cat-edit-row input:focus{border-color:var(--accent)}
+.cp-weight-total{font-size:12px;font-weight:600;margin-top:8px;padding:8px 10px;border-radius:6px}
+.cp-weight-ok{background:var(--accent-dim);color:var(--accent)}
+.cp-weight-bad{background:var(--red-dim);color:var(--red)}
 </style>
 </head>
 <body>
@@ -917,6 +948,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="nav-item" id="nav-construction" onclick="showView('construction')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12"/><path d="M4 14V6l4-3 4 3v8"/><path d="M7 14v-4h2v4"/><path d="M6 8h4"/></svg>
         Construction Expenses
+      </button>
+      <button class="nav-item" id="nav-constProjects" onclick="showView('constProjects')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 7h6M5 10h3"/><path d="M12 6V3"/><path d="M4 6V3"/></svg>
+        Construction Projects
       </button>
       <button class="nav-item" id="nav-notices" onclick="showView('notices')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M5 6h6M5 9h4"/></svg>
@@ -1126,6 +1161,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="callLogView" style="display:none"></div>
       <div id="backupsView" style="display:none"></div>
       <div id="constructionView" style="display:none"></div>
+      <div id="constProjectsView" style="display:none"></div>
 
     </main>
   </div>
@@ -1813,6 +1849,44 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('mutualExpenseModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveMutualExpense()">Split & Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CONSTRUCTION PROJECT MODAL -->
+<div class="overlay" id="constProjAddModal" onclick="if(event.target===this)closeModal('constProjAddModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span>Add Construction Project</span>
+      <button class="modal-close" onclick="closeModal('constProjAddModal')">&times;</button>
+    </div>
+    <div class="fg"><label>Property Address</label>
+      <input id="constProjAddr" list="constProjAddrList" placeholder="Search property..."
+        onfocus="this.dataset.prev=this.value;this.value=''"
+        onblur="if(!this.value)this.value=this.dataset.prev||''">
+      <datalist id="constProjAddrList"></datalist>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('constProjAddModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNewProject()">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CONSTRUCTION PROJECT CATEGORIES MODAL -->
+<div class="overlay" id="constProjCatModal" onclick="if(event.target===this)closeModal('constProjCatModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      <span>Edit Default Categories</span>
+      <button class="modal-close" onclick="closeModal('constProjCatModal')">&times;</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Define categories and their weights. Weights must total 100.</div>
+    <div id="constProjCatList"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addCategoryRow()" style="margin-top:8px;width:auto">+ Add Category</button>
+    <div id="constProjCatWeightStatus" class="cp-weight-total"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('constProjCatModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCategories()">Save Categories</button>
     </div>
   </div>
 </div>
@@ -7050,7 +7124,8 @@ function showView(v){
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
-    construction:'constructionView'
+    construction:'constructionView',
+    constProjects:'constProjectsView'
   };
 
   // Hide all views
@@ -7079,7 +7154,8 @@ function showView(v){
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
-    construction:'Construction Expense Tracking'
+    construction:'Construction Expense Tracking',
+    constProjects:'Construction Projects'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -7138,6 +7214,7 @@ function showView(v){
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
   if(v==='construction') renderConstructionView();
+  if(v==='constProjects') renderConstProjectsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -9836,6 +9913,265 @@ async function deleteConstructionExpense(id){
     toast('Error deleting expense');
   }
 }
+// ─────────────────────────────────────────────
+// CONSTRUCTION PROJECTS
+// ─────────────────────────────────────────────
+let constProjectsData = [];
+
+function getDefaultCategories(){
+  const saved = localStorage.getItem('constProjCategories');
+  if(saved){
+    try{ return JSON.parse(saved); }catch(e){}
+  }
+  return [
+    {name:'Demolition', weight:20},
+    {name:'Flooring', weight:20},
+    {name:'Electric', weight:20},
+    {name:'Plumbing', weight:20},
+    {name:'Roofing', weight:10},
+    {name:'Paint', weight:10}
+  ];
+}
+
+function calcTotalProgress(categories){
+  if(!categories||!categories.length) return 0;
+  let total=0;
+  categories.forEach(c=>{
+    total += (c.progress||0) * (c.weight||0) / 100;
+  });
+  return Math.round(total*100)/100;
+}
+
+async function loadConstProjects(){
+  try{
+    const snap = await db.collection('constructionProjects').get();
+    constProjectsData = snap.docs.map(d=>({id:d.id,...d.data()}));
+    constProjectsData.sort((a,b)=>(a.totalProgress||0)-(b.totalProgress||0));
+  }catch(e){
+    console.error('loadConstProjects error:',e);
+    constProjectsData=[];
+  }
+}
+
+async function renderConstProjectsView(){
+  const el = document.getElementById('constProjectsView');
+  if(!el) return;
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+
+  await loadConstProjects();
+
+  let html='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+  html+='<button class="btn btn-primary btn-sm" onclick="openAddProject()">+ Add Project</button>';
+  if(isAdmin()){
+    html+='<button class="btn btn-ghost btn-sm" onclick="openEditCategories()">&#9881; Edit Categories</button>';
+  }
+  html+='</div>';
+
+  if(!constProjectsData.length){
+    html+=`<div class="cp-empty">
+      <div class="cp-empty-icon">&#128679;</div>
+      <div class="cp-empty-text">No construction projects yet</div>
+      <div class="cp-empty-sub">Click "+ Add Project" to start tracking a renovation.</div>
+    </div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  constProjectsData.forEach(proj=>{
+    const tp = proj.totalProgress||0;
+    const cats = proj.categories||[];
+    const barColor = tp>=100?'var(--accent)':tp>=50?'var(--accent)':'var(--amber)';
+
+    html+=`<div class="cp-card">
+      <div class="cp-card-head">
+        <div class="cp-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
+        <div style="display:flex;gap:6px;align-items:center">`;
+    if(isAdmin()){
+      html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteProject('${proj.id}')">Delete</button>`;
+    }
+    html+=`</div>
+      </div>
+      <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;background:${barColor}"></div></div>
+      <div class="cp-overall-pct">${tp}% complete</div>`;
+
+    cats.forEach((cat,idx)=>{
+      const contrib = Math.round((cat.progress||0)*(cat.weight||0)/100*100)/100;
+      const cls = (cat.progress||0)>=100?'done':(cat.progress||0)>0?'partial':'zero';
+      html+=`<div class="cp-cat-row ${cls}">
+        <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
+        <input type="range" min="0" max="100" value="${cat.progress||0}" class="const-proj-slider"
+          oninput="previewProjectProgress('${proj.id}',${idx},this.value,this)"
+          onchange="updateProjectProgress('${proj.id}',${idx},this.value)">
+        <div class="cp-cat-pct" id="cpPct_${proj.id}_${idx}">${cat.progress||0}%</div>
+        <div class="cp-cat-contrib" id="cpCon_${proj.id}_${idx}">&rarr; ${contrib}%</div>
+      </div>`;
+    });
+
+    html+='</div>';
+  });
+
+  el.innerHTML=html;
+}
+
+function previewProjectProgress(docId,catIndex,value,slider){
+  // Live preview without saving
+  const proj = constProjectsData.find(p=>p.id===docId);
+  if(!proj) return;
+  const cats = proj.categories||[];
+  const cat = cats[catIndex];
+  if(!cat) return;
+  const contrib = Math.round(value*(cat.weight||0)/100*100)/100;
+  const pctEl = document.getElementById('cpPct_'+docId+'_'+catIndex);
+  const conEl = document.getElementById('cpCon_'+docId+'_'+catIndex);
+  if(pctEl) pctEl.textContent = value+'%';
+  if(conEl) conEl.innerHTML = '&rarr; '+contrib+'%';
+
+  // Update overall bar preview
+  let total=0;
+  cats.forEach((c,i)=>{
+    const p = i===catIndex ? Number(value) : (c.progress||0);
+    total += p*(c.weight||0)/100;
+  });
+  total = Math.round(total*100)/100;
+  const card = slider.closest('.cp-card');
+  if(card){
+    const fill = card.querySelector('.cp-overall-fill');
+    const pctLabel = card.querySelector('.cp-overall-pct');
+    if(fill) fill.style.width = Math.min(total,100)+'%';
+    if(pctLabel) pctLabel.textContent = total+'% complete';
+  }
+}
+
+async function updateProjectProgress(docId,catIndex,value){
+  const proj = constProjectsData.find(p=>p.id===docId);
+  if(!proj) return;
+  const cats = proj.categories||[];
+  cats[catIndex].progress = Number(value);
+  const total = calcTotalProgress(cats);
+  proj.totalProgress = total;
+  try{
+    await db.collection('constructionProjects').doc(docId).update({
+      categories: cats,
+      totalProgress: total,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){
+    console.error('updateProjectProgress error:',e);
+    toast('Error saving progress');
+  }
+}
+
+function openAddProject(){
+  // Populate datalist
+  const dl = document.getElementById('constProjAddrList');
+  dl.innerHTML = properties.map(p=>'<option value="'+escapeHtml(p.addr)+'">').join('');
+  document.getElementById('constProjAddr').value='';
+  document.getElementById('constProjAddModal').classList.add('open');
+}
+
+async function saveNewProject(){
+  const addrInput = document.getElementById('constProjAddr').value.trim();
+  if(!addrInput){toast('Please select a property');return;}
+
+  const prop = properties.find(p=>p.addr===addrInput);
+  if(!prop){toast('Property not found');return;}
+
+  // Check if project already exists for this property
+  const existing = constProjectsData.find(p=>p.propertyId===prop.id);
+  if(existing){toast('Project already exists for this property');return;}
+
+  const cats = getDefaultCategories().map(c=>({name:c.name,weight:c.weight,progress:0}));
+  try{
+    await db.collection('constructionProjects').add({
+      propertyId: prop.id,
+      propertyAddress: prop.addr,
+      categories: cats,
+      totalProgress: 0,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal('constProjAddModal');
+    toast('Project created');
+    renderConstProjectsView();
+  }catch(e){
+    console.error('saveNewProject error:',e);
+    toast('Error creating project');
+  }
+}
+
+function openEditCategories(){
+  const cats = getDefaultCategories();
+  const list = document.getElementById('constProjCatList');
+  list.innerHTML='';
+  cats.forEach((c,i)=>{
+    addCategoryRowHTML(list,c.name,c.weight);
+  });
+  updateCatWeightStatus();
+  document.getElementById('constProjCatModal').classList.add('open');
+}
+
+function addCategoryRow(){
+  const list = document.getElementById('constProjCatList');
+  addCategoryRowHTML(list,'',0);
+  updateCatWeightStatus();
+}
+
+function addCategoryRowHTML(container,name,weight){
+  const row = document.createElement('div');
+  row.className='cp-cat-edit-row';
+  row.innerHTML=`<input type="text" value="${escapeHtml(name)}" placeholder="Category name">
+    <input type="number" value="${weight}" min="0" max="100" placeholder="Wt" oninput="updateCatWeightStatus()">
+    <button class="btn btn-danger btn-sm" style="padding:4px 8px;font-size:10px;width:auto" onclick="this.parentElement.remove();updateCatWeightStatus()">&#10005;</button>`;
+  container.appendChild(row);
+}
+
+function updateCatWeightStatus(){
+  const rows = document.querySelectorAll('#constProjCatList .cp-cat-edit-row');
+  let total=0;
+  rows.forEach(r=>{
+    const w = Number(r.querySelector('input[type=number]').value)||0;
+    total+=w;
+  });
+  const el = document.getElementById('constProjCatWeightStatus');
+  if(total===100){
+    el.className='cp-weight-total cp-weight-ok';
+    el.textContent='Total weight: '+total+'% ✓';
+  }else{
+    el.className='cp-weight-total cp-weight-bad';
+    el.textContent='Total weight: '+total+'% (must be 100)';
+  }
+}
+
+function saveCategories(){
+  const rows = document.querySelectorAll('#constProjCatList .cp-cat-edit-row');
+  const cats=[];
+  let total=0;
+  rows.forEach(r=>{
+    const name = r.querySelector('input[type=text]').value.trim();
+    const weight = Number(r.querySelector('input[type=number]').value)||0;
+    if(name) cats.push({name,weight});
+    total+=weight;
+  });
+  if(total!==100){toast('Weights must total 100 (currently '+total+')');return;}
+  if(!cats.length){toast('Add at least one category');return;}
+  localStorage.setItem('constProjCategories',JSON.stringify(cats));
+  closeModal('constProjCatModal');
+  toast('Categories saved');
+}
+
+async function deleteProject(docId){
+  if(!isAdmin()){toast('Admin only');return;}
+  if(!confirm('Delete this construction project?')) return;
+  try{
+    await db.collection('constructionProjects').doc(docId).delete();
+    toast('Project deleted');
+    renderConstProjectsView();
+  }catch(e){
+    console.error('deleteProject error:',e);
+    toast('Error deleting project');
+  }
+}
+
 </script>
 </body>
 </html>
