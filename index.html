@@ -9966,6 +9966,7 @@ async function renderConstProjectsView(){
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
 
   await loadConstProjects();
+  await loadConstructionData(); // load expenses for budget comparison
 
   let html='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
   html+='<button class="btn btn-primary btn-sm" onclick="openAddProject()">+ Add Project</button>';
@@ -10050,6 +10051,49 @@ async function renderConstProjectsView(){
         </div>`:''}
         ${statusBadge}
         ${daysInfo}
+      </div>`;
+
+    // Budget comparison — pull actual from constructionTracking
+    const estLabor = proj.estimateLabor||0;
+    const estMaterial = proj.estimateMaterial||0;
+    const estTotal = estLabor + estMaterial;
+    const propExpenses = (typeof constructionData!=='undefined'?constructionData:[]).filter(d=>d.propertyId===proj.propertyId && !d.isGeneral);
+    const actualLabor = propExpenses.filter(d=>(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
+    const actualMaterial = propExpenses.filter(d=>!(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
+    const actualTotal = actualLabor + actualMaterial;
+    const laborDiff = estLabor - actualLabor;
+    const matDiff = estMaterial - actualMaterial;
+    const totalDiff = estTotal - actualTotal;
+    const budgetColor = (diff)=> diff>=0?'var(--accent)':'var(--red)';
+    const budgetIcon = (diff)=> diff>=0?'✅':'🚨';
+    const budgetLabel = (diff)=> diff>=0?fmt(Math.abs(diff))+' under':fmt(Math.abs(diff))+' over';
+
+    html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;padding:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px">
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👷 Labor</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+            <span style="font-size:10px;color:var(--muted)">Est:</span>
+            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${estLabor||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateProjectDates('${proj.id}','estimateLabor',parseFloat(this.value)||0)"></div>
+          </div>
+          <div style="font-size:11px;font-family:var(--mono)">Spent: <strong style="color:var(--blue)">${fmt(actualLabor)}</strong></div>
+          ${estLabor>0?`<div style="font-size:10px;color:${budgetColor(laborDiff)}">${budgetIcon(laborDiff)} ${budgetLabel(laborDiff)}</div>`:''}
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🧱 Material</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+            <span style="font-size:10px;color:var(--muted)">Est:</span>
+            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${estMaterial||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateProjectDates('${proj.id}','estimateMaterial',parseFloat(this.value)||0)"></div>
+          </div>
+          <div style="font-size:11px;font-family:var(--mono)">Spent: <strong style="color:var(--amber)">${fmt(actualMaterial)}</strong></div>
+          ${estMaterial>0?`<div style="font-size:10px;color:${budgetColor(matDiff)}">${budgetIcon(matDiff)} ${budgetLabel(matDiff)}</div>`:''}
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">💰 Total Budget</div>
+          <div style="font-size:11px;font-family:var(--mono);margin-bottom:2px">Est: <strong style="color:var(--text)">${estTotal>0?fmt(estTotal):'—'}</strong></div>
+          <div style="font-size:11px;font-family:var(--mono)">Spent: <strong style="color:${actualTotal>estTotal&&estTotal>0?'var(--red)':'var(--accent)'}">${fmt(actualTotal)}</strong></div>
+          ${estTotal>0?`<div style="font-size:10px;color:${budgetColor(totalDiff)};font-weight:600">${budgetIcon(totalDiff)} ${budgetLabel(totalDiff)} budget</div>`:''}
+          ${estTotal>0?`<div style="width:100%;height:4px;background:var(--surface3);border-radius:2px;margin-top:4px;overflow:hidden"><div style="height:100%;background:${actualTotal>estTotal?'var(--red)':'var(--accent)'};width:${Math.min(100,Math.round(actualTotal/estTotal*100))}%;border-radius:2px"></div></div>`:''}
+        </div>
       </div>
       <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${tp>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${tp>0?tp+'%':''}</span></div></div>
       <div class="cp-overall-pct">${tp}% complete</div>`;
