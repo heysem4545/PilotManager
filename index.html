@@ -9357,8 +9357,8 @@ async function renderConstructionView(){
   }
 
   const totalSpent=constructionData.reduce((s,d)=>s+(d.amount||0),0);
-  const totalLabor=constructionData.filter(d=>d.category==='Labor').reduce((s,d)=>s+(d.amount||0),0);
-  const totalMaterial=constructionData.filter(d=>d.category==='Material').reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=constructionData.filter(d=>(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=constructionData.filter(d=>(d.category||'').includes('Material')).reduce((s,d)=>s+(d.amount||0),0);
 
   // Group by propertyId
   const grouped={};
@@ -9367,8 +9367,8 @@ async function renderConstructionView(){
     if(!grouped[key]) grouped[key]={propertyId:key,propertyAddress:d.propertyAddress||'Unknown',expenses:[],totalSpent:0,totalLabor:0,totalMaterial:0};
     grouped[key].expenses.push(d);
     grouped[key].totalSpent+=(d.amount||0);
-    if(d.category==='Labor') grouped[key].totalLabor+=(d.amount||0);
-    if(d.category==='Material') grouped[key].totalMaterial+=(d.amount||0);
+    if((d.category||'').includes('Labor')) grouped[key].totalLabor+=(d.amount||0);
+    if((d.category||'').includes('Material')) grouped[key].totalMaterial+=(d.amount||0);
   });
   const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
 
@@ -9484,12 +9484,12 @@ function renderConstructionMonthly(el, tabs){
     const mk=d.date?d.date.substring(0,7):'unknown';
     if(!byMonth[mk]) byMonth[mk]={labor:0,material:0,total:0,properties:{}};
     byMonth[mk].total+=(d.amount||0);
-    if(d.category==='Labor') byMonth[mk].labor+=(d.amount||0);
+    if((d.category||'').includes('Labor')) byMonth[mk].labor+=(d.amount||0);
     else byMonth[mk].material+=(d.amount||0);
     const addr=d.propertyAddress||'Unknown';
     if(!byMonth[mk].properties[addr]) byMonth[mk].properties[addr]={labor:0,material:0,total:0};
     byMonth[mk].properties[addr].total+=(d.amount||0);
-    if(d.category==='Labor') byMonth[mk].properties[addr].labor+=(d.amount||0);
+    if((d.category||'').includes('Labor')) byMonth[mk].properties[addr].labor+=(d.amount||0);
     else byMonth[mk].properties[addr].material+=(d.amount||0);
   });
   const months=Object.keys(byMonth).sort().reverse();
