@@ -10607,17 +10607,22 @@ function renderTurnoverProjects(){
     const targetDays = wt==='Heavy'?30:wt==='Medium'?22:15;
     let statusBadge = '';
     let daysInfo = '';
+    const readyDate = proj.readyToRentDate||'';
 
-    if(prog >= 100 && completedDate){
-      const comp = new Date(completedDate+'T00:00:00');
+    if(proj.status==='Ready to Rent' && readyDate){
+      // Performance evaluation based on when WORK ORDERS were completed (not just bar)
+      const ready = new Date(readyDate+'T00:00:00');
       const targ = targetDate ? new Date(targetDate+'T00:00:00') : null;
       if(targ){
-        const diff = Math.ceil((comp - targ)/(86400000));
+        const diff = Math.ceil((ready - targ)/(86400000));
         if(diff <= 0) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--accent-dim);color:var(--accent)">🏆 On Time!${diff<0?' ('+Math.abs(diff)+' days early)':''} — Bonus Eligible</span>`;
         else if(diff <= 5) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--amber-dim);color:var(--amber)">⚠️ Late (${diff} days)</span>`;
         else if(diff <= 30) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 Too Late (${diff} days over)</span>`;
         else statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red);color:#fff">🔥 CHECK YOUR TEAM!! (${diff} days over)</span>`;
       }
+    } else if(prog >= 100 && completedDate){
+      // Bar at 100% but work orders not done yet
+      statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:var(--purple-dim);color:var(--purple)">📋 Complete Work Orders for bonus evaluation →</span>`;
     } else if(targetDate){
       const targ = new Date(targetDate+'T00:00:00');
       const daysOver = Math.ceil((today - targ)/(86400000));
@@ -10739,7 +10744,17 @@ function renderTurnoverWorkOrders(){
     html+=`<div class="to-wo-card" style="${isReady?'border-left:3px solid var(--accent)':''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <div class="to-wo-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
-        ${isReady?'<span class="to-badge-ready">🏡 Ready to Rent</span>':'<span class="to-badge-completed">✅ Completed</span>'}
+        ${isReady?'<span class="to-badge-ready">🏡 Ready to Rent</span>':'<span class="to-badge-completed">✅ Completed — finish checklist for bonus</span>'}
+        ${(()=>{
+          if(!isReady||!proj.readyToRentDate||!proj.targetDate) return '';
+          const rd=new Date(proj.readyToRentDate+'T00:00:00');
+          const td=new Date(proj.targetDate+'T00:00:00');
+          const diff=Math.ceil((rd-td)/86400000);
+          if(diff<=0) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--accent-dim);color:var(--accent)">🏆 Bonus Eligible${diff<0?' ('+Math.abs(diff)+' days early)':''}</span>`;
+          if(diff<=5) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--amber-dim);color:var(--amber)">⚠️ Late (${diff} days)</span>`;
+          if(diff<=30) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 Too Late (${diff} days)</span>`;
+          return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--red);color:#fff">🔥 CHECK YOUR TEAM!!</span>`;
+        })()}
       </div>
 
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px">
@@ -10878,10 +10893,14 @@ async function updateTurnoverField(docId, field, value){
         const pt = field==='presentableToShowing'?value:proj.presentableToShowing;
         if(pa && lr && us && np && fs && pt==='Yes'){
           updateData.status='Ready to Rent';
+          updateData.readyToRentDate=new Date().toISOString().slice(0,10);
           proj.status='Ready to Rent';
+          proj.readyToRentDate=updateData.readyToRentDate;
         } else if(proj.status==='Ready to Rent'){
           updateData.status='Completed';
+          updateData.readyToRentDate='';
           proj.status='Completed';
+          proj.readyToRentDate='';
         }
       }
     }
