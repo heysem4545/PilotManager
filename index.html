@@ -9341,7 +9341,7 @@ async function renderConstructionView(){
   const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
 
   const editable=canEdit()||isAdmin();
-  const addBtn=editable?'<button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Add Expense</button> <button class="btn btn-ghost btn-sm" style="border-color:var(--purple-dim);color:var(--purple)" onclick="openMutualExpense()">+ Add Mutual Expense</button>':'';
+  const addBtn=editable?'<div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Add Expense</button><button class="btn btn-ghost btn-sm" style="border-color:var(--purple-dim);color:var(--purple)" onclick="openMutualExpense()">+ Add Mutual Expense</button></div>':'';
 
   let rows='';
   propRows.forEach(p=>{
