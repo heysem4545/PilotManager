@@ -9317,10 +9317,15 @@ async function renderConstructionView(){
   const tabs=`<div class="ftabs" style="margin-bottom:14px">
     <button class="ftab ${constructionTab==='overview'?'active':''}" onclick="switchConstructionTab('overview')">📊 Overview</button>
     <button class="ftab ${constructionTab==='monthly'?'active':''}" onclick="switchConstructionTab('monthly')">📅 Monthly Breakdown</button>
+    <button class="ftab ${constructionTab==='general'?'active':''}" onclick="switchConstructionTab('general')">🏢 General Expenses</button>
   </div>`;
 
   if(constructionTab==='monthly'){
     renderConstructionMonthly(el, tabs);
+    return;
+  }
+  if(constructionTab==='general'){
+    renderGeneralExpenses(el, tabs);
     return;
   }
 
@@ -9586,17 +9591,86 @@ async function saveMutualExpense(){
   }
 }
 
+function renderGeneralExpenses(el, tabs){
+  // Filter to general (non-property) expenses
+  const general=constructionData.filter(d=>d.isGeneral);
+  const totalSpent=general.reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=general.filter(d=>(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=general.filter(d=>(d.category||'').includes('Material')).reduce((s,d)=>s+(d.amount||0),0);
+
+  const editable=canEdit()||isAdmin();
+  const addBtn=editable?'<button class="btn btn-primary btn-sm" onclick="openAddGeneralExpense()">+ Add General Expense</button>':'';
+
+  let rows='';
+  if(general.length===0){
+    rows=`<tr><td colspan="5" style="padding:40px 20px;text-align:center;color:var(--muted)">No general expenses yet. Click "+ Add General Expense" to add one.</td></tr>`;
+  } else {
+    const sorted=[...general].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    rows=sorted.map(d=>{
+      const catColor=(d.category||'').includes('Labor')?'var(--blue)':'var(--amber)';
+      const catEmoji=(d.category||'').includes('Labor')?'👷':'🧱';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${d.date||'—'}</td>
+        <td><span style="color:${catColor};font-weight:500;font-size:11px">${catEmoji} ${escapeHtml(d.category||'')}</span></td>
+        <td style="font-size:12px;color:var(--text)">${escapeHtml(d.description||'—')}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);text-align:right">${fmt(d.amount||0)}</td>
+        ${isAdmin()?`<td style="text-align:right"><button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="deleteConstructionExpense('${d.id}')">Delete</button></td>`:'<td></td>'}
+      </tr>`;
+    }).join('');
+  }
+
+  el.innerHTML=tabs+`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div class="mc b"><div class="mc-lbl">Total Spent</div><div class="mc-val" style="color:var(--accent)">${fmt(totalSpent)}</div></div>
+      <div class="mc b"><div class="mc-lbl">Total Labor</div><div class="mc-val" style="color:var(--blue)">${fmt(totalLabor)}</div></div>
+      <div class="mc b"><div class="mc-lbl">Total Material</div><div class="mc-val" style="color:var(--amber)">${fmt(totalMaterial)}</div></div>
+    </div>
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${general.length}</strong> general expense${general.length===1?'':'s'}</div>
+        ${addBtn}
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th style="text-align:right">Amount</th>
+            <th style="text-align:right">Actions</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function openAddGeneralExpense(){
+  document.getElementById('constExpAddr').value='GENERAL';
+  document.getElementById('constExpAddr').style.display='none';
+  document.getElementById('constExpCategory').value='Labor';
+  document.getElementById('constExpAmount').value='';
+  document.getElementById('constExpDesc').value='';
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('constExpDate').value=today;
+  // Temporarily mark as general
+  document.getElementById('constructionExpenseModal').dataset.general='true';
+  document.getElementById('constructionExpenseModal').classList.add('open');
+}
+
 function openAddExpense(){
   const dl=document.getElementById('constExpAddrList');
   if(dl){
     dl.innerHTML=(properties||[]).map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
   }
   document.getElementById('constExpAddr').value='';
+  document.getElementById('constExpAddr').style.display='';
   document.getElementById('constExpCategory').value='Labor';
   document.getElementById('constExpAmount').value='';
   document.getElementById('constExpDesc').value='';
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('constExpDate').value=today;
+  document.getElementById('constructionExpenseModal').dataset.general='false';
   document.getElementById('constructionExpenseModal').classList.add('open');
 }
 
@@ -9607,24 +9681,27 @@ async function saveConstructionExpense(){
   const amount=parseFloat(document.getElementById('constExpAmount').value)||0;
   const date=document.getElementById('constExpDate').value||'';
 
-  if(!addr){toast('Please select a property');return;}
+  const isGeneral=document.getElementById('constructionExpenseModal').dataset.general==='true';
+  if(!isGeneral && !addr){toast('Please select a property');return;}
   if(amount<=0){toast('Please enter a valid amount');return;}
 
-  // Find propertyId
-  const prop=(properties||[]).find(p=>p.addr===addr);
-  const propertyId=prop?prop.id:addr;
+  const prop=isGeneral?null:(properties||[]).find(p=>p.addr===addr);
+  const propertyId=isGeneral?'__general__':(prop?prop.id:addr);
 
   try{
     await db.collection('constructionTracking').add({
       propertyId:propertyId,
-      propertyAddress:addr,
+      propertyAddress:isGeneral?'General':addr,
       category:category,
       description:desc,
       amount:amount,
       date:date,
+      isGeneral:isGeneral,
       createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       createdBy:currentUser?currentUser.email:''
     });
+    // Reset address field visibility
+    document.getElementById('constExpAddr').style.display='';
     closeModal('constructionExpenseModal');
     toast('Expense saved');
     renderConstructionView();
