@@ -9247,6 +9247,7 @@ async function renderInspectionAlerts(){
 // CONSTRUCTION TRACKING
 // ─────────────────────────────────────────────
 let constructionData = [];
+let constructionTab = 'overview'; // 'overview' or 'monthly'
 
 async function loadConstructionData(){
   try{
@@ -9258,11 +9259,26 @@ async function loadConstructionData(){
   }
 }
 
+function switchConstructionTab(tab){
+  constructionTab=tab;
+  renderConstructionView();
+}
+
 async function renderConstructionView(){
   const el=document.getElementById('constructionView');
   if(!el) return;
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
   await loadConstructionData();
+
+  const tabs=`<div class="ftabs" style="margin-bottom:14px">
+    <button class="ftab ${constructionTab==='overview'?'active':''}" onclick="switchConstructionTab('overview')">📊 Overview</button>
+    <button class="ftab ${constructionTab==='monthly'?'active':''}" onclick="switchConstructionTab('monthly')">📅 Monthly Breakdown</button>
+  </div>`;
+
+  if(constructionTab==='monthly'){
+    renderConstructionMonthly(el, tabs);
+    return;
+  }
 
   const totalSpent=constructionData.reduce((s,d)=>s+(d.amount||0),0);
   const totalLabor=constructionData.filter(d=>d.category==='Labor').reduce((s,d)=>s+(d.amount||0),0);
@@ -9333,7 +9349,7 @@ async function renderConstructionView(){
 
   const emptyMsg=propRows.length===0?'<div style="padding:40px;text-align:center;color:var(--muted)">No construction expenses yet. Click "+ Add Expense" to get started.</div>':'';
 
-  el.innerHTML=`
+  el.innerHTML=tabs+`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
       <div class="mc b"><div class="mc-lbl">Total Spent</div><div class="mc-val" style="color:var(--accent)">${fmt(totalSpent)}</div></div>
       <div class="mc b"><div class="mc-lbl">Total Labor</div><div class="mc-val" style="color:var(--blue)">${fmt(totalLabor)}</div></div>
@@ -9370,6 +9386,79 @@ function toggleConstructionDetail(propertyId){
     row.style.display='none';
     if(chev) chev.classList.remove('open');
   }
+}
+
+function renderConstructionMonthly(el, tabs){
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Group expenses by month → property
+  const byMonth={};
+  constructionData.forEach(d=>{
+    const mk=d.date?d.date.substring(0,7):'unknown';
+    if(!byMonth[mk]) byMonth[mk]={labor:0,material:0,total:0,properties:{}};
+    byMonth[mk].total+=(d.amount||0);
+    if(d.category==='Labor') byMonth[mk].labor+=(d.amount||0);
+    else byMonth[mk].material+=(d.amount||0);
+    const addr=d.propertyAddress||'Unknown';
+    if(!byMonth[mk].properties[addr]) byMonth[mk].properties[addr]={labor:0,material:0,total:0};
+    byMonth[mk].properties[addr].total+=(d.amount||0);
+    if(d.category==='Labor') byMonth[mk].properties[addr].labor+=(d.amount||0);
+    else byMonth[mk].properties[addr].material+=(d.amount||0);
+  });
+  const months=Object.keys(byMonth).sort().reverse();
+  const grandTotal=constructionData.reduce((s,d)=>s+(d.amount||0),0);
+
+  let html=tabs;
+  html+=`<div style="margin-bottom:14px;font-size:12px;color:var(--muted)">Grand total: <strong class="const-total">${fmt(grandTotal)}</strong></div>`;
+
+  if(months.length===0){
+    html+=`<div class="table-card"><div style="padding:40px 20px;text-align:center;color:var(--muted)">No expenses recorded yet.</div></div>`;
+  } else {
+    months.forEach(mk=>{
+      const m=byMonth[mk];
+      const [y,mn]=mk.split('-');
+      const monthLabel=mn?MNAMES[parseInt(mn,10)-1]+' '+y:mk;
+      const props=Object.entries(m.properties).sort((a,b)=>b[1].total-a[1].total);
+      const safeId=mk.replace(/[^a-zA-Z0-9]/g,'_');
+      html+=`<div class="table-card" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="document.getElementById('constMonth_${safeId}').style.display=document.getElementById('constMonth_${safeId}').style.display==='none'?'':'none';this.querySelector('.lc-chevron').classList.toggle('open')">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="lc-chevron"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span>
+            <span style="font-size:14px;font-weight:600;color:var(--text)">${monthLabel}</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:12px">
+            <span class="const-total">${fmt(m.total)}</span>
+            <span class="const-labor">👷 ${fmt(m.labor)}</span>
+            <span class="const-material">🧱 ${fmt(m.material)}</span>
+          </div>
+        </div>
+        <div id="constMonth_${safeId}" style="display:none">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;padding:8px 14px">Property</th>
+              <th style="text-align:right;padding:8px 14px">👷 Labor</th>
+              <th style="text-align:right;padding:8px 14px">🧱 Material</th>
+              <th style="text-align:right;padding:8px 14px">Total</th>
+            </tr></thead>
+            <tbody>
+              ${props.map(([addr,p])=>`<tr>
+                <td style="padding:8px 14px;font-size:12px;font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--blue)">${p.labor?fmt(p.labor):'—'}</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--amber)">${p.material?fmt(p.material):'—'}</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent)">${fmt(p.total)}</td>
+              </tr>`).join('')}
+              <tr style="border-top:2px solid var(--border)">
+                <td style="padding:8px 14px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Month Total</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--blue)">${fmt(m.labor)}</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--amber)">${fmt(m.material)}</td>
+                <td style="padding:8px 14px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)">${fmt(m.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    });
+  }
+  el.innerHTML=html;
 }
 
 function openAddExpense(){
