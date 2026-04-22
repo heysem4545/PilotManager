@@ -5233,6 +5233,9 @@ function switchPropsTab(tab){
     if(histView)histView.style.display='none';
     if(listView)listView.style.display='none';
     if(monthBar)monthBar.style.display='';
+    renderMonthBar();
+    renderFilterTabs();
+    renderCollectionView();
   }
 }
 
@@ -7373,19 +7376,7 @@ function showView(v){
       propsViewTab='list';
     }
     filterSetByNav=false;
-    renderPropsViewTabs();
-    if(propsViewTab==='history' && isAdmin()){
-      document.getElementById('propsTableCard').style.display='none';
-      document.getElementById('propertyHistoryView').style.display='';
-      renderPropertyHistory();
-    } else {
-      propsViewTab='table';
-      document.getElementById('propsTableCard').style.display='';
-      document.getElementById('propertyHistoryView').style.display='none';
-      renderMonthBar();
-      renderFilterTabs();
-      renderCollectionView();
-    }
+    switchPropsTab(propsViewTab);
   }
   if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
