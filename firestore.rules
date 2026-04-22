@@ -136,5 +136,10 @@ service cloud.firestore {
     match /constructionProjects/{projId} {
       allow read, write: if request.auth != null;
     }
+
+    // Turnover Projects — authenticated users can read and write.
+    match /turnoverProjects/{projId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

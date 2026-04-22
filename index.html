@@ -855,6 +855,39 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .cp-weight-total{font-size:12px;font-weight:600;margin-top:8px;padding:8px 10px;border-radius:6px}
 .cp-weight-ok{background:var(--accent-dim);color:var(--accent)}
 .cp-weight-bad{background:var(--red-dim);color:var(--red)}
+
+/* ── TURNOVER PROJECTS ── */
+.to-tabs{display:flex;gap:3px;margin-bottom:16px}
+.to-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
+.to-tab:hover{color:var(--text);background:var(--surface2)}
+.to-tab.active{background:var(--surface3);color:var(--text);border-color:var(--border2)}
+.to-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;padding:18px}
+.to-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.to-card-addr{font-size:14px;font-weight:600}
+.to-badge-heavy{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)}
+.to-badge-medium{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)}
+.to-badge-light{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)}
+.to-badge-own{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:500;background:var(--blue-dim);color:var(--blue)}
+.to-badge-outsource{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:500;background:var(--purple-dim);color:var(--purple)}
+.to-badge-both{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:500;background:var(--amber-dim);color:var(--amber)}
+.to-badge-completed{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-dim);color:var(--blue)}
+.to-badge-ready{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)}
+.to-overall-bar{width:100%;height:22px;background:var(--surface3);border-radius:11px;overflow:hidden;margin-bottom:4px}
+.to-overall-fill{height:100%;border-radius:5px;background:var(--blue);transition:width .4s ease}
+.to-overall-pct{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;font-family:var(--mono)}
+.to-slider{-webkit-appearance:none;width:100%;height:10px;border-radius:5px;background:var(--surface3);outline:none;cursor:pointer;margin-bottom:6px}
+.to-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--blue);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.to-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--blue);cursor:pointer;border:none;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.to-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.to-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.to-empty-text{font-size:14px;margin-bottom:6px;font-weight:500;color:var(--text)}
+.to-empty-sub{font-size:12px}
+.to-wo-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;padding:16px}
+.to-wo-addr{font-size:13px;font-weight:600;margin-bottom:10px}
+.to-wo-check{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer}
+.to-wo-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.to-wo-select{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text);font-family:var(--font);outline:none;cursor:pointer}
+.to-wo-select:focus{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -959,6 +992,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="nav-item" id="nav-constProjects" onclick="showView('constProjects')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 7h6M5 10h3"/><path d="M12 6V3"/><path d="M4 6V3"/></svg>
         Construction Projects
+      </button>
+      <button class="nav-item" id="nav-turnover" onclick="showView('turnover')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12"/><path d="M4 14V8l4-4 4 4v6"/><path d="M7 14v-3h2v3"/><path d="M1 8l7-6 7 6"/></svg>
+        TurnOver Projects
       </button>
       <button class="nav-item" id="nav-notices" onclick="showView('notices')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M5 6h6M5 9h4"/></svg>
@@ -1169,6 +1206,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="backupsView" style="display:none"></div>
       <div id="constructionView" style="display:none"></div>
       <div id="constProjectsView" style="display:none"></div>
+      <div id="turnoverView" style="display:none"></div>
 
     </main>
   </div>
@@ -1894,6 +1932,53 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('constProjCatModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveCategories()">Save Categories</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TURNOVER PROJECT MODAL -->
+<div class="overlay" id="turnoverAddModal" onclick="if(event.target===this)closeModal('turnoverAddModal')">
+  <div class="modal">
+    <div class="modal-title">
+      <span>Add TurnOver Project</span>
+      <button class="modal-close" onclick="closeModal('turnoverAddModal')">&times;</button>
+    </div>
+    <div class="fg"><label>When did tenant leave?</label>
+      <input type="date" id="toTenantLeft" style="color-scheme:dark">
+    </div>
+    <div class="fg"><label>Work Type Needed</label>
+      <select id="toWorkType" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="">Select...</option>
+        <option value="Heavy">&#128308; Heavy</option>
+        <option value="Medium">&#128993; Medium</option>
+        <option value="Light">&#128994; Light</option>
+      </select>
+    </div>
+    <div class="fg"><label>Property Address</label>
+      <input id="toAddr" list="toAddrList" placeholder="Search property..."
+        onfocus="this.dataset.prev=this.value;this.value=''"
+        onblur="if(!this.value)this.value=this.dataset.prev||''">
+      <datalist id="toAddrList"></datalist>
+    </div>
+    <div class="fg"><label>Start Date</label>
+      <input type="date" id="toStartDate" style="color-scheme:dark">
+    </div>
+    <div class="fg"><label>Target Finish Date</label>
+      <input type="date" id="toTargetDate" style="color-scheme:dark">
+    </div>
+    <div class="fg"><label>Fix By</label>
+      <select id="toFixBy" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="Own">Own</option>
+        <option value="Outsource">Outsource</option>
+        <option value="Both">Both</option>
+      </select>
+    </div>
+    <div class="fg"><label>Current Home Info</label>
+      <textarea id="toHomeInfo" rows="3" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('turnoverAddModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTurnoverProject()">Create Project</button>
     </div>
   </div>
 </div>
@@ -7132,7 +7217,8 @@ function showView(v){
     tenants:'tenantsView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
-    constProjects:'constProjectsView'
+    constProjects:'constProjectsView',
+    turnover:'turnoverView'
   };
 
   // Hide all views
@@ -7162,7 +7248,8 @@ function showView(v){
     tenants:'Tenant Info', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
-    constProjects:'Construction Projects'
+    constProjects:'Construction Projects',
+    turnover:'TurnOver Projects'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -7222,6 +7309,7 @@ function showView(v){
   if(v==='inspections') renderInspectionsView();
   if(v==='construction') renderConstructionView();
   if(v==='constProjects') renderConstProjectsView();
+  if(v==='turnover') renderTurnoverView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -10420,6 +10508,432 @@ async function deleteProject(docId){
     renderConstProjectsView();
   }catch(e){
     console.error('deleteProject error:',e);
+    toast('Error deleting project');
+  }
+}
+
+// ─────────────────────────────────────────────
+// TURNOVER PROJECTS
+// ─────────────────────────────────────────────
+let turnoverData = [];
+let turnoverTab = 'projects';
+
+async function loadTurnoverProjects(){
+  try{
+    const snap = await db.collection('turnoverProjects').get();
+    turnoverData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    console.error('loadTurnoverProjects error:',e);
+    turnoverData=[];
+  }
+}
+
+async function renderTurnoverView(){
+  const el = document.getElementById('turnoverView');
+  if(!el) return;
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadTurnoverProjects();
+
+  let html='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
+  html+='<button class="btn btn-primary btn-sm" onclick="openAddTurnover()">+ Add TurnOver Project</button>';
+  html+='</div>';
+
+  html+='<div class="to-tabs">';
+  html+='<button class="to-tab'+(turnoverTab==='projects'?' active':'')+'" onclick="turnoverTab=\'projects\';renderTurnoverTabContent()">Projects</button>';
+  html+='<button class="to-tab'+(turnoverTab==='workorders'?' active':'')+'" onclick="turnoverTab=\'workorders\';renderTurnoverTabContent()">Work Orders</button>';
+  html+='</div>';
+
+  html+='<div id="turnoverTabContent"></div>';
+  el.innerHTML=html;
+  renderTurnoverTabContent();
+}
+
+function renderTurnoverTabContent(){
+  document.querySelectorAll('.to-tab').forEach((t,i)=>{
+    t.classList.toggle('active', (i===0 && turnoverTab==='projects') || (i===1 && turnoverTab==='workorders'));
+  });
+  if(turnoverTab==='projects') renderTurnoverProjects();
+  else renderTurnoverWorkOrders();
+}
+
+function renderTurnoverProjects(){
+  const container = document.getElementById('turnoverTabContent');
+  if(!container) return;
+
+  const sorted = [...turnoverData].sort((a,b)=>(a.progress||0)-(b.progress||0));
+
+  if(!sorted.length){
+    container.innerHTML=`<div class="to-empty">
+      <div class="to-empty-icon">🏠</div>
+      <div class="to-empty-text">No turnover projects yet</div>
+      <div class="to-empty-sub">Click "+ Add TurnOver Project" to start tracking a unit turnover.</div>
+    </div>`;
+    return;
+  }
+
+  let html='';
+  sorted.forEach(proj=>{
+    const prog = proj.progress||0;
+    const wt = proj.workType||'';
+    const wtBadge = wt==='Heavy'?'to-badge-heavy':wt==='Medium'?'to-badge-medium':'to-badge-light';
+    const wtIcon = wt==='Heavy'?'🔴':wt==='Medium'?'🟡':'🟢';
+    const fb = proj.fixBy||'Own';
+    const fbCls = fb==='Own'?'to-badge-own':fb==='Outsource'?'to-badge-outsource':'to-badge-both';
+
+    html+=`<div class="to-card" id="toCard_${proj.id}">
+      <div class="to-card-head">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="to-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
+          <span class="${wtBadge}">${wtIcon} ${escapeHtml(wt)}</span>
+          <span class="${fbCls}">Fix: ${escapeHtml(fb)}</span>`;
+    if(proj.status==='Completed') html+=`<span class="to-badge-completed">✅ Completed</span>`;
+    if(proj.status==='Ready to Rent') html+=`<span class="to-badge-ready">🏡 Ready to Rent</span>`;
+    html+=`</div>
+        <div style="display:flex;gap:6px;align-items:center">`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveTurnoverSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleTurnoverTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+(proj.snapshots||[]).length+')':''}</button>`;
+    if(isAdmin()){
+      html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteTurnoverProject('${proj.id}')">Delete</button>`;
+    }
+    html+=`</div></div>`;
+
+    // Dates row
+    const tenantLeft = proj.tenantLeftDate||'';
+    const startDate = proj.startDate||'';
+    const targetDate = proj.targetDate||'';
+    const completedDate = proj.completedDate||'';
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    let statusBadge = '';
+    let daysInfo = '';
+    if(prog >= 100 && completedDate){
+      const comp = new Date(completedDate+'T00:00:00');
+      const targ = targetDate ? new Date(targetDate+'T00:00:00') : null;
+      if(targ){
+        const diff = Math.ceil((comp - targ)/(86400000));
+        if(diff <= 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ On Time${diff<0?' ('+Math.abs(diff)+' days early)':''}</span>`;
+        else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">⚠️ Late by ${diff} days</span>`;
+      } else {
+        statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ Completed</span>`;
+      }
+    } else if(targetDate){
+      const targ = new Date(targetDate+'T00:00:00');
+      const daysLeft = Math.ceil((targ - today)/(86400000));
+      if(daysLeft < 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">🚨 ${Math.abs(daysLeft)} days overdue</span>`;
+      else if(daysLeft <= 7) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)">⏰ ${daysLeft} days left</span>`;
+      else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-dim);color:var(--blue)">📅 ${daysLeft} days left</span>`;
+    }
+    if(startDate && targetDate && prog < 100){
+      const start = new Date(startDate+'T00:00:00');
+      const targ = new Date(targetDate+'T00:00:00');
+      const totalDays = Math.max(1,Math.ceil((targ-start)/86400000));
+      const elapsed = Math.ceil((today-start)/86400000);
+      const expectedPct = Math.min(100,Math.round(elapsed/totalDays*100));
+      const diff = prog - expectedPct;
+      if(diff >= 0) daysInfo = `<span style="font-size:10px;color:var(--accent)">📈 ${diff}% ahead of schedule</span>`;
+      else daysInfo = `<span style="font-size:10px;color:var(--red)">📉 ${Math.abs(diff)}% behind schedule</span>`;
+    }
+
+    html+=`<div style="display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap;font-size:11px">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:10px;color:var(--muted)">Tenant Left:</span>
+        <input type="date" value="${tenantLeft}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','tenantLeftDate',this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:10px;color:var(--muted)">Start:</span>
+        <input type="date" value="${startDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','startDate',this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:10px;color:var(--muted)">Target:</span>
+        <input type="date" value="${targetDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','targetDate',this.value)">
+      </div>
+      ${prog>=100?`<div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:10px;color:var(--muted)">Completed:</span>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--accent)">${completedDate||'—'}</span>
+      </div>`:''}
+      ${statusBadge} ${daysInfo}
+    </div>`;
+
+    // Current Home Info
+    if(proj.currentHomeInfo){
+      html+=`<div style="font-size:11px;color:var(--muted);margin:6px 0;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">${escapeHtml(proj.currentHomeInfo)}</div>`;
+    }
+
+    // Progress bar
+    const fillColor = 'var(--blue)';
+    html+=`<div class="to-overall-bar"><div class="to-overall-fill" style="width:${Math.min(prog,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${prog>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${prog>0?prog+'%':''}</span></div></div>`;
+    html+=`<div class="to-overall-pct" id="toPct_${proj.id}">${prog}% complete</div>`;
+
+    // Slider
+    html+=`<input type="range" min="0" max="100" step="5" value="${prog}" class="to-slider"
+      style="background:linear-gradient(to right,${fillColor} ${prog}%,var(--surface3) ${prog}%)"
+      oninput="this.style.background='linear-gradient(to right,var(--blue) '+this.value+'%,var(--surface3) '+this.value+'%)';previewTurnoverProgress('${proj.id}',this.value)"
+      onchange="updateTurnoverProgress('${proj.id}',this.value)">`;
+
+    // Timeline section (hidden by default)
+    const snaps = proj.snapshots || [];
+    if(snaps.length > 0){
+      let tlHtml = `<div id="toTimeline_${proj.id}" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📊 Progress Timeline</div>
+        <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 8px">Date</th>
+            <th style="text-align:right;padding:6px 8px">Progress</th>
+            <th style="text-align:right;padding:6px 8px">Change</th>
+            <th style="text-align:left;padding:6px 8px">Saved By</th>
+          </tr></thead><tbody>`;
+
+      const sortedSnaps = [...snaps].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      sortedSnaps.forEach((snap,si)=>{
+        const prev = sortedSnaps[si+1];
+        const curVal = snap.progress||0;
+        const prevVal = prev ? (prev.progress||0) : null;
+        let changeIcon = '';
+        let changeColor = 'var(--text)';
+        if(prevVal !== null){
+          if(curVal > prevVal){ changeIcon='▲ +'+(curVal-prevVal)+'%'; changeColor='var(--accent)'; }
+          else if(curVal < prevVal){ changeIcon='▼ '+(curVal-prevVal)+'%'; changeColor='var(--red)'; }
+          else { changeIcon='— 0%'; changeColor='var(--muted2)'; }
+        }
+        tlHtml+=`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;font-family:var(--mono);white-space:nowrap;color:var(--text)">${snap.date||'—'}</td>
+          <td style="padding:6px 8px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--accent)">${curVal}%</td>
+          <td style="padding:6px 8px;text-align:right;font-family:var(--mono);color:${changeColor}">${changeIcon}</td>
+          <td style="padding:6px 8px;font-size:10px;color:var(--muted)">${escapeHtml(snap.savedBy||'')}</td>
+        </tr>`;
+      });
+      tlHtml+=`</tbody></table></div></div>`;
+      html+=tlHtml;
+    }
+
+    html+='</div>';
+  });
+
+  container.innerHTML=html;
+}
+
+function renderTurnoverWorkOrders(){
+  const container = document.getElementById('turnoverTabContent');
+  if(!container) return;
+
+  const completed = turnoverData.filter(p=>(p.progress||0)>=100);
+  completed.sort((a,b)=>(b.completedDate||'').localeCompare(a.completedDate||''));
+
+  if(!completed.length){
+    container.innerHTML=`<div class="to-empty">
+      <div class="to-empty-icon">📋</div>
+      <div class="to-empty-text">No completed projects yet</div>
+      <div class="to-empty-sub">Work orders appear here when a project reaches 100% progress.</div>
+    </div>`;
+    return;
+  }
+
+  let html='';
+  completed.forEach(proj=>{
+    const isReady = proj.status==='Ready to Rent';
+    html+=`<div class="to-wo-card" style="${isReady?'border-left:3px solid var(--accent)':''}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div class="to-wo-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
+        ${isReady?'<span class="to-badge-ready">🏡 Ready to Rent</span>':'<span class="to-badge-completed">✅ Completed</span>'}
+        <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Completed: ${proj.completedDate||'—'}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <label class="to-wo-check"><input type="checkbox" ${proj.postedAffordable?'checked':''} onchange="updateTurnoverField('${proj.id}','postedAffordable',this.checked)"> Posted on Affordable</label>
+        <label class="to-wo-check"><input type="checkbox" ${proj.locksRenewed?'checked':''} onchange="updateTurnoverField('${proj.id}','locksRenewed',this.checked)"> Locks Renewed</label>
+        <label class="to-wo-check"><input type="checkbox" ${proj.updatedSystem?'checked':''} onchange="updateTurnoverField('${proj.id}','updatedSystem',this.checked)"> Updated System</label>
+        <label class="to-wo-check"><input type="checkbox" ${proj.newPictures?'checked':''} onchange="updateTurnoverField('${proj.id}','newPictures',this.checked)"> Got New Pictures</label>
+        <label class="to-wo-check"><input type="checkbox" ${proj.forSaleSign?'checked':''} onchange="updateTurnoverField('${proj.id}','forSaleSign',this.checked)"> Put For Sale Sign</label>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+          <span style="font-size:12px">Presentable to Showing?</span>
+          <select class="to-wo-select" onchange="updateTurnoverField('${proj.id}','presentableToShowing',this.value)">
+            <option value="" ${!proj.presentableToShowing?'selected':''}>—</option>
+            <option value="Yes" ${proj.presentableToShowing==='Yes'?'selected':''}>Yes</option>
+            <option value="No" ${proj.presentableToShowing==='No'?'selected':''}>No</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML=html;
+}
+
+function openAddTurnover(){
+  const dl = document.getElementById('toAddrList');
+  dl.innerHTML = properties.map(p=>'<option value="'+escapeAttr(p.addr)+'">').join('');
+  document.getElementById('toAddr').value='';
+  document.getElementById('toTenantLeft').value='';
+  document.getElementById('toWorkType').value='';
+  document.getElementById('toStartDate').value='';
+  document.getElementById('toTargetDate').value='';
+  document.getElementById('toFixBy').value='Own';
+  document.getElementById('toHomeInfo').value='';
+  document.getElementById('turnoverAddModal').classList.add('open');
+}
+
+async function saveTurnoverProject(){
+  const addrInput = document.getElementById('toAddr').value.trim();
+  if(!addrInput){toast('Please select a property');return;}
+  const prop = properties.find(p=>p.addr===addrInput);
+  if(!prop){toast('Property not found');return;}
+
+  const workType = document.getElementById('toWorkType').value;
+  if(!workType){toast('Please select work type');return;}
+
+  const tenantLeftDate = document.getElementById('toTenantLeft').value||'';
+  const startDate = document.getElementById('toStartDate').value||'';
+  const targetDate = document.getElementById('toTargetDate').value||'';
+  const fixBy = document.getElementById('toFixBy').value||'Own';
+  const currentHomeInfo = document.getElementById('toHomeInfo').value.trim();
+
+  try{
+    await db.collection('turnoverProjects').add({
+      propertyId: prop.id,
+      propertyAddress: prop.addr,
+      tenantLeftDate: tenantLeftDate,
+      workType: workType,
+      startDate: startDate,
+      targetDate: targetDate,
+      completedDate: '',
+      fixBy: fixBy,
+      currentHomeInfo: currentHomeInfo,
+      progress: 0,
+      status: 'In Progress',
+      snapshots: [],
+      postedAffordable: false,
+      locksRenewed: false,
+      updatedSystem: false,
+      newPictures: false,
+      forSaleSign: false,
+      presentableToShowing: '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: currentUser?(currentUser.name||currentUser.email):''
+    });
+    closeModal('turnoverAddModal');
+    toast('TurnOver project created');
+    renderTurnoverView();
+  }catch(e){
+    console.error('saveTurnoverProject error:',e);
+    toast('Error creating project');
+  }
+}
+
+async function updateTurnoverField(docId, field, value){
+  try{
+    const updateData = {[field]:value, updatedAt:new Date()};
+    // Check if all work order items are complete => auto-set Ready to Rent
+    const proj = turnoverData.find(p=>p.id===docId);
+    if(proj){
+      proj[field]=value;
+      if(['postedAffordable','locksRenewed','updatedSystem','newPictures','forSaleSign','presentableToShowing'].includes(field)){
+        const pa = field==='postedAffordable'?value:proj.postedAffordable;
+        const lr = field==='locksRenewed'?value:proj.locksRenewed;
+        const us = field==='updatedSystem'?value:proj.updatedSystem;
+        const np = field==='newPictures'?value:proj.newPictures;
+        const fs = field==='forSaleSign'?value:proj.forSaleSign;
+        const pt = field==='presentableToShowing'?value:proj.presentableToShowing;
+        if(pa && lr && us && np && fs && pt==='Yes'){
+          updateData.status='Ready to Rent';
+          proj.status='Ready to Rent';
+        } else if(proj.status==='Ready to Rent'){
+          updateData.status='Completed';
+          proj.status='Completed';
+        }
+      }
+    }
+    await db.collection('turnoverProjects').doc(docId).update(updateData);
+    renderTurnoverTabContent();
+  }catch(e){
+    console.error('updateTurnoverField error:',e);
+    toast('Error: '+e.message);
+  }
+}
+
+function previewTurnoverProgress(docId, value){
+  const bar = document.querySelector('#toCard_'+docId+' .to-overall-fill');
+  const pct = document.getElementById('toPct_'+docId);
+  if(bar){
+    bar.style.width = Math.min(value,100)+'%';
+    const span = bar.querySelector('span');
+    if(span) span.textContent = value>0?value+'%':'';
+  }
+  if(pct) pct.textContent = value+'% complete';
+}
+
+async function updateTurnoverProgress(docId, value){
+  const prog = Number(value);
+  const proj = turnoverData.find(p=>p.id===docId);
+  if(!proj) return;
+  proj.progress = prog;
+
+  const updateData = {
+    progress: prog,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if(prog >= 100 && !proj.completedDate){
+    updateData.completedDate = new Date().toISOString().slice(0,10);
+    updateData.status = 'Completed';
+    proj.completedDate = updateData.completedDate;
+    proj.status = 'Completed';
+  } else if(prog < 100 && proj.completedDate){
+    updateData.completedDate = '';
+    updateData.status = 'In Progress';
+    proj.completedDate = '';
+    proj.status = 'In Progress';
+  }
+
+  try{
+    await db.collection('turnoverProjects').doc(docId).update(updateData);
+    renderTurnoverTabContent();
+  }catch(e){
+    console.error('updateTurnoverProgress error:',e);
+    toast('Error saving progress');
+  }
+}
+
+async function saveTurnoverSnapshot(docId){
+  const proj = turnoverData.find(p=>p.id===docId);
+  if(!proj){toast('Project not found');return;}
+  const today = new Date().toISOString().slice(0,10);
+  const snapshot = {
+    date: today,
+    progress: proj.progress||0,
+    savedBy: currentUser?(currentUser.name||currentUser.email):''
+  };
+  const snaps = proj.snapshots||[];
+  if(snaps.some(s=>s.date===today)){
+    if(!confirm('A snapshot already exists for today. Replace it?')) return;
+    const idx = snaps.findIndex(s=>s.date===today);
+    snaps[idx] = snapshot;
+  } else {
+    snaps.push(snapshot);
+  }
+  try{
+    await db.collection('turnoverProjects').doc(docId).update({snapshots:snaps, updatedAt:new Date()});
+    proj.snapshots = snaps;
+    toast('📸 Snapshot saved for '+today);
+    renderTurnoverTabContent();
+  }catch(e){
+    console.error('saveTurnoverSnapshot error:',e);
+    toast('Error: '+e.message);
+  }
+}
+
+function toggleTurnoverTimeline(docId){
+  const el = document.getElementById('toTimeline_'+docId);
+  if(el) el.style.display = el.style.display==='none'?'':'none';
+}
+
+async function deleteTurnoverProject(docId){
+  if(!isAdmin()){toast('Admin only');return;}
+  if(!confirm('Delete this turnover project?')) return;
+  try{
+    await db.collection('turnoverProjects').doc(docId).delete();
+    toast('Project deleted');
+    renderTurnoverView();
+  }catch(e){
+    console.error('deleteTurnoverProject error:',e);
     toast('Error deleting project');
   }
 }
