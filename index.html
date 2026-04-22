@@ -10369,6 +10369,48 @@ async function renderConstProjectsView(){
     </div>
   </div>`;
 
+  // Quick-glance progress chart for all active houses
+  if(window._cpTab==='active' && activeProjects.length>0){
+    const sorted = [...activeProjects].sort((a,b)=>(a.totalProgress||0)-(b.totalProgress||0));
+    html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📊 All Houses Progress</div>
+      <div style="display:flex;flex-direction:column;gap:5px">`;
+    sorted.forEach(p=>{
+      const prog=p.totalProgress||0;
+      const barColor=prog>=100?'var(--blue)':prog>=75?'#4ade80':prog>=50?'var(--amber)':prog>=25?'var(--purple)':'var(--red)';
+      const auditItems=p.auditItems||[];
+      const auditDone=auditItems.filter(a=>a.checked).length;
+      const auditTotal=auditItems.length;
+      const auditPct=auditTotal>0?Math.round(auditDone/auditTotal*100):0;
+      const addr=(p.propertyAddress||'Unknown').replace(/,.*$/,'');
+      html+=`<div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;color:var(--text);width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0" title="${escapeHtml(p.propertyAddress||'')}">${escapeHtml(addr)}</span>
+        <div style="flex:1;display:flex;align-items:center;gap:4px">
+          <div style="flex:1;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden;position:relative">
+            <div style="height:100%;width:${prog}%;background:${barColor};border-radius:7px;transition:width .3s"></div>
+          </div>
+          <span style="font-size:10px;font-weight:700;color:${barColor};width:32px;text-align:right;font-family:var(--mono)">${prog}%</span>
+        </div>
+        ${prog>=100?`<div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+          <div style="width:40px;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${auditPct}%;background:#4ade80;border-radius:4px"></div>
+          </div>
+          <span style="font-size:9px;color:${auditPct>=100?'#4ade80':'var(--muted)'};width:20px;font-family:var(--mono)">${auditPct}%</span>
+        </div>`:`<div style="width:63px"></div>`}
+      </div>`;
+    });
+    html+=`</div>
+      <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border2);font-size:9px;color:var(--muted)">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--red);vertical-align:middle"></span> 0-24%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--purple);vertical-align:middle"></span> 25-49%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--amber);vertical-align:middle"></span> 50-74%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#4ade80;vertical-align:middle"></span> 75-99%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--blue);vertical-align:middle"></span> 100%</span>
+        <span style="margin-left:auto"><span style="display:inline-block;width:16px;height:6px;border-radius:3px;background:#4ade80;vertical-align:middle"></span> Audit</span>
+      </div>
+    </div>`;
+  }
+
   if(window._cpTab==='archived'){
     // Archived tab
     if(!archivedProjects.length){
