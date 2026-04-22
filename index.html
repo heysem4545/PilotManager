@@ -962,7 +962,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/><circle cx="13" cy="11" r="2.5"/></svg>
         Rent Tracking
       </button>
-      <button class="nav-item" id="nav-collection" onclick="setFilter('balance')">
+      <button class="nav-item" id="nav-collection" onclick="showView('collection')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
         Collection
         <span class="nav-badge" id="courtBadge" style="display:none">0</span>
@@ -1125,7 +1125,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
       <!-- PROPERTIES VIEW -->
       <div id="propsView" style="display:none">
-        <div id="collectionToggle" style="display:none;margin-bottom:12px;gap:8px;align-items:center" class="ftabs"></div>
         <div class="ftabs" id="propsViewTabs" style="margin-bottom:12px"></div>
         <div id="propertyHistoryView" style="display:none"></div>
         <div id="propsListView" style="display:none"></div>
@@ -1161,6 +1160,12 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
             <div class="pagination" id="pagination"></div>
           </div>
         </div>
+      </div>
+
+      <!-- COLLECTION VIEW (separate from properties) -->
+      <div id="collectionView" style="display:none">
+        <div id="collectionTabs" class="ftabs" style="margin-bottom:12px;gap:8px;display:flex;align-items:center"></div>
+        <div id="collectionContent"></div>
         <div id="allBalancesView" style="display:none"></div>
         <div id="historyView" style="display:none"></div>
         <div id="balancesOnlyView" style="display:none"></div>
@@ -2710,8 +2715,6 @@ function applySidebarPermissions(){
 
     if(id.startsWith('nav-')){
       sectionId = id.replace(/^nav-/,'');
-    } else if(onclick === "setFilter('balance')"){
-      sectionId = 'collection';
     } else if(onclick === "showView('monthly')"){
       sectionId = 'monthly';
     } else if(onclick.startsWith('setFilter(')){
@@ -2906,63 +2909,105 @@ function renderDonut(){
 
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
-  const toggleEl=document.getElementById('collectionToggle');
-  if(currentFilter==='balance'){
-    // Hide inner filter tabs, show collection toggle above card
-    el.style.display='none';
-    toggleEl.style.display='flex';
-    toggleEl.innerHTML=`
-      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
-      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
-      <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
-      <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
-    `;
-    return;
-  }
-  toggleEl.style.display='none';
   el.style.display='';
   const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented'},{k:'VACANT',l:'Vacant'},{k:'EVICTION',l:'Eviction'},{k:'CONSTRUCTION',l:'Construction'},{k:'balance',l:'Has Balance'}];
   el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
-function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderCollectionView();}
+function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderTable();}
 function applyFilters(){currentPage=1;renderTable();}
 
 function switchCollectionView(mode){
   collectionViewMode=mode;
-  renderFilterTabs();
-  renderCollectionView();
+  renderCollectionPage();
 }
 
-function renderCollectionView(){
-  const tableCard=document.querySelector('#propsView .table-card');
+function renderCollectionPage(){
+  // Render collection tabs
+  const tabsEl=document.getElementById('collectionTabs');
+  if(tabsEl){
+    tabsEl.innerHTML=`
+      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
+      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
+      <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
+      <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
+    `;
+  }
+  // Hide all sub-views
   const abView=document.getElementById('allBalancesView');
   const histView=document.getElementById('historyView');
   const boView=document.getElementById('balancesOnlyView');
-  const monthBarEl=document.getElementById('monthBar');
-  const isBalance = currentFilter==='balance';
-  // Hide everything first
-  if(tableCard) tableCard.style.display='none';
-  abView.style.display='none';
-  histView.style.display='none';
+  const contentEl=document.getElementById('collectionContent');
+  if(abView) abView.style.display='none';
+  if(histView) histView.style.display='none';
   if(boView) boView.style.display='none';
-  if(monthBarEl) monthBarEl.style.display='none';
+  if(contentEl) contentEl.innerHTML='';
 
-  if(isBalance && collectionViewMode==='allBalances'){
-    abView.style.display='block';
+  if(collectionViewMode==='allBalances'){
+    if(abView) abView.style.display='block';
     renderAllBalances();
-  } else if(isBalance && collectionViewMode==='balancesOnly'){
+  } else if(collectionViewMode==='balancesOnly'){
     if(boView) boView.style.display='block';
     renderBalancesOnly();
-  } else if(isBalance && collectionViewMode==='history'){
-    histView.style.display='block';
+  } else if(collectionViewMode==='history'){
+    if(histView) histView.style.display='block';
     renderCollectionHistory();
   } else {
-    // Monthly View — show the properties table + month bar
-    if(tableCard) tableCard.style.display='';
-    if(monthBarEl) monthBarEl.style.display='';
-    renderTable();
+    // Monthly View — show balance-filtered properties table with month bar inside collectionContent
+    renderCollectionMonthlyView();
   }
+}
+
+function renderCollectionMonthlyView(){
+  const contentEl=document.getElementById('collectionContent');
+  if(!contentEl) return;
+  // Build month bar using the shared month bar builder
+  const monthBarHtml='<div class="month-bar" id="collMonthBar">'+buildMonthBarHTML()+'</div>';
+
+  // Filter properties with balance for the active month
+  let list=[...properties];
+  list=list.filter(p=>{
+    const mp=getMonthProp(p);
+    const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+    const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+    return cmhaBal>0||tenBal>0;
+  });
+  list.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+
+  const rows=list.map(p=>{
+    const mp=getMonthProp(p);
+    const cmha=mp.cmha||0,cmhaPaid=mp.cmhaPaid||0;
+    const tp=mp.tenantPortion||0,tPaid=mp.tenantPaid||0;
+    const cmhaBal=Math.max(0,cmha-cmhaPaid);
+    const tenBal=Math.max(0,tp-tPaid);
+    const collected=cmhaPaid+tPaid;
+    const rate=(cmha+tp)>0?Math.round(collected/(cmha+tp)*100):0;
+    const st=p.status||'';
+    const badge=st?`<span class="badge ${({RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction',CONSTRUCTION:'b-construction'})[st]||'b-unknown'}">${({RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction',CONSTRUCTION:'Construction'})[st]||st}</span>`:'';
+    return `<tr>
+      <td><div class="addr-main">${p.addr||''}</div><div class="addr-sub">${p.unit||''}</div></td>
+      <td>${badge}</td>
+      <td class="money">${fmt(cmha)}</td><td class="money">${fmt(tp)}</td>
+      <td class="money">${fmt(cmhaPaid)}</td><td class="money">${fmt(tPaid)}</td>
+      <td class="money">${fmt(collected)}</td>
+      <td class="money" style="color:${(cmhaBal+tenBal)>0?'var(--red)':'var(--accent)'}">${fmt(cmhaBal)} / ${fmt(tenBal)}</td>
+      <td><div class="rate-pill" style="--pct:${rate}%"><span>${rate}%</span></div></td>
+    </tr>`;
+  }).join('');
+
+  contentEl.innerHTML=monthBarHtml+`
+    <div class="table-card">
+      <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${list.length} properties with balance</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
+            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>Rate</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 async function renderAllBalances(){
@@ -5069,7 +5114,7 @@ async function savePopupField(){
     await updatePropertyField(activePopupId, activePopupField, value);
     closeModal('notesModal');
     toast('Saved');
-    if(currentView==='properties' && collectionViewMode==='allBalances') renderAllBalances();
+    if(currentView==='collection' && collectionViewMode==='allBalances') renderAllBalances();
   }catch(e){ toast('Error: '+e.message); }
 }
 
@@ -5129,6 +5174,8 @@ function renderMonthBar(){
   const html=buildMonthBarHTML();
   document.getElementById('monthBar').innerHTML=html;
   document.getElementById('dashMonthBar').innerHTML=html;
+  const collMB=document.getElementById('collMonthBar');
+  if(collMB) collMB.innerHTML=html;
 }
 
 async function switchMonth(y,m){
@@ -5144,6 +5191,8 @@ async function switchMonth(y,m){
   renderPotential();
   renderStatusBars();
   renderDonut();
+  // If on collection monthly view, re-render it too
+  if(currentView==='collection' && collectionViewMode==='monthly') renderCollectionMonthlyView();
 }
 
 function switchMonthFromSelect(val){
@@ -5247,7 +5296,7 @@ function switchPropsTab(tab){
     if(monthBar)monthBar.style.display='';
     renderMonthBar();
     renderFilterTabs();
-    renderCollectionView();
+    renderTable();
   }
 }
 
@@ -7423,7 +7472,8 @@ function showView(v){
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
-    turnover:'turnoverView'
+    turnover:'turnoverView',
+    collection:'collectionView'
   };
 
   // Hide all views
@@ -7454,7 +7504,8 @@ function showView(v){
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
-    turnover:'TurnOver Projects'
+    turnover:'TurnOver Projects',
+    collection:'Collection'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -7480,10 +7531,10 @@ function showView(v){
     renderStatusBars();
     renderDonut();
   }
+  if(v==='collection') renderCollectionPage();
   if(v==='properties'){
     if(!filterSetByNav){
       currentFilter='all';
-      collectionViewMode='monthly';
       propsViewTab='list';
     }
     filterSetByNav=false;
@@ -7509,25 +7560,6 @@ function showView(v){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
     }else{renderTeam();}
-  }
-}
-
-function setFilter(f){
-  currentFilter=f;
-  currentPage=1;
-  filterSetByNav=true;
-  if(currentView==='properties'){
-    renderFilterTabs();
-    renderTable();
-  } else {
-    showView('properties');
-  }
-  if(f==='balance'){
-    document.getElementById('viewTitle').textContent='Collection';
-    // Highlight the Collection nav item instead of All Properties
-    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-    const colNav=document.getElementById('nav-collection');
-    if(colNav) colNav.classList.add('active');
   }
 }
 
