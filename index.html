@@ -953,6 +953,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z"/></svg>
         All Properties
       </button>
+      <button class="nav-item" id="nav-tenantLease" onclick="showView('tenantLease')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M11 3h3v3"/></svg>
+        Tenant & Lease
+      </button>
       <div class="nav-label">Finance</div>
       <button class="nav-item" id="nav-rentTracking" onclick="openRentTracking()">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/><circle cx="13" cy="11" r="2.5"/></svg>
@@ -1207,6 +1211,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="availableView" style="display:none"></div>
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
+      <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
       <div id="backupsView" style="display:none"></div>
@@ -5297,6 +5302,74 @@ function renderPropertiesList(){
     </div>`;
 }
 
+function renderTenantLeaseView(){
+  const el=document.getElementById('tenantLeaseView');
+  if(!el) return;
+  const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const editable=canEdit();
+  const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
+  const ism=is+';font-family:var(--mono)';
+
+  let searchHtml=`<input type="text" id="tlSearch" placeholder="🔍 Search address or tenant…" oninput="filterTenantLease()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:260px">`;
+
+  const rows=sorted.map(p=>{
+    const addr=p.addr||'';
+    const leaseEff=p.leaseEffective2||'';
+    const leaseExp=p.leaseExpire2||'';
+    const tName=p.tenantName2||p.tenant||'';
+    const tNum=p.tenantNumber2||'';
+    const secInfo=p.secondaryInfo||'';
+    const notes=p.tenantNotes||'';
+    // Check if lease is expiring within 30 days
+    const today=new Date();today.setHours(0,0,0,0);
+    let expStyle='';
+    if(leaseExp){
+      const exp=new Date(leaseExp+'T00:00:00');
+      const daysLeft=Math.ceil((exp-today)/86400000);
+      if(daysLeft<0) expStyle='background:rgba(245,112,106,0.2);color:var(--red);font-weight:600';
+      else if(daysLeft<=30) expStyle='background:rgba(245,201,106,0.15);color:var(--amber);font-weight:600';
+    }
+    const dis=editable?'':'disabled';
+    return `<tr class="tl-row" data-search="${escapeAttr((addr+' '+tName).toLowerCase())}">
+      <td style="font-weight:500;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(addr)}">${escapeHtml(addr||'—')}</td>
+      <td><input type="date" value="${leaseEff}" style="${ism};width:125px;color-scheme:dark" ${dis} onchange="updatePropertyField('${p.id}','leaseEffective2',this.value)"></td>
+      <td><input type="date" value="${leaseExp}" style="${ism};width:125px;color-scheme:dark;${expStyle}" ${dis} onchange="updatePropertyField('${p.id}','leaseExpire2',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(tName)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','tenantName2',this.value)"></td>
+      <td><input type="tel" value="${escapeAttr(tNum)}" placeholder="📞" style="${ism};width:110px" ${dis} onblur="updatePropertyField('${p.id}','tenantNumber2',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${sorted.length}</strong> properties · ${searchHtml}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>🏠 Address</th>
+            <th>📅 Lease Effective</th>
+            <th>📅 Lease Expire</th>
+            <th>👤 Tenant Name</th>
+            <th>📞 Tenant Number</th>
+            <th>📋 Secondary Info</th>
+            <th>📝 Notes</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function filterTenantLease(){
+  const q=(document.getElementById('tlSearch').value||'').toLowerCase();
+  document.querySelectorAll('.tl-row').forEach(r=>{
+    r.style.display=!q||r.dataset.search.includes(q)?'':'none';
+  });
+}
+
 function openRentTracking(){
   propsViewTab='table';
   filterSetByNav=true;
@@ -7315,7 +7388,7 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', inspections:'inspectionsView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -7346,7 +7419,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     notices:'Notice Papers', leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', inspections:'Inspection Tracker',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
@@ -7393,6 +7466,7 @@ function showView(v){
   if(v==='utility') renderUtilityView();
   if(v==='meetings') renderMeetingsView();
   if(v==='callLog') renderCallLogView();
+  if(v==='tenantLease') renderTenantLeaseView();
   if(v==='available') renderAvailableView();
   if(v==='leads') renderLeadsView();
   if(v==='backups') renderBackupsView();
