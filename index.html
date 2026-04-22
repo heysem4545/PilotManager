@@ -10107,13 +10107,13 @@ async function renderConstProjectsView(){
       const cls = isNA?'done':prog>=100?'done':prog>0?'partial':'zero';
       const fillColor = (isNA||prog>=100)?'var(--blue)':'var(--amber)';
       if(isNA){
-        html+=`<div class="cp-cat-row done" style="opacity:0.6">
-          <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
+        html+=`<div class="cp-cat-row" style="background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.2);border-radius:6px;padding:6px 8px;margin-bottom:2px">
+          <div class="cp-cat-name" style="color:var(--amber)">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
           <div style="flex:1;display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--muted);font-style:italic;padding:4px 10px;background:var(--surface3);border-radius:5px">N/A — Not needed</span>
+            <span style="font-size:11px;color:var(--amber);font-style:italic;padding:4px 10px;background:rgba(245,201,106,0.15);border-radius:5px;font-weight:500">N/A — Not needed</span>
           </div>
-          <div style="font-size:10px;color:var(--blue)">→ ${contrib}%</div>
-          <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:2px 8px;font-size:9px;color:var(--muted);cursor:pointer" onclick="toggleCategoryNA('${proj.id}',${idx},false)">Undo</button>
+          <div style="font-size:10px;color:var(--amber);font-weight:500">→ ${contrib}%</div>
+          <button style="background:none;border:1px solid var(--amber-dim);border-radius:4px;padding:2px 8px;font-size:9px;color:var(--amber);cursor:pointer" onclick="toggleCategoryNA('${proj.id}',${idx},false)">Undo</button>
         </div>`;
       } else {
         html+=`<div class="cp-cat-row ${cls}">
