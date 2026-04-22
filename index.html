@@ -10386,6 +10386,10 @@ async function renderConstProjectsView(){
           <span style="font-size:10px;color:var(--muted)">Completed:</span>
           <input type="date" value="${completedDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateProjectDates('${proj.id}','completedDate',this.value)">
         </div>`:''}
+        ${(proj.auditedDate)?`<div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:10px;color:#4ade80">🔍 Audited:</span>
+          <input type="date" value="${proj.auditedDate||''}" style="font-size:11px;padding:2px 6px;border:1px solid rgba(74,222,128,0.3);border-radius:5px;background:rgba(74,222,128,0.08);color:#4ade80;color-scheme:dark" onchange="updateProjectDates('${proj.id}','auditedDate',this.value)">
+        </div>`:''}
         ${statusBadge}
         ${daysInfo}
       </div>`;
@@ -10453,16 +10457,27 @@ async function renderConstProjectsView(){
             ${auditPct>0?`<span style="font-size:9px;font-weight:700;color:#0d0d10">${auditPct}%</span>`:''}
           </div>
         </div>
-        <div style="font-size:11px;color:${auditPct>=100?'#4ade80':'var(--text)'};font-weight:500">${auditTotal>0?`${auditDone} of ${auditTotal} audit items fixed`:'No audit items yet — send your auditor'}</div>`;
+        <div style="font-size:11px;color:${auditPct>=100?'#4ade80':'var(--text)'};font-weight:500">${auditTotal>0?`${auditDone} of ${auditTotal} audit items fixed`:'No audit items yet — send your auditor'}</div>
+        ${auditPct>=100&&proj.auditedDate?`<div style="margin-top:6px;padding:6px 10px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:6px;display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">✅</span>
+          <span style="font-size:12px;font-weight:600;color:#4ade80">Audit Complete</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:auto">Completed: ${proj.auditedDate}</span>
+        </div>`:''}`;
       // Show audit checklist inline
       if(auditTotal>0){
         html+=`<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">`;
         auditItems.forEach((item,ai)=>{
-          html+=`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
-            <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="toggleAuditItem('${proj.id}',${ai},this.checked)">
-            <span style="flex:1;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
-            ${isAdmin()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 4px" onclick="event.preventDefault();removeAuditItem('${proj.id}',${ai})" title="Remove">×</button>`:''}
-          </label>`;
+          html+=`<div style="padding:5px 8px;border-radius:6px;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="toggleAuditItem('${proj.id}',${ai},this.checked)">
+              <span style="flex:1;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+              ${isAdmin()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 4px" onclick="event.preventDefault();removeAuditItem('${proj.id}',${ai})" title="Remove">×</button>`:''}
+            </label>
+            <div style="display:flex;gap:10px;margin-top:2px;padding-left:23px">
+              ${item.addedDate?`<span style="font-size:10px;color:var(--muted)">📅 Added: ${item.addedDate}</span>`:''}
+              ${item.checked&&item.fixedDate?`<span style="font-size:10px;color:#4ade80">✅ Fixed: ${item.fixedDate}</span>`:''}
+            </div>
+          </div>`;
         });
         html+=`</div>`;
       }
@@ -10739,10 +10754,16 @@ function renderAuditList(proj){
     return;
   }
   list.innerHTML=items.map((item,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'};border-radius:6px">
-      <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
-      <span style="flex:1;font-size:12px;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
-      <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px" onclick="removeAuditItem('${proj.id}',${i})" title="Remove">×</button>
+    <div style="padding:6px 8px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'};border-radius:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+        <span style="flex:1;font-size:12px;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+        <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px" onclick="removeAuditItem('${proj.id}',${i})" title="Remove">×</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:3px;padding-left:26px">
+        ${item.addedDate?`<span style="font-size:10px;color:var(--muted)">📅 Added: ${item.addedDate}</span>`:''}
+        ${item.checked&&item.fixedDate?`<span style="font-size:10px;color:#4ade80">✅ Fixed: ${item.fixedDate}</span>`:''}
+      </div>
     </div>
   `).join('');
 }
@@ -10755,7 +10776,7 @@ async function addAuditItem(){
   const proj=constProjectsData.find(p=>p.id===projId);
   if(!proj) return;
   const items=proj.auditItems||[];
-  items.push({text, checked:false});
+  items.push({text, checked:false, addedDate:new Date().toISOString().slice(0,10), fixedDate:''});
   try{
     await db.collection('constructionProjects').doc(projId).update({auditItems:items});
     proj.auditItems=items;
@@ -10783,8 +10804,18 @@ async function toggleAuditItem(projId, idx, checked){
   if(!proj) return;
   const items=proj.auditItems||[];
   items[idx].checked=checked;
+  items[idx].fixedDate=checked?new Date().toISOString().slice(0,10):'';
+  const updateData={auditItems:items};
+  const allDone=items.length>0&&items.every(it=>it.checked);
+  if(allDone&&!proj.auditedDate){
+    updateData.auditedDate=new Date().toISOString().slice(0,10);
+    proj.auditedDate=updateData.auditedDate;
+  } else if(!allDone&&proj.auditedDate){
+    updateData.auditedDate='';
+    proj.auditedDate='';
+  }
   try{
-    await db.collection('constructionProjects').doc(projId).update({auditItems:items});
+    await db.collection('constructionProjects').doc(projId).update(updateData);
     proj.auditItems=items;
     await renderConstProjectsView();
   }catch(e){ toast('Error: '+e.message); }
