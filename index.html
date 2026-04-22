@@ -10009,7 +10009,8 @@ async function renderConstProjectsView(){
       html+=`<div class="cp-cat-row ${cls}">
         <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
         <input type="range" min="0" max="100" step="5" value="${prog}" class="const-proj-slider"
-          oninput="previewProjectProgress('${proj.id}',${idx},this.value,this)"
+          style="background:linear-gradient(to right,${fillColor} ${prog}%,var(--surface3) ${prog}%)"
+          oninput="this.style.background='linear-gradient(to right,'+(this.value>=100?'var(--blue)':'var(--amber)')+' '+this.value+'%,var(--surface3) '+this.value+'%)';previewProjectProgress('${proj.id}',${idx},this.value,this)"
           onchange="updateProjectProgress('${proj.id}',${idx},this.value)">
         <div class="cp-cat-pct" id="cpPct_${proj.id}_${idx}" style="min-width:32px;text-align:right">${prog}%</div>
         <div class="cp-cat-contrib" id="cpCon_${proj.id}_${idx}">&rarr; ${contrib}%</div>
