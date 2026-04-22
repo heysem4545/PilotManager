@@ -2834,7 +2834,7 @@ function renderMetrics(){
     .join('');
 
   document.getElementById('metricsGrid').innerHTML=`
-    <div class="mc g"><div class="mc-lbl">Expected Rent · Occupancy</div><div class="mc-val g" style="font-size:26px">${fmt(t.rent)}</div><div class="mc-sub" style="font-size:12px;margin-top:4px">${occ}% occupied · ${t.rented} of ${properties.length} units · ${mLabel}</div>${(()=>{
+    <div class="mc g"><div class="mc-lbl">Expected Rent · Occupancy</div><div class="mc-val g" style="font-size:26px">${fmt(t.rent)}</div><div style="font-size:16px;font-weight:700;color:var(--amber);margin-top:6px">${occ}% Occupied <span style="font-size:12px;font-weight:500;color:var(--text)">${t.rented} of ${properties.length} units</span></div><div class="mc-sub">${mLabel}</div>${(()=>{
       const sc={'RENTED':0,'VACANT':0,'EVICTION':0,'MOVING PROCESS':0,'CONSTRUCTION':0};
       let unknown=0;
       properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else unknown++;});
