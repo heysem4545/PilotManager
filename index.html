@@ -1120,6 +1120,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <div id="collectionToggle" style="display:none;margin-bottom:12px;gap:8px;align-items:center" class="ftabs"></div>
         <div class="ftabs" id="propsViewTabs" style="margin-bottom:12px"></div>
         <div id="propertyHistoryView" style="display:none"></div>
+        <div id="propsListView" style="display:none"></div>
         <div class="table-card" id="propsTableCard">
           <div class="month-bar" id="monthBar"></div>
           <div class="toolbar">
@@ -2038,7 +2039,7 @@ let editPropId = null;
 let currentFilter = 'all';
 let filterSetByNav = false;
 let collectionViewMode = 'monthly'; // 'monthly' or 'allBalances'
-let propsViewTab = 'table'; // 'table' or 'history'
+let propsViewTab = 'list'; // 'list', 'table', or 'history'
 let allBalancesRange = 'full';
 let currentPage = 1;
 let sortField = 'rowIndex';
@@ -5200,9 +5201,10 @@ function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pa
 function renderPropsViewTabs(){
   const el=document.getElementById('propsViewTabs');
   if(!el)return;
-  let html=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">Properties</button>`;
+  let html=`<button class="ftab ${propsViewTab==='list'?'active':''}" onclick="switchPropsTab('list')">🏠 All Properties</button>`;
+  html+=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">📊 Monthly Data</button>`;
   if(isAdmin()){
-    html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">History Log</button>`;
+    html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">📜 History Log</button>`;
   }
   el.innerHTML=html;
 }
@@ -5212,14 +5214,93 @@ function switchPropsTab(tab){
   renderPropsViewTabs();
   const tableCard=document.getElementById('propsTableCard');
   const histView=document.getElementById('propertyHistoryView');
-  if(tab==='history'){
+  const listView=document.getElementById('propsListView');
+  const monthBar=document.getElementById('monthBar');
+  if(tab==='list'){
     if(tableCard)tableCard.style.display='none';
+    if(histView)histView.style.display='none';
+    if(monthBar)monthBar.style.display='none';
+    if(listView)listView.style.display='';
+    renderPropertiesList();
+  } else if(tab==='history'){
+    if(tableCard)tableCard.style.display='none';
+    if(listView)listView.style.display='none';
+    if(monthBar)monthBar.style.display='none';
     if(histView)histView.style.display='';
     renderPropertyHistory();
   } else {
     if(tableCard)tableCard.style.display='';
     if(histView)histView.style.display='none';
+    if(listView)listView.style.display='none';
+    if(monthBar)monthBar.style.display='';
   }
+}
+
+function renderPropertiesList(){
+  const el=document.getElementById('propsListView');
+  if(!el)return;
+  const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const editable=canEdit();
+
+  let searchHtml=`<input type="text" id="propListSearch" placeholder="🔍 Search address…" oninput="filterPropsList()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:250px">`;
+
+  const rows=sorted.map((p,i)=>{
+    const addr=p.addr||'(no address)';
+    const unit=p.unit||'';
+    const status=p.status||'';
+    const tenant=p.tenant||'';
+    const statusBadge=status?`<span class="badge ${BC[status]||'b-unknown'}">${BL[status]||status}</span>`:'<span style="color:var(--muted2)">—</span>';
+    return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+tenant).toLowerCase()}">
+      <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
+      <td style="font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
+      <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px;color:var(--text)">${escapeHtml(tenant)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${p.rent?fmt(p.rent):'—'}</td>
+      ${editable?`<td style="text-align:right">
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" onclick="openEdit('${p.id}')">Edit</button>
+        ${isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="if(confirm('Delete ${escapeAttr(addr)}? This cannot be undone.'))deleteProp('${p.id}')">Sold/Delete</button>`:''}
+      </td>`:'<td></td>'}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${sorted.length}</strong> properties · ${searchHtml}</div>
+        ${editable?`<button class="btn btn-primary btn-sm" onclick="openAdd()">+ Add Property</button>`:''}
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>#</th>
+            <th>Address</th>
+            <th>Unit</th>
+            <th>Status</th>
+            <th>Tenant</th>
+            <th>Rent</th>
+            <th style="text-align:right">Actions</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function filterPropsList(){
+  const q=(document.getElementById('propListSearch').value||'').toLowerCase();
+  document.querySelectorAll('.prop-list-row').forEach(r=>{
+    r.style.display=!q||r.dataset.search.includes(q)?'':'none';
+  });
+}
+
+function deleteProp(id){
+  deleteProperty(id).then(()=>{
+    return loadProperties();
+  }).then(()=>{
+    renderPropertiesList();
+    toast('Property deleted');
+  }).catch(e=>toast('Error: '+e.message));
 }
 
 async function renderPropertyHistory(){
