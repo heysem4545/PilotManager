@@ -10312,6 +10312,53 @@ async function renderConstProjectsView(){
   }
   html+='</div>';
 
+  // Summary stats
+  const totalProjects = constProjectsData.length;
+  const inProgressProjs = constProjectsData.filter(p=>(p.totalProgress||0)<100);
+  const completedProjs = constProjectsData.filter(p=>(p.totalProgress||0)>=100);
+  const waitingAudit = completedProjs.filter(p=>{const items=p.auditItems||[];return items.length===0||(items.length>0&&!items.every(i=>i.checked));});
+  const auditComplete = completedProjs.filter(p=>{const items=p.auditItems||[];return items.length>0&&items.every(i=>i.checked);});
+  const overdue = constProjectsData.filter(p=>{if((p.totalProgress||0)>=100||!p.targetDate)return false;const t=new Date(p.targetDate+'T00:00:00');const now=new Date();now.setHours(0,0,0,0);return t<now;});
+  const avgProgress = totalProjects>0?Math.round(constProjectsData.reduce((s,p)=>s+(p.totalProgress||0),0)/totalProjects):0;
+  const totalBudget = constProjectsData.reduce((s,p)=>s+(p.estimateLabor||0)+(p.estimateMaterial||0),0);
+  const propExpAll = (typeof constructionData!=='undefined'?constructionData:[]).filter(d=>!d.isGeneral);
+  const totalActual = propExpAll.reduce((s,d)=>s+(d.amount||0),0);
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${totalProjects}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">Total Projects</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--amber)">${inProgressProjs.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">🔨 In Progress</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--blue)">${completedProjs.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">✅ Renovation Done</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--purple)">${waitingAudit.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">🔍 Waiting Audit</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:#4ade80">${auditComplete.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">🏁 Fully Complete</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:${overdue.length>0?'var(--red)':'var(--accent)'}">${overdue.length}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">⚠️ Overdue</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:24px;font-weight:700;color:var(--text)">${avgProgress}%</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">📊 Avg Progress</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--accent)'}">${totalBudget>0?fmt(totalActual)+' / '+fmt(totalBudget):'—'}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">💰 Spent / Budget</div>
+    </div>
+  </div>`;
+
   if(!constProjectsData.length){
     html+=`<div class="cp-empty">
       <div class="cp-empty-icon">&#128679;</div>
