@@ -5334,6 +5334,15 @@ function renderTenantLeaseView(){
       <td style="font-weight:500;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(addr)}">${escapeHtml(addr||'—')}</td>
       <td><input type="date" value="${leaseEff}" style="${ism};width:125px;color-scheme:dark" ${dis} onchange="updatePropertyField('${p.id}','leaseEffective2',this.value)"></td>
       <td><input type="date" value="${leaseExp}" style="${ism};width:125px;color-scheme:dark;${expStyle}" ${dis} onchange="updatePropertyField('${p.id}','leaseExpire2',this.value)"></td>
+      <td style="text-align:center;font-family:var(--mono);font-size:11px;font-weight:600">${(()=>{
+        if(!leaseExp) return '<span style="color:var(--muted2)">—</span>';
+        const exp=new Date(leaseExp+'T00:00:00');
+        const dLeft=Math.ceil((exp-today)/86400000);
+        if(dLeft<0) return `<span style="padding:3px 8px;border-radius:5px;background:var(--red-dim);color:var(--red)">Expired ${Math.abs(dLeft)}d ago</span>`;
+        if(dLeft<=60) return `<span style="padding:3px 8px;border-radius:5px;background:var(--red-dim);color:var(--red)">${dLeft} days</span>`;
+        if(dLeft<=90) return `<span style="padding:3px 8px;border-radius:5px;background:var(--amber-dim);color:var(--amber)">${dLeft} days</span>`;
+        return `<span style="color:var(--text)">${dLeft} days</span>`;
+      })()}</td>
       <td><input type="text" value="${escapeAttr(tName)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','tenantName2',this.value)"></td>
       <td><input type="tel" value="${escapeAttr(tNum)}" placeholder="📞" style="${ism};width:110px" ${dis} onblur="updatePropertyField('${p.id}','tenantNumber2',this.value)"></td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
@@ -5352,6 +5361,7 @@ function renderTenantLeaseView(){
             <th>🏠 Address</th>
             <th>📅 Lease Effective</th>
             <th>📅 Lease Expire</th>
+            <th>⏳ Days Left</th>
             <th>👤 Tenant Name</th>
             <th>📞 Tenant Number</th>
             <th>📋 Secondary Info</th>
