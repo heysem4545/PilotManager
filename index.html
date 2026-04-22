@@ -10493,9 +10493,9 @@ async function renderConstProjectsView(){
     const auditPct = auditTotal>0 ? Math.round(auditDone/auditTotal*100) : 0;
     {
       const auditActive = tp>=100;
-      const auditBarColor = auditActive ? '#4ade80' : 'rgba(74,222,128,0.25)';
-      const auditTextColor = auditActive ? (auditPct>=100?'#4ade80':'var(--text)') : 'var(--muted2)';
-      const auditLabelColor = auditActive ? 'var(--muted)' : 'var(--muted2)';
+      const auditBarColor = auditActive ? '#4ade80' : 'rgba(74,222,128,0.5)';
+      const auditTextColor = auditActive ? (auditPct>=100?'#4ade80':'var(--text)') : 'var(--muted)';
+      const auditLabelColor = auditActive ? 'var(--muted)' : 'var(--muted)';
       const auditOpacity = auditActive ? '1' : '0.7';
       html+=`<div style="margin-top:8px;opacity:${auditOpacity}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
