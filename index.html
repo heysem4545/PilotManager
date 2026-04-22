@@ -9986,6 +9986,8 @@ async function renderConstProjectsView(){
       <div class="cp-card-head">
         <div class="cp-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
         <div style="display:flex;gap:6px;align-items:center">`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveProjectSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleProjectTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+proj.snapshots.length+')':''}</button>`;
     if(isAdmin()){
       html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteProject('${proj.id}')">Delete</button>`;
     }
@@ -10007,10 +10009,82 @@ async function renderConstProjectsView(){
       </div>`;
     });
 
+    // Timeline section (hidden by default)
+    const snaps = proj.snapshots || [];
+    if(snaps.length > 0){
+      let timelineHtml = `<div id="cpTimeline_${proj.id}" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📊 Progress Timeline</div>
+        <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 8px">Date</th>`;
+      const catNames = (snaps[0].categories||[]).map(c=>c.name);
+      catNames.forEach(n=>{timelineHtml+=`<th style="text-align:right;padding:6px 8px">${escapeHtml(n)}</th>`;});
+      timelineHtml+=`<th style="text-align:right;padding:6px 8px;font-weight:700">Total</th></tr></thead><tbody>`;
+
+      snaps.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      snaps.forEach((snap,si)=>{
+        const prev = snaps[si+1]; // older snapshot
+        const snapCats = snap.categories||[];
+        const prevCats = prev ? (prev.categories||[]) : null;
+        timelineHtml+=`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;font-family:var(--mono);white-space:nowrap;color:var(--text)">${snap.date||'—'}</td>`;
+        snapCats.forEach((c,ci)=>{
+          const prevVal = prevCats ? (prevCats[ci]?.progress||0) : null;
+          const curVal = c.progress||0;
+          let changeIcon = '';
+          let changeColor = 'var(--text)';
+          if(prevVal !== null){
+            if(curVal > prevVal){ changeIcon='▲'; changeColor='var(--accent)'; }
+            else if(curVal < prevVal){ changeIcon='▼'; changeColor='var(--red)'; }
+            else { changeIcon='—'; changeColor='var(--muted2)'; }
+          }
+          timelineHtml+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mono);color:${changeColor}">${curVal}% ${changeIcon}</td>`;
+        });
+        timelineHtml+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--accent)">${snap.totalProgress||0}%</td></tr>`;
+      });
+      timelineHtml+=`</tbody></table></div></div>`;
+      html+=timelineHtml;
+    }
+
     html+='</div>';
   });
 
   el.innerHTML=html;
+}
+
+function toggleProjectTimeline(docId){
+  const el=document.getElementById('cpTimeline_'+docId);
+  if(el) el.style.display=el.style.display==='none'?'':'none';
+}
+
+async function saveProjectSnapshot(docId){
+  const proj=constProjectsData.find(p=>p.id===docId);
+  if(!proj){toast('Project not found');return;}
+  const today=new Date().toISOString().slice(0,10);
+  const snapshot={
+    date:today,
+    categories:(proj.categories||[]).map(c=>({name:c.name,weight:c.weight,progress:c.progress||0})),
+    totalProgress:proj.totalProgress||0,
+    savedBy:currentUser?(currentUser.name||currentUser.email):''
+  };
+  const snaps=proj.snapshots||[];
+  // Check if already snapshotted today
+  if(snaps.some(s=>s.date===today)){
+    if(!confirm('A snapshot already exists for today. Replace it?')) return;
+    const idx=snaps.findIndex(s=>s.date===today);
+    snaps[idx]=snapshot;
+  } else {
+    snaps.push(snapshot);
+  }
+  try{
+    await db.collection('constructionProjects').doc(docId).update({snapshots:snaps,updatedAt:new Date()});
+    proj.snapshots=snaps;
+    toast('📸 Snapshot saved for '+today);
+    await renderConstProjectsView();
+  }catch(e){
+    console.error('saveProjectSnapshot',e);
+    toast('Error: '+e.message);
+  }
 }
 
 function previewProjectProgress(docId,catIndex,value,slider){
