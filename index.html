@@ -1963,7 +1963,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     </div>
     <div style="font-size:11px;color:var(--muted);padding:6px 0;line-height:1.5">
       ⚡ Start date = tenant leave date. Target auto-calculated:<br>
-      <strong style="color:var(--red)">🔴 Heavy = 30 days</strong> · <strong style="color:var(--amber)">🟡 Medium = 20 days</strong> · <strong style="color:var(--accent)">🟢 Light = 10 days</strong>
+      <strong style="color:var(--red)">🔴 Heavy = 30 days</strong> · <strong style="color:var(--amber)">🟡 Medium = 22 days</strong> · <strong style="color:var(--accent)">🟢 Light = 15 days</strong>
     </div>
     <div class="fg"><label>Fix By</label>
       <select id="toFixBy" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -10604,7 +10604,7 @@ function renderTurnoverProjects(){
     const today = new Date(); today.setHours(0,0,0,0);
 
     // Auto-calculated target days based on work type
-    const targetDays = wt==='Heavy'?30:wt==='Medium'?20:10;
+    const targetDays = wt==='Heavy'?30:wt==='Medium'?22:15;
     let statusBadge = '';
     let daysInfo = '';
 
@@ -10822,7 +10822,7 @@ async function saveTurnoverProject(){
   const tenantLeftDate = document.getElementById('toTenantLeft').value||'';
   if(!tenantLeftDate){toast('Please enter tenant leave date');return;}
   // Auto-calculate: start = tenant left, target = start + days based on work type
-  const targetDays = workType==='Heavy'?30:workType==='Medium'?20:10;
+  const targetDays = workType==='Heavy'?30:workType==='Medium'?22:15;
   const startD = new Date(tenantLeftDate+'T00:00:00');
   const targetD = new Date(startD.getTime() + targetDays*86400000);
   const startDate = tenantLeftDate;
