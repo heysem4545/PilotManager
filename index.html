@@ -5202,7 +5202,7 @@ function renderPropsViewTabs(){
   const el=document.getElementById('propsViewTabs');
   if(!el)return;
   let html=`<button class="ftab ${propsViewTab==='list'?'active':''}" onclick="switchPropsTab('list')">🏠 All Properties</button>`;
-  html+=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">📊 Monthly Data</button>`;
+  html+=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">📊 Rent Tracking</button>`;
   if(isAdmin()){
     html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">📜 History Log</button>`;
   }
