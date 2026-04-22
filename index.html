@@ -9458,6 +9458,10 @@ async function renderConstructionView(){
 async function updateExpenseField(docId, field, value){
   try{
     await db.collection('constructionTracking').doc(docId).update({[field]:value});
+    // Update local cache and re-render so subtotals recalculate
+    const item = constructionData.find(d=>d.id===docId);
+    if(item) item[field] = value;
+    await renderConstructionView();
   }catch(e){
     console.error('updateExpenseField',e);
     toast('Error: '+e.message);
