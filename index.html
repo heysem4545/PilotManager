@@ -5346,6 +5346,17 @@ function renderTenantLeaseView(){
       <td><input type="text" value="${escapeAttr(tName)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','tenantName2',this.value)"></td>
       <td><input type="tel" value="${escapeAttr(tNum)}" placeholder="📞" style="${ism};width:110px" ${dis} onblur="updatePropertyField('${p.id}','tenantNumber2',this.value)"></td>
       <td><input type="email" value="${escapeAttr(p.tenantEmail||'')}" placeholder="✉" style="${is};width:130px" ${dis} onblur="updatePropertyField('${p.id}','tenantEmail',this.value)"></td>
+      <td>${(()=>{
+        const methods=['Zelle','Doorloop','Turbotenant','Money Order','Cash'];
+        const saved=(p.payMethods||[]);
+        return `<div style="display:flex;flex-wrap:wrap;gap:3px">${methods.map(m=>{
+          const checked=saved.includes(m);
+          return `<label style="display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:10px;cursor:pointer;background:${checked?'var(--accent-dim)':'var(--surface3)'};color:${checked?'var(--accent)':'var(--muted)'};border:1px solid ${checked?'var(--accent-dim)':'var(--border2)'}">
+            <input type="checkbox" ${checked?'checked':''} ${dis} style="display:none" onchange="togglePayMethod('${p.id}','${m}',this.checked)">
+            ${m}
+          </label>`;
+        }).join('')}</div>`;
+      })()}</td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
     </tr>`;
@@ -5366,6 +5377,7 @@ function renderTenantLeaseView(){
             <th>👤 Tenant Name</th>
             <th>📞 Tenant Number</th>
             <th>✉ Email</th>
+            <th>💳 Pay Method</th>
             <th>📋 Secondary Info</th>
             <th>📝 Notes</th>
           </tr></thead>
@@ -5373,6 +5385,17 @@ function renderTenantLeaseView(){
         </table>
       </div>
     </div>`;
+}
+
+async function togglePayMethod(propId, method, checked){
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  let methods=Array.isArray(p.payMethods)?[...p.payMethods]:[];
+  if(checked && !methods.includes(method)) methods.push(method);
+  if(!checked) methods=methods.filter(m=>m!==method);
+  await updatePropertyField(propId,'payMethods',methods);
+  p.payMethods=methods;
+  renderTenantLeaseView();
 }
 
 function filterTenantLease(){
