@@ -1953,6 +1953,27 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 </div>
 
 <!-- ADD TURNOVER PROJECT MODAL -->
+<!-- AUDIT ITEMS MODAL -->
+<div class="overlay" id="auditModal" onclick="if(event.target===this)closeModal('auditModal')">
+  <div class="modal" style="width:480px">
+    <div class="modal-title">
+      <span>🔍 Audit Items</span>
+      <button class="modal-close" onclick="closeModal('auditModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="auditModalAddr"></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Add items that need fixing from the audit inspection. Each item = equal portion of the audit bar.</div>
+    <div id="auditItemsList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:40vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="auditNewItem" placeholder="Type audit item…" style="flex:1;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addAuditItem()">
+      <button class="btn btn-primary btn-sm" onclick="addAuditItem()">Add</button>
+    </div>
+    <input type="hidden" id="auditModalProjId" value="">
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('auditModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="turnoverAddModal" onclick="if(event.target===this)closeModal('turnoverAddModal')">
   <div class="modal">
     <div class="modal-title">
@@ -10414,6 +10435,40 @@ async function renderConstProjectsView(){
       <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${tp>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${tp>0?tp+'%':''}</span></div></div>
       <div class="cp-overall-pct">${tp}% complete</div>`;
 
+    // Audit bar — only show when renovation is complete (100%)
+    const auditItems = proj.auditItems || [];
+    const auditDone = auditItems.filter(a=>a.checked).length;
+    const auditTotal = auditItems.length;
+    const auditPct = auditTotal>0 ? Math.round(auditDone/auditTotal*100) : 0;
+    if(tp>=100){
+      html+=`<div style="margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔍 Audit Progress</span>
+          <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="openAuditModal('${proj.id}')">
+            ${auditTotal>0?'Edit Audit Items ('+auditTotal+')':'+ Add Audit Items'}
+          </button>
+        </div>
+        <div style="width:100%;height:16px;background:var(--surface3);border-radius:8px;overflow:hidden;margin-bottom:3px">
+          <div style="height:100%;border-radius:8px;background:#4ade80;width:${auditPct}%;transition:width .3s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:${auditPct>0?'36px':'0'}">
+            ${auditPct>0?`<span style="font-size:9px;font-weight:700;color:#0d0d10">${auditPct}%</span>`:''}
+          </div>
+        </div>
+        <div style="font-size:11px;color:${auditPct>=100?'#4ade80':'var(--text)'};font-weight:500">${auditTotal>0?`${auditDone} of ${auditTotal} audit items fixed`:'No audit items yet — send your auditor'}</div>`;
+      // Show audit checklist inline
+      if(auditTotal>0){
+        html+=`<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">`;
+        auditItems.forEach((item,ai)=>{
+          html+=`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
+            <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="toggleAuditItem('${proj.id}',${ai},this.checked)">
+            <span style="flex:1;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+            ${isAdmin()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 4px" onclick="event.preventDefault();removeAuditItem('${proj.id}',${ai})" title="Remove">×</button>`:''}
+          </label>`;
+        });
+        html+=`</div>`;
+      }
+      html+=`</div>`;
+    }
+
     cats.forEach((cat,idx)=>{
       const isNA = cat.na === true;
       const effectiveProgress = isNA ? 100 : (cat.progress||0);
@@ -10664,6 +10719,75 @@ async function saveNewProject(){
     console.error('saveNewProject error:',e);
     toast('Error creating project');
   }
+}
+
+function openAuditModal(projId){
+  const proj=constProjectsData.find(p=>p.id===projId);
+  if(!proj) return;
+  document.getElementById('auditModalProjId').value=projId;
+  document.getElementById('auditModalAddr').textContent=proj.propertyAddress||'';
+  document.getElementById('auditNewItem').value='';
+  renderAuditList(proj);
+  document.getElementById('auditModal').classList.add('open');
+}
+
+function renderAuditList(proj){
+  const list=document.getElementById('auditItemsList');
+  const items=proj.auditItems||[];
+  if(items.length===0){
+    list.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px">No audit items yet. Type an item below and click Add.</div>';
+    return;
+  }
+  list.innerHTML=items.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'};border-radius:6px">
+      <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <span style="flex:1;font-size:12px;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
+      <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px" onclick="removeAuditItem('${proj.id}',${i})" title="Remove">×</button>
+    </div>
+  `).join('');
+}
+
+async function addAuditItem(){
+  const projId=document.getElementById('auditModalProjId').value;
+  const input=document.getElementById('auditNewItem');
+  const text=(input.value||'').trim();
+  if(!text){toast('Type an audit item');return;}
+  const proj=constProjectsData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.auditItems||[];
+  items.push({text, checked:false});
+  try{
+    await db.collection('constructionProjects').doc(projId).update({auditItems:items});
+    proj.auditItems=items;
+    input.value='';
+    renderAuditList(proj);
+    await renderConstProjectsView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function removeAuditItem(projId, idx){
+  const proj=constProjectsData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.auditItems||[];
+  items.splice(idx,1);
+  try{
+    await db.collection('constructionProjects').doc(projId).update({auditItems:items});
+    proj.auditItems=items;
+    renderAuditList(proj);
+    await renderConstProjectsView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function toggleAuditItem(projId, idx, checked){
+  const proj=constProjectsData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.auditItems||[];
+  items[idx].checked=checked;
+  try{
+    await db.collection('constructionProjects').doc(projId).update({auditItems:items});
+    proj.auditItems=items;
+    await renderConstProjectsView();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 function openEditCategories(){
