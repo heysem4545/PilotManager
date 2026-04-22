@@ -9358,7 +9358,7 @@ async function renderConstructionView(){
 
   const totalSpent=constructionData.reduce((s,d)=>s+(d.amount||0),0);
   const totalLabor=constructionData.filter(d=>(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
-  const totalMaterial=constructionData.filter(d=>(d.category||'').includes('Material')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=constructionData.filter(d=>!(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
 
   // Group by propertyId
   const grouped={};
@@ -9368,7 +9368,7 @@ async function renderConstructionView(){
     grouped[key].expenses.push(d);
     grouped[key].totalSpent+=(d.amount||0);
     if((d.category||'').includes('Labor')) grouped[key].totalLabor+=(d.amount||0);
-    if((d.category||'').includes('Material')) grouped[key].totalMaterial+=(d.amount||0);
+    else grouped[key].totalMaterial+=(d.amount||0);
   });
   const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
 
@@ -9417,8 +9417,8 @@ async function renderConstructionView(){
             <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Category</th><th style="text-align:left">Description</th><th style="text-align:right">Amount</th><th style="text-align:left">Paid Method</th><th style="text-align:center;width:70px"></th></tr></thead>
             <tbody>${detailRows}</tbody>
             <tfoot>
-              <tr><td colspan="4" style="text-align:right;font-family:var(--font)">👷 Labor Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-labor">${fmt(laborSub)}</td><td></td></tr>
-              <tr><td colspan="4" style="text-align:right;font-family:var(--font)">🧱 Material Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-material">${fmt(matSub)}</td><td></td></tr>
+              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">👷 Labor Subtotal</td><td style="text-align:right;font-family:var(--mono);font-weight:600" class="const-labor">${fmt(laborSub)}</td><td colspan="2"></td></tr>
+              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">🧱 Material Subtotal</td><td style="text-align:right;font-family:var(--mono);font-weight:600" class="const-material">${fmt(matSub)}</td><td colspan="2"></td></tr>
             </tfoot>
           </table>
         </div>
