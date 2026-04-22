@@ -1741,8 +1741,19 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="fg"><label>Description</label>
       <input id="constExpDesc" placeholder="What was this expense for?">
     </div>
-    <div class="fg"><label>Date</label>
-      <input id="constExpDate" type="date" min="2020-01-01" max="2030-12-31" style="color-scheme:dark">
+    <div class="frow">
+      <div class="fg"><label>Date</label>
+        <input id="constExpDate" type="date" min="2020-01-01" max="2030-12-31" style="color-scheme:dark">
+      </div>
+      <div class="fg"><label>Paid Method</label>
+        <select id="constExpPaidMethod">
+          <option value="">— select —</option>
+          <option value="Wire">🏦 Wire</option>
+          <option value="Credit Card">💳 Credit Card</option>
+          <option value="Zelle">⚡ Zelle</option>
+          <option value="Cash">💵 Cash</option>
+        </select>
+      </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('constructionExpenseModal')">Cancel</button>
@@ -1784,8 +1795,19 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div class="fg"><label>Description</label>
       <input id="mutualDesc" placeholder="What was this expense for?">
     </div>
-    <div class="fg"><label>Date</label>
-      <input id="mutualDate" type="date" min="2020-01-01" max="2030-12-31" style="color-scheme:dark">
+    <div class="frow">
+      <div class="fg"><label>Date</label>
+        <input id="mutualDate" type="date" min="2020-01-01" max="2030-12-31" style="color-scheme:dark">
+      </div>
+      <div class="fg"><label>Paid Method</label>
+        <select id="mutualPaidMethod">
+          <option value="">— select —</option>
+          <option value="Wire">🏦 Wire</option>
+          <option value="Credit Card">💳 Credit Card</option>
+          <option value="Zelle">⚡ Zelle</option>
+          <option value="Cash">💵 Cash</option>
+        </select>
+      </div>
     </div>
     <div id="mutualPreview" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-top:8px;display:none"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -9525,6 +9547,7 @@ function openMutualExpense(){
   document.getElementById('mutualCategory').value='Labor';
   document.getElementById('mutualAmount').value='';
   document.getElementById('mutualDesc').value='';
+  document.getElementById('mutualPaidMethod').value='';
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('mutualDate').value=today;
   document.getElementById('mutualPreview').style.display='none';
@@ -9562,6 +9585,7 @@ async function saveMutualExpense(){
   const category=document.getElementById('mutualCategory').value;
   const desc=(document.getElementById('mutualDesc').value||'').trim();
   const date=document.getElementById('mutualDate').value||'';
+  const paidMethod=document.getElementById('mutualPaidMethod').value||'';
 
   if(count===0){toast('Please select at least one property');return;}
   if(total<=0){toast('Please enter a valid amount');return;}
@@ -9577,6 +9601,7 @@ async function saveMutualExpense(){
         propertyId,
         propertyAddress:addr,
         category:mutualLabel,
+        paidMethod:paidMethod,
         description:desc||'Mutual expense split across '+count+' properties',
         amount:each,
         date,
@@ -9671,6 +9696,7 @@ function renderExpenseList(el, tabs){
         <td><span style="color:${catColor};font-weight:500;font-size:11px">${catEmoji} ${escapeHtml(d.category||'—')}</span></td>
         <td style="font-size:12px;color:var(--text);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(d.description||'')}">${escapeHtml(d.description||'—')}</td>
         <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);text-align:right">${fmt(d.amount||0)}</td>
+        <td style="font-size:11px">${d.paidMethod?`<span style="padding:2px 6px;border-radius:4px;background:var(--surface3);color:var(--text);font-weight:500">${{'Wire':'🏦','Credit Card':'💳','Zelle':'⚡','Cash':'💵'}[d.paidMethod]||''} ${escapeHtml(d.paidMethod)}</span>`:'<span style="color:var(--muted2)">—</span>'}</td>
         <td style="font-size:11px;color:var(--muted)">${d.createdBy?escapeHtml(d.createdBy):'—'}</td>
         ${isAdmin()?`<td style="text-align:right"><button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="deleteConstructionExpense('${d.id}')">Delete</button></td>`:'<td></td>'}
       </tr>`;
@@ -9691,6 +9717,7 @@ function renderExpenseList(el, tabs){
             <th>📦 Category</th>
             <th>📝 Description</th>
             <th style="text-align:right">💰 Amount</th>
+            <th>💳 Paid Method</th>
             <th>👤 Added By</th>
             <th style="text-align:right">Actions</th>
           </tr></thead>
@@ -9713,6 +9740,7 @@ function openAddGeneralExpense(){
   document.getElementById('constExpCategory').value='Labor';
   document.getElementById('constExpAmount').value='';
   document.getElementById('constExpDesc').value='';
+  document.getElementById('constExpPaidMethod').value='';
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('constExpDate').value=today;
   // Temporarily mark as general
@@ -9730,6 +9758,7 @@ function openAddExpense(){
   document.getElementById('constExpCategory').value='Labor';
   document.getElementById('constExpAmount').value='';
   document.getElementById('constExpDesc').value='';
+  document.getElementById('constExpPaidMethod').value='';
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('constExpDate').value=today;
   document.getElementById('constructionExpenseModal').dataset.general='false';
@@ -9742,6 +9771,7 @@ async function saveConstructionExpense(){
   const desc=(document.getElementById('constExpDesc').value||'').trim();
   const amount=parseFloat(document.getElementById('constExpAmount').value)||0;
   const date=document.getElementById('constExpDate').value||'';
+  const paidMethod=document.getElementById('constExpPaidMethod').value||'';
 
   const isGeneral=document.getElementById('constructionExpenseModal').dataset.general==='true';
   if(!isGeneral && !addr){toast('Please select a property');return;}
@@ -9758,6 +9788,7 @@ async function saveConstructionExpense(){
       description:desc,
       amount:amount,
       date:date,
+      paidMethod:paidMethod,
       isGeneral:isGeneral,
       createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       createdBy:currentUser?currentUser.email:''
