@@ -5345,6 +5345,7 @@ function renderTenantLeaseView(){
       })()}</td>
       <td><input type="text" value="${escapeAttr(tName)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','tenantName2',this.value)"></td>
       <td><input type="tel" value="${escapeAttr(tNum)}" placeholder="📞" style="${ism};width:110px" ${dis} onblur="updatePropertyField('${p.id}','tenantNumber2',this.value)"></td>
+      <td><input type="email" value="${escapeAttr(p.tenantEmail||'')}" placeholder="✉" style="${is};width:130px" ${dis} onblur="updatePropertyField('${p.id}','tenantEmail',this.value)"></td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
     </tr>`;
@@ -5364,6 +5365,7 @@ function renderTenantLeaseView(){
             <th>⏳ Days Left</th>
             <th>👤 Tenant Name</th>
             <th>📞 Tenant Number</th>
+            <th>✉ Email</th>
             <th>📋 Secondary Info</th>
             <th>📝 Notes</th>
           </tr></thead>
