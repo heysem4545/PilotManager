@@ -5349,13 +5349,9 @@ function renderTenantLeaseView(){
       <td>${(()=>{
         const methods=['Zelle','Doorloop','Turbotenant','Money Order','Cash'];
         const saved=(p.payMethods||[]);
-        return `<div style="display:flex;flex-wrap:wrap;gap:3px">${methods.map(m=>{
-          const checked=saved.includes(m);
-          return `<label style="display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:10px;cursor:pointer;background:${checked?'var(--accent-dim)':'var(--surface3)'};color:${checked?'var(--accent)':'var(--muted)'};border:1px solid ${checked?'var(--accent-dim)':'var(--border2)'}">
-            <input type="checkbox" ${checked?'checked':''} ${dis} style="display:none" onchange="togglePayMethod('${p.id}','${m}',this.checked)">
-            ${m}
-          </label>`;
-        }).join('')}</div>`;
+        const display=saved.length?saved.map(m=>`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--accent-dim);color:var(--accent)">${m}</span>`).join(' '):'';
+        const opts=methods.map(m=>`<option value="${m}">${saved.includes(m)?'✓ ':''} ${m}</option>`).join('');
+        return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap">${display}<select ${dis} style="font-size:9px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;background:var(--surface2);color:var(--muted);cursor:pointer;width:18px" onchange="togglePayMethod('${p.id}',this.value,true);this.selectedIndex=0"><option value="">+</option>${opts}</select></div>`;
       })()}</td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
