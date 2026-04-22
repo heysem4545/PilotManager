@@ -10305,22 +10305,32 @@ async function renderConstProjectsView(){
   await loadConstProjects();
   await loadConstructionData(); // load expenses for budget comparison
 
-  let html='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+  if(typeof window._cpTab==='undefined') window._cpTab='active';
+
+  const activeProjects = constProjectsData.filter(p=>!p.archived);
+  const archivedProjects = constProjectsData.filter(p=>p.archived);
+
+  let html=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
+    <button onclick="window._cpTab='active';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">🔨 Active Projects (${activeProjects.length})</button>
+    <button onclick="window._cpTab='archived';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📦 Projects Archived (${archivedProjects.length})</button>
+  </div>`;
+
+  html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
   html+='<button class="btn btn-primary btn-sm" onclick="openAddProject()">+ Add Project</button>';
   if(isAdmin()){
     html+='<button class="btn btn-ghost btn-sm" onclick="openEditCategories()">&#9881; Edit Categories</button>';
   }
   html+='</div>';
 
-  // Summary stats
-  const totalProjects = constProjectsData.length;
-  const inProgressProjs = constProjectsData.filter(p=>(p.totalProgress||0)<100);
-  const completedProjs = constProjectsData.filter(p=>(p.totalProgress||0)>=100);
+  // Summary stats — only count active projects
+  const totalProjects = activeProjects.length;
+  const inProgressProjs = activeProjects.filter(p=>(p.totalProgress||0)<100);
+  const completedProjs = activeProjects.filter(p=>(p.totalProgress||0)>=100);
   const waitingAudit = completedProjs.filter(p=>{const items=p.auditItems||[];return items.length===0||(items.length>0&&!items.every(i=>i.checked));});
   const auditComplete = completedProjs.filter(p=>{const items=p.auditItems||[];return items.length>0&&items.every(i=>i.checked);});
-  const overdue = constProjectsData.filter(p=>{if((p.totalProgress||0)>=100||!p.targetDate)return false;const t=new Date(p.targetDate+'T00:00:00');const now=new Date();now.setHours(0,0,0,0);return t<now;});
-  const avgProgress = totalProjects>0?Math.round(constProjectsData.reduce((s,p)=>s+(p.totalProgress||0),0)/totalProjects):0;
-  const totalBudget = constProjectsData.reduce((s,p)=>s+(p.estimateLabor||0)+(p.estimateMaterial||0),0);
+  const overdue = activeProjects.filter(p=>{if((p.totalProgress||0)>=100||!p.targetDate)return false;const t=new Date(p.targetDate+'T00:00:00');const now=new Date();now.setHours(0,0,0,0);return t<now;});
+  const avgProgress = totalProjects>0?Math.round(activeProjects.reduce((s,p)=>s+(p.totalProgress||0),0)/totalProjects):0;
+  const totalBudget = activeProjects.reduce((s,p)=>s+(p.estimateLabor||0)+(p.estimateMaterial||0),0);
   const propExpAll = (typeof constructionData!=='undefined'?constructionData:[]).filter(d=>!d.isGeneral);
   const totalActual = propExpAll.reduce((s,d)=>s+(d.amount||0),0);
 
@@ -10359,17 +10369,55 @@ async function renderConstProjectsView(){
     </div>
   </div>`;
 
-  if(!constProjectsData.length){
+  if(window._cpTab==='archived'){
+    // Archived tab
+    if(!archivedProjects.length){
+      html+=`<div class="cp-empty">
+        <div class="cp-empty-icon">📦</div>
+        <div class="cp-empty-text">No archived projects</div>
+        <div class="cp-empty-sub">Completed projects you archive will appear here.</div>
+      </div>`;
+      el.innerHTML=html;
+      return;
+    }
+    archivedProjects.forEach(proj=>{
+      const tp=proj.totalProgress||0;
+      const auditItems=proj.auditItems||[];
+      const auditDone=auditItems.filter(a=>a.checked).length;
+      const auditTotal=auditItems.length;
+      html+=`<div class="cp-card" style="opacity:0.85;border-color:var(--border2)">
+        <div class="cp-card-head">
+          <div class="cp-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="restoreProject('${proj.id}')">↩ Restore</button>
+            ${isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteProject('${proj.id}')">Delete</button>`:''}
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;font-size:11px;color:var(--muted)">
+          <span>📊 Progress: <strong style="color:var(--text)">${tp}%</strong></span>
+          <span>📅 Start: <strong style="color:var(--text)">${proj.startDate||'—'}</strong></span>
+          <span>✅ Completed: <strong style="color:var(--accent)">${proj.completedDate||'—'}</strong></span>
+          ${proj.auditedDate?`<span>🔍 Audited: <strong style="color:#4ade80">${proj.auditedDate}</strong></span>`:''}
+          <span>🔍 Audit: <strong style="color:var(--text)">${auditTotal>0?auditDone+'/'+auditTotal+' fixed':'No items'}</strong></span>
+          ${proj.archivedDate?`<span>📦 Archived: <strong style="color:var(--text)">${proj.archivedDate}</strong></span>`:''}
+        </div>
+      </div>`;
+    });
+    el.innerHTML=html;
+    return;
+  }
+
+  if(!activeProjects.length){
     html+=`<div class="cp-empty">
       <div class="cp-empty-icon">&#128679;</div>
-      <div class="cp-empty-text">No construction projects yet</div>
+      <div class="cp-empty-text">No active construction projects</div>
       <div class="cp-empty-sub">Click "+ Add Project" to start tracking a renovation.</div>
     </div>`;
     el.innerHTML=html;
     return;
   }
 
-  constProjectsData.forEach(proj=>{
+  activeProjects.forEach(proj=>{
     const tp = proj.totalProgress||0;
     const cats = proj.categories||[];
     html+=`<div class="cp-card">
@@ -10378,6 +10426,7 @@ async function renderConstProjectsView(){
         <div style="display:flex;gap:6px;align-items:center">`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveProjectSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleProjectTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+proj.snapshots.length+')':''}</button>`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveProject('${proj.id}')">📦 Archive</button>`;
     if(isAdmin()){
       html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteProject('${proj.id}')">Delete</button>`;
     }
@@ -10751,6 +10800,29 @@ async function updateProjectProgress(docId,catIndex,value){
 }
 
 function openAddProject(){
+async function archiveProject(projId){
+  if(!confirm('Archive this project? It will move to the Projects Archived tab.')) return;
+  try{
+    await db.collection('constructionProjects').doc(projId).update({archived:true, archivedDate:new Date().toISOString().slice(0,10)});
+    const proj=constProjectsData.find(p=>p.id===projId);
+    if(proj){proj.archived=true;proj.archivedDate=new Date().toISOString().slice(0,10);}
+    toast('Project archived');
+    await renderConstProjectsView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function restoreProject(projId){
+  if(!confirm('Restore this project back to active?')) return;
+  try{
+    await db.collection('constructionProjects').doc(projId).update({archived:false, archivedDate:''});
+    const proj=constProjectsData.find(p=>p.id===projId);
+    if(proj){proj.archived=false;proj.archivedDate='';}
+    toast('Project restored');
+    window._cpTab='active';
+    await renderConstProjectsView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
   // Populate datalist
   const dl = document.getElementById('constProjAddrList');
   dl.innerHTML = properties.map(p=>'<option value="'+escapeHtml(p.addr)+'">').join('');
