@@ -10156,6 +10156,7 @@ async function updateProjectProgress(docId,catIndex,value){
       totalProgress: total,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    await renderConstProjectsView();
   }catch(e){
     console.error('updateProjectProgress error:',e);
     toast('Error saving progress');
