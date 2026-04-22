@@ -10731,13 +10731,58 @@ function renderTurnoverWorkOrders(){
   let html='';
   completed.forEach(proj=>{
     const isReady = proj.status==='Ready to Rent';
+    // Calculate duration
+    const start = proj.startDate ? new Date(proj.startDate+'T00:00:00') : null;
+    const comp = proj.completedDate ? new Date(proj.completedDate+'T00:00:00') : null;
+    const targ = proj.targetDate ? new Date(proj.targetDate+'T00:00:00') : null;
+    const durationDays = (start && comp) ? Math.ceil((comp-start)/86400000) : null;
+    const wasLate = (comp && targ) ? Math.ceil((comp-targ)/86400000) : null;
+
+    const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);width:80px';
+
     html+=`<div class="to-wo-card" style="${isReady?'border-left:3px solid var(--accent)':''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <div class="to-wo-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
         ${isReady?'<span class="to-badge-ready">🏡 Ready to Rent</span>':'<span class="to-badge-completed">✅ Completed</span>'}
-        <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Completed: ${proj.completedDate||'—'}</span>
       </div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📋 Project Report</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;margin-bottom:8px">
+          <div><span style="color:var(--muted)">Work Type:</span> <strong style="color:${proj.workType==='Heavy'?'var(--red)':proj.workType==='Medium'?'var(--amber)':'var(--accent)'}">${proj.workType||'—'}</strong></div>
+          <div><span style="color:var(--muted)">Fix By:</span> <strong>${proj.fixBy||'—'}</strong></div>
+          <div><span style="color:var(--muted)">Tenant Left:</span> <strong>${proj.tenantLeftDate||'—'}</strong></div>
+          <div><span style="color:var(--muted)">Started:</span> <strong>${proj.startDate||'—'}</strong></div>
+          <div><span style="color:var(--muted)">Completed:</span> <strong style="color:var(--accent)">${proj.completedDate||'—'}</strong></div>
+          <div><span style="color:var(--muted)">Target Was:</span> <strong>${proj.targetDate||'—'}</strong></div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px;flex-wrap:wrap">
+          ${durationDays!==null?`<span>⏱ Duration: <strong>${durationDays} days</strong></span>`:''}
+          ${wasLate!==null?(wasLate<=0?`<span style="color:var(--accent)">✅ Finished ${Math.abs(wasLate)} days early</span>`:`<span style="color:var(--red)">⚠️ Finished ${wasLate} days late</span>`):''}
+        </div>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💰 Cost Summary</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div>
+            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🧱 Material</div>
+            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costMaterial||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateTurnoverField('${proj.id}','costMaterial',parseFloat(this.value)||0)"></div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🏢 Outsource</div>
+            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costOutsource||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateTurnoverField('${proj.id}','costOutsource',parseFloat(this.value)||0)"></div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">👷 Own Labor</div>
+            <input type="text" value="${escapeAttr(proj.costOwnLabor||'')}" placeholder="Notes…" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" onblur="updateTurnoverField('${proj.id}','costOwnLabor',this.value)">
+          </div>
+        </div>
+        ${(proj.costMaterial||0)+(proj.costOutsource||0)>0?`<div style="margin-top:8px;font-size:11px;font-family:var(--mono)">Total Spent: <strong style="color:var(--accent)">${fmt((proj.costMaterial||0)+(proj.costOutsource||0))}</strong></div>`:''}
+      </div>
+
       <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">✅ Checklist</div>
         <label class="to-wo-check"><input type="checkbox" ${proj.postedAffordable?'checked':''} onchange="updateTurnoverField('${proj.id}','postedAffordable',this.checked)"> Posted on Affordable</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.locksRenewed?'checked':''} onchange="updateTurnoverField('${proj.id}','locksRenewed',this.checked)"> Locks Renewed</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.updatedSystem?'checked':''} onchange="updateTurnoverField('${proj.id}','updatedSystem',this.checked)"> Updated System</label>
