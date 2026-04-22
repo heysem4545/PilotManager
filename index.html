@@ -9614,7 +9614,7 @@ async function saveMutualExpense(){
         propertyAddress:addr,
         category:mutualLabel,
         paidMethod:paidMethod,
-        description:desc||'Mutual expense split across '+count+' properties',
+        description:(desc?desc+' ':'')+'(Mutual 1/'+count+' — '+fmt(total)+' total)',
         amount:each,
         date,
         mutualGroup:true,
