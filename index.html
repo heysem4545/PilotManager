@@ -9392,15 +9392,18 @@ async function renderConstructionView(){
     </tr>`;
     // Detail row (hidden)
     const detailExpenses=p.expenses.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const dis='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
     let detailRows='';
     detailExpenses.forEach(ex=>{
-      const catEmoji=ex.category==='Labor'?'\u{1F477}':'\u{1F9F1}';
+      const catOpts=['Labor','Material'].map(o=>`<option value="${o}"${(ex.category||'')===o?' selected':''}>${o==='Labor'?'👷':'🧱'} ${o}</option>`).join('');
+      const pmOpts=['','Wire','Credit Card','Zelle','Cash'].map(o=>`<option value="${o}"${(ex.paidMethod||'')===o?' selected':''}>${o?({'Wire':'🏦','Credit Card':'💳','Zelle':'⚡','Cash':'💵'}[o]||'')+' '+o:'— select —'}</option>`).join('');
       const delBtn=isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:10px" onclick="deleteConstructionExpense('${ex.id}')">Delete</button>`:'';
       detailRows+=`<tr>
-        <td style="font-family:var(--mono);white-space:nowrap">${escapeHtml(ex.date||'—')}</td>
-        <td>${catEmoji} <span class="${ex.category==='Labor'?'const-labor':'const-material'}">${escapeHtml(ex.category||'')}</span></td>
-        <td style="color:var(--text)">${escapeHtml(ex.description||'—')}</td>
-        <td style="font-family:var(--mono);text-align:right;font-weight:500">${fmt(ex.amount||0)}</td>
+        <td><input type="date" value="${ex.date||''}" style="${dis};width:120px;color-scheme:dark" onchange="updateExpenseField('${ex.id}','date',this.value)"></td>
+        <td><select style="${dis};cursor:pointer" onchange="updateExpenseField('${ex.id}','category',this.value)">${catOpts}</select></td>
+        <td><input type="text" value="${escapeAttr(ex.description||'')}" style="${dis};width:150px" onblur="updateExpenseField('${ex.id}','description',this.value)"></td>
+        <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 5px;width:80px"><span style="color:var(--muted);font-size:11px">$</span><input type="number" value="${ex.amount||''}" step="0.01" style="background:none;border:none;padding:3px 4px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateExpenseField('${ex.id}','amount',parseFloat(this.value)||0)"></div></td>
+        <td><select style="${dis};cursor:pointer" onchange="updateExpenseField('${ex.id}','paidMethod',this.value)">${pmOpts}</select></td>
         <td style="text-align:center">${delBtn}</td>
       </tr>`;
     });
@@ -9411,11 +9414,11 @@ async function renderConstructionView(){
         <div class="lc-detail-inner">
           <div class="lc-detail-title">Expense Details — ${escapeHtml(p.propertyAddress)}</div>
           <table class="lc-detail-table">
-            <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Category</th><th style="text-align:left">Description</th><th style="text-align:right">Amount</th><th style="text-align:center;width:70px"></th></tr></thead>
+            <thead><tr><th style="text-align:left">Date</th><th style="text-align:left">Category</th><th style="text-align:left">Description</th><th style="text-align:right">Amount</th><th style="text-align:left">Paid Method</th><th style="text-align:center;width:70px"></th></tr></thead>
             <tbody>${detailRows}</tbody>
             <tfoot>
-              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">👷 Labor Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-labor">${fmt(laborSub)}</td><td></td></tr>
-              <tr><td colspan="3" style="text-align:right;font-family:var(--font)">🧱 Material Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-material">${fmt(matSub)}</td><td></td></tr>
+              <tr><td colspan="4" style="text-align:right;font-family:var(--font)">👷 Labor Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-labor">${fmt(laborSub)}</td><td></td></tr>
+              <tr><td colspan="4" style="text-align:right;font-family:var(--font)">🧱 Material Subtotal</td><td style="text-align:right;font-family:var(--mono)" class="const-material">${fmt(matSub)}</td><td></td></tr>
             </tfoot>
           </table>
         </div>
@@ -9448,6 +9451,15 @@ async function renderConstructionView(){
       </table></div>`:''}
       ${emptyMsg}
     </div>`;
+}
+
+async function updateExpenseField(docId, field, value){
+  try{
+    await db.collection('constructionTracking').doc(docId).update({[field]:value});
+  }catch(e){
+    console.error('updateExpenseField',e);
+    toast('Error: '+e.message);
+  }
 }
 
 function toggleConstructionDetail(propertyId){
