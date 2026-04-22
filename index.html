@@ -9609,7 +9609,9 @@ async function saveMutualExpense(){
   if(total<=0){toast('Please enter a valid amount');return;}
 
   const each=Math.round(total/count*100)/100;
+  console.log('[saveMutualExpense] category dropdown value:', category);
   const mutualLabel='Mutual '+category+' 1/'+count;
+  console.log('[saveMutualExpense] mutualLabel:', mutualLabel);
 
   try{
     for(const cb of checks){
