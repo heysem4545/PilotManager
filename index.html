@@ -9357,8 +9357,8 @@ async function renderConstructionView(){
   }
 
   const totalSpent=constructionData.reduce((s,d)=>s+(d.amount||0),0);
-  const totalLabor=constructionData.filter(d=>(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
-  const totalMaterial=constructionData.filter(d=>!(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=constructionData.filter(d=>(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=constructionData.filter(d=>!(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
 
   // Group by propertyId
   const grouped={};
@@ -9367,7 +9367,7 @@ async function renderConstructionView(){
     if(!grouped[key]) grouped[key]={propertyId:key,propertyAddress:d.propertyAddress||'Unknown',expenses:[],totalSpent:0,totalLabor:0,totalMaterial:0};
     grouped[key].expenses.push(d);
     grouped[key].totalSpent+=(d.amount||0);
-    if((d.category||'').includes('Labor')) grouped[key].totalLabor+=(d.amount||0);
+    if((d.category||'').toLowerCase().includes('labor')) grouped[key].totalLabor+=(d.amount||0);
     else grouped[key].totalMaterial+=(d.amount||0);
   });
   const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
@@ -9407,8 +9407,10 @@ async function renderConstructionView(){
         <td style="text-align:center">${delBtn}</td>
       </tr>`;
     });
-    const laborSub=p.totalLabor;
-    const matSub=p.totalMaterial;
+    // Calculate subtotals directly from expenses to be accurate
+    const laborSub=p.expenses.filter(ex=>(ex.category||'').toLowerCase().includes('labor')).reduce((s,ex)=>s+(ex.amount||0),0);
+    const matSub=p.expenses.filter(ex=>!(ex.category||'').toLowerCase().includes('labor')).reduce((s,ex)=>s+(ex.amount||0),0);
+    console.log('[detail]',p.propertyAddress,'expenses:',p.expenses.map(e=>({cat:e.category,amt:e.amount})),'labor:',laborSub,'material:',matSub);
     rows+=`<tr class="lc-detail-row" id="const-detail-${safeId}" style="display:none">
       <td colspan="5">
         <div class="lc-detail-inner">
@@ -9484,12 +9486,12 @@ function renderConstructionMonthly(el, tabs){
     const mk=d.date?d.date.substring(0,7):'unknown';
     if(!byMonth[mk]) byMonth[mk]={labor:0,material:0,total:0,properties:{}};
     byMonth[mk].total+=(d.amount||0);
-    if((d.category||'').includes('Labor')) byMonth[mk].labor+=(d.amount||0);
+    if((d.category||'').toLowerCase().includes('labor')) byMonth[mk].labor+=(d.amount||0);
     else byMonth[mk].material+=(d.amount||0);
     const addr=d.propertyAddress||'Unknown';
     if(!byMonth[mk].properties[addr]) byMonth[mk].properties[addr]={labor:0,material:0,total:0};
     byMonth[mk].properties[addr].total+=(d.amount||0);
-    if((d.category||'').includes('Labor')) byMonth[mk].properties[addr].labor+=(d.amount||0);
+    if((d.category||'').toLowerCase().includes('labor')) byMonth[mk].properties[addr].labor+=(d.amount||0);
     else byMonth[mk].properties[addr].material+=(d.amount||0);
   });
   const months=Object.keys(byMonth).sort().reverse();
@@ -9637,7 +9639,7 @@ function renderGeneralExpenses(el, tabs){
   // Filter to general (non-property) expenses
   const general=constructionData.filter(d=>d.isGeneral);
   const totalSpent=general.reduce((s,d)=>s+(d.amount||0),0);
-  const totalLabor=general.filter(d=>(d.category||'').includes('Labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=general.filter(d=>(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
   const totalMaterial=general.filter(d=>(d.category||'').includes('Material')).reduce((s,d)=>s+(d.amount||0),0);
 
   const editable=canEdit()||isAdmin();
@@ -9649,8 +9651,8 @@ function renderGeneralExpenses(el, tabs){
   } else {
     const sorted=[...general].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     rows=sorted.map(d=>{
-      const catColor=(d.category||'').includes('Labor')?'var(--blue)':'var(--amber)';
-      const catEmoji=(d.category||'').includes('Labor')?'👷':'🧱';
+      const catColor=(d.category||'').toLowerCase().includes('labor')?'var(--blue)':'var(--amber)';
+      const catEmoji=(d.category||'').toLowerCase().includes('labor')?'👷':'🧱';
       return `<tr>
         <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${d.date||'—'}</td>
         <td><span style="color:${catColor};font-weight:500;font-size:11px">${catEmoji} ${escapeHtml(d.category||'')}</span></td>
@@ -9698,8 +9700,8 @@ function renderExpenseList(el, tabs){
     rows=`<tr><td colspan="7" style="padding:40px 20px;text-align:center;color:var(--muted)">No expenses recorded yet.</td></tr>`;
   } else {
     rows=all.map(d=>{
-      const catColor=(d.category||'').includes('Labor')?'var(--blue)':(d.category||'').includes('Material')?'var(--amber)':'var(--purple)';
-      const catEmoji=(d.category||'').includes('Labor')?'👷':(d.category||'').includes('Material')?'🧱':'📦';
+      const catColor=(d.category||'').toLowerCase().includes('labor')?'var(--blue)':(d.category||'').includes('Material')?'var(--amber)':'var(--purple)';
+      const catEmoji=(d.category||'').toLowerCase().includes('labor')?'👷':(d.category||'').includes('Material')?'🧱':'📦';
       const addrDisp=d.isGeneral?'<span style="color:var(--purple);font-weight:500">General</span>':escapeHtml(d.propertyAddress||'—');
       const searchData=((d.propertyAddress||'')+(d.category||'')+(d.description||'')+(d.date||'')).toLowerCase();
       return `<tr class="exp-list-row" data-search="${escapeAttr(searchData)}">
