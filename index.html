@@ -823,18 +823,24 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .cp-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .cp-card-addr{font-size:14px;font-weight:600}
 .cp-overall-bar{width:100%;height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;margin-bottom:4px}
-.cp-overall-fill{height:100%;border-radius:5px;background:var(--accent);transition:width .4s ease}
+.cp-overall-fill{height:100%;border-radius:5px;background:#4ade80;transition:width .4s ease}
 .cp-overall-pct{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:14px;font-family:var(--mono)}
 .cp-cat-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border)}
 .cp-cat-name{font-size:12px;font-weight:500;width:140px;flex-shrink:0}
 .cp-cat-weight{font-size:10px;color:var(--muted);font-family:var(--mono)}
 .const-proj-slider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:var(--surface3);outline:none;cursor:pointer;flex:1}
-.const-proj-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
-.const-proj-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+.const-proj-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--amber);cursor:pointer}
+.const-proj-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--amber);cursor:pointer;border:none}
+.cp-cat-row.done .const-proj-slider::-webkit-slider-thumb{background:#4ade80}
+.cp-cat-row.done .const-proj-slider::-moz-range-thumb{background:#4ade80}
 .cp-cat-pct{font-size:11px;font-family:var(--mono);width:36px;text-align:right;flex-shrink:0}
 .cp-cat-contrib{font-size:11px;font-family:var(--mono);width:50px;text-align:right;flex-shrink:0;color:var(--muted)}
-.cp-cat-row.done .cp-cat-name{color:var(--accent)}
+.cp-cat-row.done .cp-cat-name{color:#4ade80}
 .cp-cat-row.partial .cp-cat-name{color:var(--amber)}
+.cp-cat-row.done .cp-cat-pct{color:#4ade80}
+.cp-cat-row.partial .cp-cat-pct{color:var(--amber)}
+.cp-cat-row.done .cp-cat-contrib{color:#4ade80}
+.cp-cat-row.partial .cp-cat-contrib{color:var(--amber)}
 .cp-cat-row.zero .cp-cat-name{color:var(--muted2)}
 .cp-empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .cp-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
@@ -9980,8 +9986,6 @@ async function renderConstProjectsView(){
   constProjectsData.forEach(proj=>{
     const tp = proj.totalProgress||0;
     const cats = proj.categories||[];
-    const barColor = tp>=100?'var(--accent)':tp>=50?'var(--accent)':'var(--amber)';
-
     html+=`<div class="cp-card">
       <div class="cp-card-head">
         <div class="cp-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
@@ -9993,7 +9997,7 @@ async function renderConstProjectsView(){
     }
     html+=`</div>
       </div>
-      <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;background:${barColor}"></div></div>
+      <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%"></div></div>
       <div class="cp-overall-pct">${tp}% complete</div>`;
 
     cats.forEach((cat,idx)=>{
@@ -10001,7 +10005,7 @@ async function renderConstProjectsView(){
       const cls = (cat.progress||0)>=100?'done':(cat.progress||0)>0?'partial':'zero';
       html+=`<div class="cp-cat-row ${cls}">
         <div class="cp-cat-name">${escapeHtml(cat.name)} <span class="cp-cat-weight">(${cat.weight}%)</span></div>
-        <input type="range" min="0" max="100" value="${cat.progress||0}" class="const-proj-slider"
+        <input type="range" min="0" max="100" step="5" value="${cat.progress||0}" class="const-proj-slider"
           oninput="previewProjectProgress('${proj.id}',${idx},this.value,this)"
           onchange="updateProjectProgress('${proj.id}',${idx},this.value)">
         <div class="cp-cat-pct" id="cpPct_${proj.id}_${idx}">${cat.progress||0}%</div>
