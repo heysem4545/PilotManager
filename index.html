@@ -9318,6 +9318,7 @@ async function renderConstructionView(){
     <button class="ftab ${constructionTab==='overview'?'active':''}" onclick="switchConstructionTab('overview')">📊 Overview</button>
     <button class="ftab ${constructionTab==='monthly'?'active':''}" onclick="switchConstructionTab('monthly')">📅 Monthly Breakdown</button>
     <button class="ftab ${constructionTab==='general'?'active':''}" onclick="switchConstructionTab('general')">🏢 General Expenses</button>
+    <button class="ftab ${constructionTab==='list'?'active':''}" onclick="switchConstructionTab('list')">📋 List of Expenses</button>
   </div>`;
 
   if(constructionTab==='monthly'){
@@ -9326,6 +9327,10 @@ async function renderConstructionView(){
   }
   if(constructionTab==='general'){
     renderGeneralExpenses(el, tabs);
+    return;
+  }
+  if(constructionTab==='list'){
+    renderExpenseList(el, tabs);
     return;
   }
 
@@ -9643,6 +9648,63 @@ function renderGeneralExpenses(el, tabs){
         </table>
       </div>
     </div>`;
+}
+
+function renderExpenseList(el, tabs){
+  const all=[...constructionData].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const totalSpent=all.reduce((s,d)=>s+(d.amount||0),0);
+
+  let searchHtml=`<input type="text" id="expListSearch" placeholder="🔍 Search by address, category, description…" oninput="filterExpenseList()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:280px">`;
+
+  let rows='';
+  if(all.length===0){
+    rows=`<tr><td colspan="7" style="padding:40px 20px;text-align:center;color:var(--muted)">No expenses recorded yet.</td></tr>`;
+  } else {
+    rows=all.map(d=>{
+      const catColor=(d.category||'').includes('Labor')?'var(--blue)':(d.category||'').includes('Material')?'var(--amber)':'var(--purple)';
+      const catEmoji=(d.category||'').includes('Labor')?'👷':(d.category||'').includes('Material')?'🧱':'📦';
+      const addrDisp=d.isGeneral?'<span style="color:var(--purple);font-weight:500">General</span>':escapeHtml(d.propertyAddress||'—');
+      const searchData=((d.propertyAddress||'')+(d.category||'')+(d.description||'')+(d.date||'')).toLowerCase();
+      return `<tr class="exp-list-row" data-search="${escapeAttr(searchData)}">
+        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${d.date||'—'}</td>
+        <td style="font-size:12px">${addrDisp}</td>
+        <td><span style="color:${catColor};font-weight:500;font-size:11px">${catEmoji} ${escapeHtml(d.category||'—')}</span></td>
+        <td style="font-size:12px;color:var(--text);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(d.description||'')}">${escapeHtml(d.description||'—')}</td>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);text-align:right">${fmt(d.amount||0)}</td>
+        <td style="font-size:11px;color:var(--muted)">${d.createdBy?escapeHtml(d.createdBy):'—'}</td>
+        ${isAdmin()?`<td style="text-align:right"><button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="deleteConstructionExpense('${d.id}')">Delete</button></td>`:'<td></td>'}
+      </tr>`;
+    }).join('');
+  }
+
+  el.innerHTML=tabs+`
+    <div style="margin-bottom:14px;font-size:12px;color:var(--muted)">Total: <strong class="const-total">${fmt(totalSpent)}</strong> across <strong style="color:var(--text)">${all.length}</strong> expense${all.length===1?'':'s'}</div>
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left">${searchHtml}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>📅 Date</th>
+            <th>🏠 Property</th>
+            <th>📦 Category</th>
+            <th>📝 Description</th>
+            <th style="text-align:right">💰 Amount</th>
+            <th>👤 Added By</th>
+            <th style="text-align:right">Actions</th>
+          </tr></thead>
+          <tbody id="expListBody">${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function filterExpenseList(){
+  const q=(document.getElementById('expListSearch').value||'').toLowerCase();
+  document.querySelectorAll('.exp-list-row').forEach(row=>{
+    row.style.display=!q||row.dataset.search.includes(q)?'':'none';
+  });
 }
 
 function openAddGeneralExpense(){
