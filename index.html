@@ -1751,6 +1751,50 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- MUTUAL CONSTRUCTION EXPENSE MODAL -->
+<div class="overlay" id="mutualExpenseModal" onclick="if(event.target===this)closeModal('mutualExpenseModal')">
+  <div class="modal" style="width:540px">
+    <div class="modal-title">
+      <span>Add Mutual Expense</span>
+      <button class="modal-close" onclick="closeModal('mutualExpenseModal')">×</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5">Select multiple properties. The total amount will be split equally among them.</div>
+    <div class="fg"><label>Select Properties</label>
+      <div id="mutualPropList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:4px;background:var(--surface2)"></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px" onclick="mutualSelectAll(true)">Select All</button>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 8px" onclick="mutualSelectAll(false)">Clear All</button>
+        <span id="mutualSelectedCount" style="font-size:11px;color:var(--muted);margin-left:auto;display:flex;align-items:center">0 selected</span>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Category</label>
+        <select id="mutualCategory">
+          <option value="Labor">👷 Labor</option>
+          <option value="Material">🧱 Material</option>
+        </select>
+      </div>
+      <div class="fg"><label>Total Amount (will be split)</label>
+        <div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:0 10px">
+          <span style="color:var(--muted);font-size:13px;font-family:var(--mono)">$</span>
+          <input id="mutualAmount" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateMutualPreview()" style="background:none;border:none;padding:9px 8px;font-size:13px;color:var(--text);font-family:var(--mono);outline:none;width:100%">
+        </div>
+      </div>
+    </div>
+    <div class="fg"><label>Description</label>
+      <input id="mutualDesc" placeholder="What was this expense for?">
+    </div>
+    <div class="fg"><label>Date</label>
+      <input id="mutualDate" type="date" min="2020-01-01" max="2030-12-31" style="color-scheme:dark">
+    </div>
+    <div id="mutualPreview" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-top:8px;display:none"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('mutualExpenseModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMutualExpense()">Split & Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="toast-dot"></span><span id="toastMsg"></span></div>
 
 <!-- Firebase Config -->
@@ -9297,7 +9341,7 @@ async function renderConstructionView(){
   const propRows=Object.values(grouped).sort((a,b)=>b.totalSpent-a.totalSpent);
 
   const editable=canEdit()||isAdmin();
-  const addBtn=editable?'<button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Add Expense</button>':'';
+  const addBtn=editable?'<button class="btn btn-primary btn-sm" onclick="openAddExpense()">+ Add Expense</button> <button class="btn btn-ghost btn-sm" style="border-color:var(--purple-dim);color:var(--purple)" onclick="openMutualExpense()">+ Add Mutual Expense</button>':'';
 
   let rows='';
   propRows.forEach(p=>{
@@ -9459,6 +9503,87 @@ function renderConstructionMonthly(el, tabs){
     });
   }
   el.innerHTML=html;
+}
+
+function openMutualExpense(){
+  const list=document.getElementById('mutualPropList');
+  const sorted=[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  list.innerHTML=sorted.map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;cursor:pointer;font-size:12px;transition:background .1s" onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+    <input type="checkbox" class="mutual-prop-check" value="${p.id}" data-addr="${escapeAttr(p.addr||'')}" onchange="updateMutualPreview()" style="accent-color:var(--accent);width:14px;height:14px">
+    <span style="color:var(--text)">${escapeHtml(p.addr||'(no address)')}</span>
+  </label>`).join('');
+  document.getElementById('mutualCategory').value='Labor';
+  document.getElementById('mutualAmount').value='';
+  document.getElementById('mutualDesc').value='';
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('mutualDate').value=today;
+  document.getElementById('mutualPreview').style.display='none';
+  document.getElementById('mutualSelectedCount').textContent='0 selected';
+  document.getElementById('mutualExpenseModal').classList.add('open');
+}
+
+function mutualSelectAll(check){
+  document.querySelectorAll('.mutual-prop-check').forEach(cb=>{cb.checked=check;});
+  updateMutualPreview();
+}
+
+function updateMutualPreview(){
+  const checks=[...document.querySelectorAll('.mutual-prop-check:checked')];
+  const count=checks.length;
+  const total=parseFloat(document.getElementById('mutualAmount').value)||0;
+  const category=document.getElementById('mutualCategory').value;
+  document.getElementById('mutualSelectedCount').textContent=count+' selected';
+  const preview=document.getElementById('mutualPreview');
+  if(count>0 && total>0){
+    const each=Math.round(total/count*100)/100;
+    preview.style.display='';
+    preview.innerHTML=`<div style="font-weight:600;color:var(--accent);margin-bottom:6px">💰 Split Preview</div>
+      <div><strong>${fmt(total)}</strong> ÷ ${count} properties = <strong style="color:var(--accent)">${fmt(each)}</strong> each</div>
+      <div style="margin-top:4px;font-size:11px;color:var(--muted)">Category will show as: <strong style="color:var(--purple)">Mutual ${category} 1/${count}</strong></div>`;
+  } else {
+    preview.style.display='none';
+  }
+}
+
+async function saveMutualExpense(){
+  const checks=[...document.querySelectorAll('.mutual-prop-check:checked')];
+  const count=checks.length;
+  const total=parseFloat(document.getElementById('mutualAmount').value)||0;
+  const category=document.getElementById('mutualCategory').value;
+  const desc=(document.getElementById('mutualDesc').value||'').trim();
+  const date=document.getElementById('mutualDate').value||'';
+
+  if(count===0){toast('Please select at least one property');return;}
+  if(total<=0){toast('Please enter a valid amount');return;}
+
+  const each=Math.round(total/count*100)/100;
+  const mutualLabel='Mutual '+category+' 1/'+count;
+
+  try{
+    for(const cb of checks){
+      const propertyId=cb.value;
+      const addr=cb.dataset.addr||'';
+      await db.collection('constructionTracking').add({
+        propertyId,
+        propertyAddress:addr,
+        category:mutualLabel,
+        description:desc||'Mutual expense split across '+count+' properties',
+        amount:each,
+        date,
+        mutualGroup:true,
+        mutualTotal:total,
+        mutualCount:count,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy:currentUser?currentUser.email:''
+      });
+    }
+    closeModal('mutualExpenseModal');
+    toast(`${fmt(total)} split across ${count} properties (${fmt(each)} each)`);
+    await renderConstructionView();
+  }catch(e){
+    console.error('saveMutualExpense',e);
+    toast('Error: '+e.message);
+  }
 }
 
 function openAddExpense(){
