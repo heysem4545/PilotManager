@@ -872,6 +872,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .to-badge-both{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:500;background:var(--amber-dim);color:var(--amber)}
 .to-badge-completed{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-dim);color:var(--blue)}
 .to-badge-ready{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 .to-overall-bar{width:100%;height:22px;background:var(--surface3);border-radius:11px;overflow:hidden;margin-bottom:4px}
 .to-overall-fill{height:100%;border-radius:5px;background:var(--blue);transition:width .4s ease}
 .to-overall-pct{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;font-family:var(--mono)}
@@ -1960,11 +1961,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         onblur="if(!this.value)this.value=this.dataset.prev||''">
       <datalist id="toAddrList"></datalist>
     </div>
-    <div class="fg"><label>Start Date</label>
-      <input type="date" id="toStartDate" style="color-scheme:dark">
-    </div>
-    <div class="fg"><label>Target Finish Date</label>
-      <input type="date" id="toTargetDate" style="color-scheme:dark">
+    <div style="font-size:11px;color:var(--muted);padding:6px 0;line-height:1.5">
+      ⚡ Start date = tenant leave date. Target auto-calculated:<br>
+      <strong style="color:var(--red)">🔴 Heavy = 30 days</strong> · <strong style="color:var(--amber)">🟡 Medium = 20 days</strong> · <strong style="color:var(--accent)">🟢 Light = 10 days</strong>
     </div>
     <div class="fg"><label>Fix By</label>
       <select id="toFixBy" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -10604,49 +10603,46 @@ function renderTurnoverProjects(){
     const completedDate = proj.completedDate||'';
     const today = new Date(); today.setHours(0,0,0,0);
 
+    // Auto-calculated target days based on work type
+    const targetDays = wt==='Heavy'?30:wt==='Medium'?20:10;
     let statusBadge = '';
     let daysInfo = '';
+
     if(prog >= 100 && completedDate){
       const comp = new Date(completedDate+'T00:00:00');
       const targ = targetDate ? new Date(targetDate+'T00:00:00') : null;
       if(targ){
         const diff = Math.ceil((comp - targ)/(86400000));
-        if(diff <= 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ On Time${diff<0?' ('+Math.abs(diff)+' days early)':''}</span>`;
-        else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">⚠️ Late by ${diff} days</span>`;
-      } else {
-        statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ Completed</span>`;
+        if(diff <= 0) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--accent-dim);color:var(--accent)">🏆 On Time!${diff<0?' ('+Math.abs(diff)+' days early)':''} — Bonus Eligible</span>`;
+        else if(diff <= 5) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--amber-dim);color:var(--amber)">⚠️ Late (${diff} days)</span>`;
+        else if(diff <= 30) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 Too Late (${diff} days over)</span>`;
+        else statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red);color:#fff">🔥 CHECK YOUR TEAM!! (${diff} days over)</span>`;
       }
     } else if(targetDate){
       const targ = new Date(targetDate+'T00:00:00');
-      const daysLeft = Math.ceil((targ - today)/(86400000));
-      if(daysLeft < 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">🚨 ${Math.abs(daysLeft)} days overdue</span>`;
-      else if(daysLeft <= 7) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)">⏰ ${daysLeft} days left</span>`;
-      else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-dim);color:var(--blue)">📅 ${daysLeft} days left</span>`;
+      const daysOver = Math.ceil((today - targ)/(86400000));
+      const daysLeft = -daysOver;
+      if(daysLeft > 7) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:var(--blue-dim);color:var(--blue)">📅 ${daysLeft} days left</span>`;
+      else if(daysLeft > 0) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:var(--amber-dim);color:var(--amber)">⏰ ${daysLeft} days left — hurry!</span>`;
+      else if(daysOver <= 5) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--amber-dim);color:var(--amber)">⚠️ ${daysOver} days late</span>`;
+      else if(daysOver <= 30) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 ${daysOver} days — TOO LATE!</span>`;
+      else statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red);color:#fff;animation:pulse 1s infinite">🔥 CHECK YOUR TEAM!! (${daysOver} days over)</span>`;
     }
     if(startDate && targetDate && prog < 100){
       const start = new Date(startDate+'T00:00:00');
       const targ = new Date(targetDate+'T00:00:00');
-      const totalDays = Math.max(1,Math.ceil((targ-start)/86400000));
+      const totalD = Math.max(1,Math.ceil((targ-start)/86400000));
       const elapsed = Math.ceil((today-start)/86400000);
-      const expectedPct = Math.min(100,Math.round(elapsed/totalDays*100));
+      const expectedPct = Math.min(100,Math.round(elapsed/totalD*100));
       const diff = prog - expectedPct;
-      if(diff >= 0) daysInfo = `<span style="font-size:10px;color:var(--accent)">📈 ${diff}% ahead of schedule</span>`;
-      else daysInfo = `<span style="font-size:10px;color:var(--red)">📉 ${Math.abs(diff)}% behind schedule</span>`;
+      if(diff >= 0) daysInfo = `<span style="font-size:10px;color:var(--accent)">📈 ${diff}% ahead</span>`;
+      else daysInfo = `<span style="font-size:10px;color:var(--red)">📉 ${Math.abs(diff)}% behind</span>`;
     }
 
     html+=`<div style="display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap;font-size:11px">
-      <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:10px;color:var(--muted)">Tenant Left:</span>
-        <input type="date" value="${tenantLeft}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','tenantLeftDate',this.value)">
-      </div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:10px;color:var(--muted)">Start:</span>
-        <input type="date" value="${startDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','startDate',this.value)">
-      </div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:10px;color:var(--muted)">Target:</span>
-        <input type="date" value="${targetDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateTurnoverField('${proj.id}','targetDate',this.value)">
-      </div>
+      <span style="color:var(--muted)">Tenant Left: <strong style="color:var(--text)">${tenantLeft||'—'}</strong></span>
+      <span style="color:var(--muted)">Start: <strong style="color:var(--text)">${startDate||'—'}</strong></span>
+      <span style="color:var(--muted)">Target (${targetDays}d): <strong style="color:var(--text)">${targetDate||'—'}</strong></span>
       ${prog>=100?`<div style="display:flex;align-items:center;gap:4px">
         <span style="font-size:10px;color:var(--muted)">Completed:</span>
         <span style="font-size:11px;font-family:var(--mono);color:var(--accent)">${completedDate||'—'}</span>
@@ -10809,8 +10805,6 @@ function openAddTurnover(){
   document.getElementById('toAddr').value='';
   document.getElementById('toTenantLeft').value='';
   document.getElementById('toWorkType').value='';
-  document.getElementById('toStartDate').value='';
-  document.getElementById('toTargetDate').value='';
   document.getElementById('toFixBy').value='Own';
   document.getElementById('toHomeInfo').value='';
   document.getElementById('turnoverAddModal').classList.add('open');
@@ -10826,8 +10820,13 @@ async function saveTurnoverProject(){
   if(!workType){toast('Please select work type');return;}
 
   const tenantLeftDate = document.getElementById('toTenantLeft').value||'';
-  const startDate = document.getElementById('toStartDate').value||'';
-  const targetDate = document.getElementById('toTargetDate').value||'';
+  if(!tenantLeftDate){toast('Please enter tenant leave date');return;}
+  // Auto-calculate: start = tenant left, target = start + days based on work type
+  const targetDays = workType==='Heavy'?30:workType==='Medium'?20:10;
+  const startD = new Date(tenantLeftDate+'T00:00:00');
+  const targetD = new Date(startD.getTime() + targetDays*86400000);
+  const startDate = tenantLeftDate;
+  const targetDate = targetD.toISOString().slice(0,10);
   const fixBy = document.getElementById('toFixBy').value||'Own';
   const currentHomeInfo = document.getElementById('toHomeInfo').value.trim();
 
