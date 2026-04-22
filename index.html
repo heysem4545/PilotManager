@@ -9997,6 +9997,59 @@ async function renderConstProjectsView(){
       html+=`<button class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:10px" onclick="deleteProject('${proj.id}')">Delete</button>`;
     }
     html+=`</div>
+      </div>`;
+
+    // Project dates & performance
+    const startDate = proj.startDate||'';
+    const targetDate = proj.targetDate||'';
+    const completedDate = proj.completedDate||'';
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    let statusBadge = '';
+    let daysInfo = '';
+    if(tp >= 100 && completedDate){
+      const comp = new Date(completedDate+'T00:00:00');
+      const targ = targetDate ? new Date(targetDate+'T00:00:00') : null;
+      if(targ){
+        const diff = Math.ceil((comp - targ)/(86400000));
+        if(diff <= 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ On Time${diff<0?' ('+Math.abs(diff)+' days early)':''}</span>`;
+        else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">⚠️ Late by ${diff} days</span>`;
+      } else {
+        statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)">✅ Completed</span>`;
+      }
+    } else if(targetDate){
+      const targ = new Date(targetDate+'T00:00:00');
+      const daysLeft = Math.ceil((targ - today)/(86400000));
+      if(daysLeft < 0) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)">🚨 ${Math.abs(daysLeft)} days overdue</span>`;
+      else if(daysLeft <= 7) statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)">⏰ ${daysLeft} days left</span>`;
+      else statusBadge = `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--blue-dim);color:var(--blue)">📅 ${daysLeft} days left</span>`;
+    }
+    if(startDate && targetDate && tp < 100){
+      const start = new Date(startDate+'T00:00:00');
+      const targ = new Date(targetDate+'T00:00:00');
+      const totalDays = Math.max(1,Math.ceil((targ-start)/86400000));
+      const elapsed = Math.ceil((today-start)/86400000);
+      const expectedPct = Math.min(100,Math.round(elapsed/totalDays*100));
+      const diff = tp - expectedPct;
+      if(diff >= 0) daysInfo = `<span style="font-size:10px;color:var(--accent)">📈 ${diff}% ahead of schedule</span>`;
+      else daysInfo = `<span style="font-size:10px;color:var(--red)">📉 ${Math.abs(diff)}% behind schedule</span>`;
+    }
+
+    html+=`<div style="display:flex;gap:10px;align-items:center;margin:10px 0;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:10px;color:var(--muted)">Start:</span>
+          <input type="date" value="${startDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateProjectDates('${proj.id}','startDate',this.value)">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:10px;color:var(--muted)">Target:</span>
+          <input type="date" value="${targetDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateProjectDates('${proj.id}','targetDate',this.value)">
+        </div>
+        ${tp>=100?`<div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:10px;color:var(--muted)">Completed:</span>
+          <input type="date" value="${completedDate}" style="font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);color-scheme:dark" onchange="updateProjectDates('${proj.id}','completedDate',this.value)">
+        </div>`:''}
+        ${statusBadge}
+        ${daysInfo}
       </div>
       <div class="cp-overall-bar"><div class="cp-overall-fill" style="width:${Math.min(tp,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${tp>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${tp>0?tp+'%':''}</span></div></div>
       <div class="cp-overall-pct">${tp}% complete</div>`;
@@ -10095,6 +10148,15 @@ async function saveProjectSnapshot(docId){
   }
 }
 
+async function updateProjectDates(docId, field, value){
+  try{
+    await db.collection('constructionProjects').doc(docId).update({[field]:value, updatedAt:new Date()});
+    const proj=constProjectsData.find(p=>p.id===docId);
+    if(proj) proj[field]=value;
+    await renderConstProjectsView();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
 async function stepProgress(docId, catIndex, delta){
   const proj=constProjectsData.find(p=>p.id===docId);
   if(!proj) return;
@@ -10149,12 +10211,21 @@ async function updateProjectProgress(docId,catIndex,value){
   cats[catIndex].progress = Number(value);
   const total = calcTotalProgress(cats);
   proj.totalProgress = total;
+  // Auto-set completedDate when hitting 100%
+  const updateData = {
+    categories: cats,
+    totalProgress: total,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if(total >= 100 && !proj.completedDate){
+    updateData.completedDate = new Date().toISOString().slice(0,10);
+    proj.completedDate = updateData.completedDate;
+  } else if(total < 100 && proj.completedDate){
+    updateData.completedDate = '';
+    proj.completedDate = '';
+  }
   try{
-    await db.collection('constructionProjects').doc(docId).update({
-      categories: cats,
-      totalProgress: total,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    await db.collection('constructionProjects').doc(docId).update(updateData);
     await renderConstProjectsView();
   }catch(e){
     console.error('updateProjectProgress error:',e);
