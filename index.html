@@ -954,6 +954,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         All Properties
       </button>
       <div class="nav-label">Finance</div>
+      <button class="nav-item" id="nav-rentTracking" onclick="openRentTracking()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/><circle cx="13" cy="11" r="2.5"/></svg>
+        Rent Tracking
+      </button>
       <button class="nav-item" id="nav-collection" onclick="setFilter('balance')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
         Collection
@@ -5202,7 +5206,6 @@ function renderPropsViewTabs(){
   const el=document.getElementById('propsViewTabs');
   if(!el)return;
   let html=`<button class="ftab ${propsViewTab==='list'?'active':''}" onclick="switchPropsTab('list')">🏠 All Properties</button>`;
-  html+=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">📊 Rent Tracking</button>`;
   if(isAdmin()){
     html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">📜 History Log</button>`;
   }
@@ -5285,6 +5288,18 @@ function renderPropertiesList(){
         </table>
       </div>
     </div>`;
+}
+
+function openRentTracking(){
+  propsViewTab='table';
+  filterSetByNav=true;
+  currentFilter='all';
+  showView('properties');
+  // Highlight the rent tracking nav item
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navEl=document.getElementById('nav-rentTracking');
+  if(navEl) navEl.classList.add('active');
+  document.getElementById('viewTitle').textContent='Rent Tracking';
 }
 
 function filterPropsList(){
