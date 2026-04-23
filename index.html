@@ -3333,7 +3333,7 @@ async function renderBalancesOnly(){
           <thead>
             <tr>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Send Collection</th>
-              <th style="text-align:left;min-width:140px">Address</th>
+              <th rowspan="2" style="text-align:left;min-width:140px;vertical-align:bottom">Address</th>
               ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📝 Action Note</th>
