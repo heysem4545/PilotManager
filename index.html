@@ -11105,7 +11105,6 @@ async function deleteProject(docId){
 // TURNOVER PROJECTS
 // ─────────────────────────────────────────────
 let turnoverData = [];
-let turnoverTab = 'projects';
 
 let _turnoverUnsub=null;
 let _turnoverRendering=false;
@@ -11261,23 +11260,11 @@ async function renderTurnoverView(){
     </div>`;
   }
 
-  html+='<div class="to-tabs">';
-  html+='<button class="to-tab'+(turnoverTab==='projects'?' active':'')+'" onclick="turnoverTab=\'projects\';renderTurnoverTabContent()">Projects</button>';
-  html+='<button class="to-tab'+(turnoverTab==='workorders'?' active':'')+'" onclick="turnoverTab=\'workorders\';renderTurnoverTabContent()">Work Orders</button>';
-  html+='</div>';
-
   html+='<div id="turnoverTabContent"></div>';
   el.innerHTML=html;
-  renderTurnoverTabContent();
+  renderTurnoverProjects();
 }
 
-function renderTurnoverTabContent(){
-  document.querySelectorAll('.to-tab').forEach((t,i)=>{
-    t.classList.toggle('active', (i===0 && turnoverTab==='projects') || (i===1 && turnoverTab==='workorders'));
-  });
-  if(turnoverTab==='projects') renderTurnoverProjects();
-  else renderTurnoverWorkOrders();
-}
 
 function renderTurnoverProjects(){
   const container = document.getElementById('turnoverTabContent');
@@ -11474,99 +11461,19 @@ function renderTurnoverProjects(){
       html+=tlHtml;
     }
 
-    html+='</div>';
-  });
+    // Office checklist & cost summary (always visible)
+    html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">`;
 
-  container.innerHTML=html;
-}
-
-function renderTurnoverWorkOrders(){
-  const container = document.getElementById('turnoverTabContent');
-  if(!container) return;
-
-  const completed = turnoverData.filter(p=>(p.progress||0)>=100&&!p.archived);
-  completed.sort((a,b)=>(b.completedDate||'').localeCompare(a.completedDate||''));
-
-  if(!completed.length){
-    container.innerHTML=`<div class="to-empty">
-      <div class="to-empty-icon">📋</div>
-      <div class="to-empty-text">No completed projects yet</div>
-      <div class="to-empty-sub">Work orders appear here when a project reaches 100% progress.</div>
-    </div>`;
-    return;
-  }
-
-  let html='';
-  completed.forEach(proj=>{
-    const isReady = proj.status==='Ready to Rent';
-    // Calculate duration
-    const start = proj.startDate ? new Date(proj.startDate+'T00:00:00') : null;
-    const comp = proj.completedDate ? new Date(proj.completedDate+'T00:00:00') : null;
-    const targ = proj.targetDate ? new Date(proj.targetDate+'T00:00:00') : null;
-    const durationDays = (start && comp) ? Math.ceil((comp-start)/86400000) : null;
-    const wasLate = (comp && targ) ? Math.ceil((comp-targ)/86400000) : null;
-
-    const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);width:80px';
-
-    html+=`<div class="to-wo-card" style="${isReady?'border-left:3px solid var(--accent)':''}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <div class="to-wo-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
-        ${isReady?'<span class="to-badge-ready">🏡 Ready to Rent</span>':'<span class="to-badge-completed">✅ Completed — finish checklist for bonus</span>'}
-        ${(()=>{
-          if(!isReady||!proj.readyToRentDate||!proj.targetDate) return '';
-          const rd=new Date(proj.readyToRentDate+'T00:00:00');
-          const td=new Date(proj.targetDate+'T00:00:00');
-          const diff=Math.ceil((rd-td)/86400000);
-          if(diff<=0) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--accent-dim);color:var(--accent)">🏆 Bonus Eligible${diff<0?' ('+Math.abs(diff)+' days early)':''}</span>`;
-          if(diff<=5) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--amber-dim);color:var(--amber)">⚠️ Late (${diff} days)</span>`;
-          if(diff<=30) return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 Too Late (${diff} days)</span>`;
-          return `<span style="padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;background:var(--red);color:#fff">🔥 CHECK YOUR TEAM!!</span>`;
-        })()}
-      </div>
-
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📋 Project Report</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;margin-bottom:8px">
-          <div><span style="color:var(--muted)">Work Type:</span> <strong style="color:${proj.workType==='Heavy'?'var(--red)':proj.workType==='Medium'?'var(--amber)':'var(--accent)'}">${proj.workType||'—'}</strong></div>
-          <div><span style="color:var(--muted)">Fix By:</span> <strong>${proj.fixBy||'—'}</strong></div>
-          <div><span style="color:var(--muted)">Tenant Left:</span> <strong>${proj.tenantLeftDate||'—'}</strong></div>
-          <div><span style="color:var(--muted)">Started:</span> <strong>${proj.startDate||'—'}</strong></div>
-          <div><span style="color:var(--muted)">Completed:</span> <strong style="color:var(--accent)">${proj.completedDate||'—'}</strong></div>
-          <div><span style="color:var(--muted)">Target Was:</span> <strong>${proj.targetDate||'—'}</strong></div>
-        </div>
-        <div style="display:flex;gap:12px;font-size:11px;flex-wrap:wrap">
-          ${durationDays!==null?`<span>⏱ Duration: <strong>${durationDays} days</strong></span>`:''}
-          ${wasLate!==null?(wasLate<=0?`<span style="color:var(--accent)">✅ Finished ${Math.abs(wasLate)} days early</span>`:`<span style="color:var(--red)">⚠️ Finished ${wasLate} days late</span>`):''}
-        </div>
-      </div>
-
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💰 Cost Summary</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          <div>
-            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🧱 Material</div>
-            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costMaterial||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateTurnoverField('${proj.id}','costMaterial',parseFloat(this.value)||0)"></div>
-          </div>
-          <div>
-            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🏢 Outsource</div>
-            <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costOutsource||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:65px" onblur="updateTurnoverField('${proj.id}','costOutsource',parseFloat(this.value)||0)"></div>
-          </div>
-          <div>
-            <div style="font-size:9px;color:var(--muted);margin-bottom:3px">👷 Own Labor</div>
-            <input type="text" value="${escapeAttr(proj.costOwnLabor||'')}" placeholder="Notes…" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" onblur="updateTurnoverField('${proj.id}','costOwnLabor',this.value)">
-          </div>
-        </div>
-        ${(proj.costMaterial||0)+(proj.costOutsource||0)>0?`<div style="margin-top:8px;font-size:11px;font-family:var(--mono)">Total Spent: <strong style="color:var(--accent)">${fmt((proj.costMaterial||0)+(proj.costOutsource||0))}</strong></div>`:''}
-      </div>
-
+    // Office checklist
+    html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">✅ Office Checklist</div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">✅ Checklist</div>
         <label class="to-wo-check"><input type="checkbox" ${proj.postedAffordable?'checked':''} onchange="updateTurnoverField('${proj.id}','postedAffordable',this.checked)"> Posted on Affordable</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.locksRenewed?'checked':''} onchange="updateTurnoverField('${proj.id}','locksRenewed',this.checked)"> Locks Renewed</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.updatedSystem?'checked':''} onchange="updateTurnoverField('${proj.id}','updatedSystem',this.checked)"> Updated System</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.newPictures?'checked':''} onchange="updateTurnoverField('${proj.id}','newPictures',this.checked)"> Got New Pictures</label>
         <label class="to-wo-check"><input type="checkbox" ${proj.forSaleSign?'checked':''} onchange="updateTurnoverField('${proj.id}','forSaleSign',this.checked)"> Put For Sale Sign</label>
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
           <span style="font-size:12px">Presentable to Showing?</span>
           <select class="to-wo-select" onchange="updateTurnoverField('${proj.id}','presentableToShowing',this.value)">
             <option value="" ${!proj.presentableToShowing?'selected':''}>—</option>
@@ -11576,10 +11483,35 @@ function renderTurnoverWorkOrders(){
         </div>
       </div>
     </div>`;
+
+    // Cost summary
+    html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💰 Cost Summary</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div>
+          <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🧱 Material</div>
+          <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costMaterial||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateTurnoverField('${proj.id}','costMaterial',parseFloat(this.value)||0)"></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);margin-bottom:3px">🏢 Outsource</div>
+          <div style="display:flex;align-items:center;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:0 4px"><span style="color:var(--muted);font-size:10px">$</span><input type="number" value="${proj.costOutsource||''}" placeholder="0" style="background:none;border:none;padding:2px 3px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateTurnoverField('${proj.id}','costOutsource',parseFloat(this.value)||0)"></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);margin-bottom:3px">👷 Own Labor</div>
+          <input type="text" value="${escapeAttr(proj.costOwnLabor||'')}" placeholder="Notes…" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" onblur="updateTurnoverField('${proj.id}','costOwnLabor',this.value)">
+        </div>
+      </div>
+      ${(proj.costMaterial||0)+(proj.costOutsource||0)>0?`<div style="margin-top:8px;font-size:11px;font-family:var(--mono);padding-top:6px;border-top:1px solid var(--border2)">Total Spent: <strong style="color:var(--accent)">${fmt((proj.costMaterial||0)+(proj.costOutsource||0))}</strong></div>`:''}
+    </div>`;
+
+    html+=`</div>`;
+
+    html+='</div>';
   });
 
   container.innerHTML=html;
 }
+
 
 function openAddTurnover(){
   const dl = document.getElementById('toAddrList');
@@ -11672,7 +11604,7 @@ async function updateTurnoverField(docId, field, value){
       }
     }
     await db.collection('turnoverProjects').doc(docId).update(updateData);
-    renderTurnoverTabContent();
+    renderTurnoverProjects();
   }catch(e){
     console.error('updateTurnoverField error:',e);
     toast('Error: '+e.message);
@@ -11715,7 +11647,7 @@ async function updateTurnoverProgress(docId, value){
 
   try{
     await db.collection('turnoverProjects').doc(docId).update(updateData);
-    renderTurnoverTabContent();
+    renderTurnoverProjects();
   }catch(e){
     console.error('updateTurnoverProgress error:',e);
     toast('Error saving progress');
@@ -11743,7 +11675,7 @@ async function saveTurnoverSnapshot(docId){
     await db.collection('turnoverProjects').doc(docId).update({snapshots:snaps, updatedAt:new Date()});
     proj.snapshots = snaps;
     toast('📸 Snapshot saved for '+today);
-    renderTurnoverTabContent();
+    renderTurnoverProjects();
   }catch(e){
     console.error('saveTurnoverSnapshot error:',e);
     toast('Error: '+e.message);
