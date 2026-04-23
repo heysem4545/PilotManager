@@ -861,9 +861,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .to-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
 .to-tab:hover{color:var(--text);background:var(--surface2)}
 .to-tab.active{background:var(--surface3);color:var(--text);border-color:var(--border2)}
-.to-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;padding:18px}
-.to-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
-.to-card-addr{font-size:14px;font-weight:600}
+.to-card{background:var(--surface);border:2px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:22px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+.to-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:2px solid var(--border2)}
+.to-card-addr{font-size:16px;font-weight:700;letter-spacing:-0.01em}
 .to-badge-heavy{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)}
 .to-badge-medium{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)}
 .to-badge-light{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)}
@@ -11312,7 +11312,8 @@ function renderTurnoverProjects(){
     const fb = proj.fixBy||'Own';
     const fbCls = fb==='Own'?'to-badge-own':fb==='Outsource'?'to-badge-outsource':'to-badge-both';
 
-    html+=`<div class="to-card" id="toCard_${proj.id}">
+    const cardBorder = prog>=100?'#4ade80':prog>=75?'var(--blue)':prog>=50?'var(--amber)':prog>=25?'var(--purple)':'var(--red)';
+    html+=`<div class="to-card" id="toCard_${proj.id}" style="border-left:4px solid ${cardBorder}">
       <div class="to-card-head">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div class="to-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
