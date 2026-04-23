@@ -2860,6 +2860,52 @@ async function sendToCollection(propertyId){
 // ─────────────────────────────────────────────
 // CALCULATIONS
 // ─────────────────────────────────────────────
+function getMonthPropForKey(p, key){
+  const md = (monthData[p.id]||{})[key] || {};
+  const cmhaPaid = md.cmhaPaid !== undefined ? md.cmhaPaid : 0;
+  const tenantPaid = md.tenantPaid !== undefined ? md.tenantPaid : 0;
+  const status = md.status || '';
+  const cmha = md.cmha !== undefined ? md.cmha : 0;
+  const tenantPortion = md.tenantPortion !== undefined ? md.tenantPortion : 0;
+  const collected = cmhaPaid + tenantPaid;
+  const balance = Math.max(0, cmha - cmhaPaid) + Math.max(0, tenantPortion - tenantPaid);
+  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status};
+}
+
+function calcTotalsForKey(key){
+  const gmp = p => getMonthPropForKey(p, key);
+  const mProps = properties.map(gmp);
+  const rent = properties.filter(p=>gmp(p).status==='RENTED').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const coll = mProps.reduce((s,p)=>s+p.collected,0);
+  const rented = mProps.filter(p=>p.status==='RENTED').length;
+  const baseRented = properties.filter(p=>gmp(p).status==='RENTED');
+  const realBal = baseRented.reduce((s,p)=>{const mp=gmp(p);return s+Math.max(0,mp.cmha-mp.cmhaPaid)+Math.max(0,mp.tenantPortion-mp.tenantPaid);},0);
+  const vacantIncome = properties.filter(p=>gmp(p).status==='VACANT').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const evictionIncome = properties.filter(p=>gmp(p).status==='EVICTION').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const constructionIncome = properties.filter(p=>gmp(p).status==='CONSTRUCTION').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const movingIncome = properties.filter(p=>gmp(p).status==='MOVING PROCESS').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const totalPotential = vacantIncome+evictionIncome+constructionIncome+movingIncome;
+  return {rent, coll, rented, realBal, totalPotential};
+}
+
+function prevMonthKey(){
+  let pm=activeMonth-1, py=activeYear;
+  if(pm<0){pm=11;py--;}
+  return monthKey(py,pm);
+}
+
+function compBadge(cur, prev, higherIsGood, noValue){
+  if(prev===0 && cur===0) return '';
+  const diff = cur - prev;
+  if(diff===0) return `<span style="font-size:9px;color:var(--muted);margin-left:4px">— same</span>`;
+  const isUp = diff > 0;
+  const arrow = isUp ? '▲' : '▼';
+  const color = noValue ? 'var(--muted)' : (isUp === higherIsGood ? 'var(--accent)' : 'var(--red)');
+  const abs = Math.abs(diff);
+  const display = abs >= 1 ? fmt(abs).replace('$','') : abs;
+  return `<span style="font-size:9px;color:${color};font-weight:600;margin-left:4px">${arrow} ${fmt(abs)}</span>`;
+}
+
 function calcTotals(){
   const mProps=properties.map(p=>getMonthProp(p));
   const rent=properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
@@ -2896,6 +2942,28 @@ function renderMetrics(){
   const collRate=pct(t.coll,t.rent);
   const occ=pct(t.rented,properties.length);
 
+  // Previous month totals for comparison
+  const pk = prevMonthKey();
+  const pt = calcTotalsForKey(pk);
+  const prevOcc = pct(pt.rented, properties.length);
+  let pm=activeMonth-1, py=activeYear;
+  if(pm<0){pm=11;py--;}
+  const prevUtilKey=py+'-'+String(pm+1).padStart(2,'0');
+  let prevUtilTotal=0;
+  properties.forEach(p=>{
+    const ud=utilityData[p.id];
+    if(!ud||!ud.payments||!ud.payments[prevUtilKey]) return;
+    const pay=ud.payments[prevUtilKey];
+    prevUtilTotal+=(pay.water||0)+(pay.sewer||0);
+  });
+  const prevCalls = (typeof callLogData!=='undefined' ? callLogData : []).filter(c=>{
+    if(!c.date) return false;
+    const [y,m] = c.date.split('-');
+    return parseInt(y,10)===py && parseInt(m,10)===pm+1;
+  }).length;
+  const MNAMES_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const prevLabel = MNAMES_SHORT[pm];
+
   // Utility totals for the active month
   const utilKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
   let utilWater=0, utilSewer=0, utilProps=0;
@@ -2925,11 +2993,11 @@ function renderMetrics(){
     .join('');
 
   document.getElementById('metricsGrid').innerHTML=`
-    <div class="mc g"><div class="mc-lbl">Expected Rent</div><div class="mc-val" style="font-size:22px;font-weight:700;color:var(--text)">${fmt(t.rent)}</div><div class="mc-sub">${t.rented} rented units · ${mLabel}</div><div class="mc-split" style="flex-wrap:wrap;gap:3px;margin-top:6px"><span class="cs">CMHA ${fmt(properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).cmha||0),0))}</span><span class="ts">Tenant ${fmt(properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).tenantPortion||0),0))}</span></div></div>
-    <div class="mc g"><div class="mc-lbl">Total Collected</div><div class="mc-val g" style="font-size:22px">${fmt(t.coll)}</div><div class="mc-sub">${collRate}% collection rate · ${mLabel}</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)} · ${properties.filter(p=>getMonthProp(p).cmhaPaid>0).length} prop</span></div><div class="mc-split"><span class="ts">Tenant ${fmt(t.tp)} · ${properties.filter(p=>getMonthProp(p).tenantPaid>0).length} prop</span></div></div>
-    <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${t.cmhaBehind+t.tenantBehind} properties behind · ${mLabel}</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">CMHA ${fmt(Math.max(0,t.cmhaBal))} · ${t.cmhaBehind} behind</span></div><div class="mc-split"><span class="tr" style="background:var(--red-dim);color:var(--red)">Tenant ${fmt(Math.max(0,t.tenantBal))} · ${t.tenantBehind} behind</span></div></div>
-    <div class="mc a"><div class="mc-lbl">⚡ Potential Income</div><div class="mc-val a">${fmt(t.totalPotential)}<span style="font-size:12px;font-weight:400">/mo</span></div><div class="mc-sub">${properties.filter(p=>['VACANT','EVICTION','CONSTRUCTION','MOVING PROCESS'].includes((getMonthProp(p).status||'').toUpperCase())).length} non-rented units</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${fmt(t.vacantIncome)}</span><span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${fmt(t.evictionIncome)}</span><span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${fmt(t.constructionIncome)}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${fmt(t.movingIncome)}</span></div></div>
-    <div class="mc g"><div class="mc-lbl">Occupancy</div><div class="mc-val g" style="font-size:26px">${occ}%</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-top:6px">${t.rented} of ${properties.length} units</div><div class="mc-sub">${mLabel}</div>${(()=>{
+    <div class="mc g"><div class="mc-lbl">Expected Rent</div><div class="mc-val" style="font-size:22px;font-weight:700;color:var(--text)">${fmt(t.rent)}${compBadge(t.rent,pt.rent,true)}</div><div class="mc-sub">${t.rented} rented units · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.rent)}</div><div class="mc-split" style="flex-wrap:wrap;gap:3px;margin-top:6px"><span class="cs">CMHA ${fmt(properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).cmha||0),0))}</span><span class="ts">Tenant ${fmt(properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).tenantPortion||0),0))}</span></div></div>
+    <div class="mc g"><div class="mc-lbl">Total Collected</div><div class="mc-val g" style="font-size:22px">${fmt(t.coll)}${compBadge(t.coll,pt.coll,true)}</div><div class="mc-sub">${collRate}% collection rate · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.coll)}</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)} · ${properties.filter(p=>getMonthProp(p).cmhaPaid>0).length} prop</span></div><div class="mc-split"><span class="ts">Tenant ${fmt(t.tp)} · ${properties.filter(p=>getMonthProp(p).tenantPaid>0).length} prop</span></div></div>
+    <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}${compBadge(t.realBal,pt.realBal,false)}</div><div class="mc-sub">${t.cmhaBehind+t.tenantBehind} properties behind · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.realBal)}</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">CMHA ${fmt(Math.max(0,t.cmhaBal))} · ${t.cmhaBehind} behind</span></div><div class="mc-split"><span class="tr" style="background:var(--red-dim);color:var(--red)">Tenant ${fmt(Math.max(0,t.tenantBal))} · ${t.tenantBehind} behind</span></div></div>
+    <div class="mc a"><div class="mc-lbl">⚡ Potential Income</div><div class="mc-val a">${fmt(t.totalPotential)}<span style="font-size:12px;font-weight:400">/mo</span></div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.totalPotential)}</div><div class="mc-sub">${properties.filter(p=>['VACANT','EVICTION','CONSTRUCTION','MOVING PROCESS'].includes((getMonthProp(p).status||'').toUpperCase())).length} non-rented units</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${fmt(t.vacantIncome)}</span><span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${fmt(t.evictionIncome)}</span><span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${fmt(t.constructionIncome)}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${fmt(t.movingIncome)}</span></div></div>
+    <div class="mc g"><div class="mc-lbl">Occupancy</div><div class="mc-val g" style="font-size:26px">${occ}%${compBadge(occ,prevOcc,true)}</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-top:6px">${t.rented} of ${properties.length} units</div><div class="mc-sub">${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevOcc}%</div>${(()=>{
       const sc={'RENTED':0,'VACANT':0,'EVICTION':0,'MOVING PROCESS':0,'CONSTRUCTION':0};
       let unknown=0;
       properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else unknown++;});
@@ -2942,8 +3010,8 @@ function renderMetrics(){
         ${unknown?`<span class="cs" style="background:var(--surface3);color:var(--muted)">Unknown ${unknown}</span>`:''}
       </div>`;
     })()}</div>
-    <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
-    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
+    <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}${compBadge(utilWater+utilSewer,prevUtilTotal,false)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevUtilTotal)}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
+    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
   `;
 }
 
