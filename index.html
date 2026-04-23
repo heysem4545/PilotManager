@@ -1952,7 +1952,26 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
-<!-- ADD TURNOVER PROJECT MODAL -->
+<!-- DEFAULT TURNOVER ITEMS MODAL -->
+<div class="overlay" id="toDefaultItemsModal" onclick="if(event.target===this)closeModal('toDefaultItemsModal')">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      <span>Edit Default To-Do Items</span>
+      <button class="modal-close" onclick="closeModal('toDefaultItemsModal')">&times;</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Define the default items that auto-populate when creating a new turnover project. You can still add/remove items per project.</div>
+    <div id="toDefaultItemsList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:50vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="toDefaultNewItem" placeholder="Type default item…" style="flex:1;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addDefaultTurnoverItem()">
+      <button class="btn btn-primary btn-sm" onclick="addDefaultTurnoverItem()">Add</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('toDefaultItemsModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveDefaultTurnoverItems()">Save Defaults</button>
+    </div>
+  </div>
+</div>
+
 <!-- AUDIT ITEMS MODAL -->
 <div class="overlay" id="auditModal" onclick="if(event.target===this)closeModal('auditModal')">
   <div class="modal" style="width:480px">
@@ -11192,6 +11211,9 @@ async function renderTurnoverView(){
 
   html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
   html+='<button class="btn btn-primary btn-sm" onclick="openAddTurnover()">+ Add TurnOver Project</button>';
+  if(isAdmin()){
+    html+='<button class="btn btn-ghost btn-sm" onclick="openDefaultTurnoverItems()">&#9881; Edit Default Items</button>';
+  }
   html+='</div>';
 
   // Summary stats for active turnover projects
@@ -11461,40 +11483,45 @@ function renderTurnoverProjects(){
       html+=tlHtml;
     }
 
-    // Collapsible details bar
-    const officeChecked = [proj.postedAffordable,proj.locksRenewed,proj.updatedSystem,proj.newPictures,proj.forSaleSign].filter(Boolean).length;
-    const officePts = proj.presentableToShowing==='Yes'?1:0;
-    const officeTotal = officeChecked+officePts;
+    // Office checklist — dynamic from officeChecklist array (migrate old boolean fields)
+    if(!proj.officeChecklist && (proj.postedAffordable!==undefined||proj.locksRenewed!==undefined)){
+      proj.officeChecklist=[
+        {text:'Posted on Affordable',checked:!!proj.postedAffordable},
+        {text:'Locks Renewed',checked:!!proj.locksRenewed},
+        {text:'Updated System',checked:!!proj.updatedSystem},
+        {text:'Got New Pictures',checked:!!proj.newPictures},
+        {text:'Put For Sale Sign',checked:!!proj.forSaleSign},
+        {text:'Presentable to Showing',checked:proj.presentableToShowing==='Yes'}
+      ];
+      db.collection('turnoverProjects').doc(proj.id).update({officeChecklist:proj.officeChecklist}).catch(()=>{});
+    }
+    if(!proj.officeChecklist){
+      proj.officeChecklist=getDefaultTurnoverItems().map(text=>({text,checked:false}));
+    }
+    const officeItems = proj.officeChecklist;
+    const officeDone = officeItems.filter(i=>i.checked).length;
+    const officeTotal = officeItems.length;
     const costTotal = (proj.costMaterial||0)+(proj.costOutsource||0);
+    const allOfficeDone = officeTotal>0&&officeDone===officeTotal;
     html+=`<div style="margin-top:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden">
       <div onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'':'none';this.querySelector('.to-detail-arrow').textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);cursor:pointer;user-select:none">
         <span class="to-detail-arrow" style="font-size:12px;color:var(--muted)">▸</span>
         <span style="font-size:11px;font-weight:600;color:var(--text)">Details</span>
-        <span style="font-size:10px;color:var(--muted)">✅ Office ${officeTotal}/6</span>
+        <span style="font-size:10px;color:${allOfficeDone?'#4ade80':'var(--muted)'}">✅ Office ${officeDone}/${officeTotal}</span>
         ${costTotal>0?`<span style="font-size:10px;color:var(--muted)">💰 ${fmt(costTotal)}</span>`:''}
-        ${proj.status==='Ready to Rent'?`<span style="font-size:10px;color:#4ade80;font-weight:600">🏡 Ready</span>`:''}
+        ${allOfficeDone?`<span style="font-size:10px;color:#4ade80;font-weight:600">🏡 Ready</span>`:''}
       </div>
       <div style="display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px">`;
 
     // Office checklist
     html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px">
-      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">✅ Office Checklist</div>
-      <div style="display:flex;flex-direction:column;gap:2px">
-        <label class="to-wo-check"><input type="checkbox" ${proj.postedAffordable?'checked':''} onchange="updateTurnoverField('${proj.id}','postedAffordable',this.checked)"> Posted on Affordable</label>
-        <label class="to-wo-check"><input type="checkbox" ${proj.locksRenewed?'checked':''} onchange="updateTurnoverField('${proj.id}','locksRenewed',this.checked)"> Locks Renewed</label>
-        <label class="to-wo-check"><input type="checkbox" ${proj.updatedSystem?'checked':''} onchange="updateTurnoverField('${proj.id}','updatedSystem',this.checked)"> Updated System</label>
-        <label class="to-wo-check"><input type="checkbox" ${proj.newPictures?'checked':''} onchange="updateTurnoverField('${proj.id}','newPictures',this.checked)"> Got New Pictures</label>
-        <label class="to-wo-check"><input type="checkbox" ${proj.forSaleSign?'checked':''} onchange="updateTurnoverField('${proj.id}','forSaleSign',this.checked)"> Put For Sale Sign</label>
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-          <span style="font-size:12px">Presentable to Showing?</span>
-          <select class="to-wo-select" onchange="updateTurnoverField('${proj.id}','presentableToShowing',this.value)">
-            <option value="" ${!proj.presentableToShowing?'selected':''}>—</option>
-            <option value="Yes" ${proj.presentableToShowing==='Yes'?'selected':''}>Yes</option>
-            <option value="No" ${proj.presentableToShowing==='No'?'selected':''}>No</option>
-          </select>
-        </div>
-      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">✅ Office Checklist (${officeDone}/${officeTotal})</div>
+      <div style="display:flex;flex-direction:column;gap:2px">`;
+    officeItems.forEach((oi,oIdx)=>{
+      html+=`<label class="to-wo-check"><input type="checkbox" ${oi.checked?'checked':''} onchange="toggleOfficeItem('${proj.id}',${oIdx},this.checked)"> ${escapeHtml(oi.text)}</label>`;
+    });
+    html+=`</div>
     </div>`;
 
     // Cost summary
@@ -11525,6 +11552,66 @@ function renderTurnoverProjects(){
   container.innerHTML=html;
 }
 
+
+function getDefaultTurnoverItems(){
+  const saved = localStorage.getItem('defaultTurnoverItems');
+  if(saved){
+    try{ return JSON.parse(saved); }catch(e){}
+  }
+  return [
+    'Posted on Affordable',
+    'Locks Renewed',
+    'Updated System',
+    'Got New Pictures',
+    'Put For Sale Sign',
+    'Presentable to Showing'
+  ];
+}
+
+function openDefaultTurnoverItems(){
+  const items = getDefaultTurnoverItems();
+  const list = document.getElementById('toDefaultItemsList');
+  list.innerHTML='';
+  items.forEach((item,i)=>{
+    const row = document.createElement('div');
+    row.style='display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px';
+    row.innerHTML=`<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <input type="text" value="${escapeHtml(item)}" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none">
+      <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:10px;width:auto" onclick="this.parentElement.remove()">×</button>`;
+    list.appendChild(row);
+  });
+  document.getElementById('toDefaultNewItem').value='';
+  document.getElementById('toDefaultItemsModal').classList.add('open');
+}
+
+function addDefaultTurnoverItem(){
+  const input = document.getElementById('toDefaultNewItem');
+  const text = (input.value||'').trim();
+  if(!text){toast('Type an item');return;}
+  const list = document.getElementById('toDefaultItemsList');
+  const count = list.children.length+1;
+  const row = document.createElement('div');
+  row.style='display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px';
+  row.innerHTML=`<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${count}.</span>
+    <input type="text" value="${escapeHtml(text)}" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none">
+    <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:10px;width:auto" onclick="this.parentElement.remove()">×</button>`;
+  list.appendChild(row);
+  input.value='';
+  input.focus();
+}
+
+function saveDefaultTurnoverItems(){
+  const rows = document.querySelectorAll('#toDefaultItemsList > div');
+  const items=[];
+  rows.forEach(r=>{
+    const name = r.querySelector('input[type=text]').value.trim();
+    if(name) items.push(name);
+  });
+  if(!items.length){toast('Add at least one item');return;}
+  localStorage.setItem('defaultTurnoverItems',JSON.stringify(items));
+  closeModal('toDefaultItemsModal');
+  toast('Default items saved ('+items.length+' items)');
+}
 
 function openAddTurnover(){
   const dl = document.getElementById('toAddrList');
@@ -11557,6 +11644,8 @@ async function saveTurnoverProject(){
   const fixBy = document.getElementById('toFixBy').value||'Own';
   const currentHomeInfo = document.getElementById('toHomeInfo').value.trim();
 
+  const defaultOffice = getDefaultTurnoverItems().map(text=>({text, checked:false}));
+
   try{
     await db.collection('turnoverProjects').add({
       propertyId: prop.id,
@@ -11571,6 +11660,8 @@ async function saveTurnoverProject(){
       progress: 0,
       status: 'In Progress',
       snapshots: [],
+      turnoverItems: [],
+      officeChecklist: defaultOffice,
       postedAffordable: false,
       locksRenewed: false,
       updatedSystem: false,
@@ -11592,30 +11683,8 @@ async function saveTurnoverProject(){
 async function updateTurnoverField(docId, field, value){
   try{
     const updateData = {[field]:value, updatedAt:new Date()};
-    // Check if all work order items are complete => auto-set Ready to Rent
     const proj = turnoverData.find(p=>p.id===docId);
-    if(proj){
-      proj[field]=value;
-      if(['postedAffordable','locksRenewed','updatedSystem','newPictures','forSaleSign','presentableToShowing'].includes(field)){
-        const pa = field==='postedAffordable'?value:proj.postedAffordable;
-        const lr = field==='locksRenewed'?value:proj.locksRenewed;
-        const us = field==='updatedSystem'?value:proj.updatedSystem;
-        const np = field==='newPictures'?value:proj.newPictures;
-        const fs = field==='forSaleSign'?value:proj.forSaleSign;
-        const pt = field==='presentableToShowing'?value:proj.presentableToShowing;
-        if(pa && lr && us && np && fs && pt==='Yes'){
-          updateData.status='Ready to Rent';
-          updateData.readyToRentDate=new Date().toISOString().slice(0,10);
-          proj.status='Ready to Rent';
-          proj.readyToRentDate=updateData.readyToRentDate;
-        } else if(proj.status==='Ready to Rent'){
-          updateData.status='Completed';
-          updateData.readyToRentDate='';
-          proj.status='Completed';
-          proj.readyToRentDate='';
-        }
-      }
-    }
+    if(proj) proj[field]=value;
     await db.collection('turnoverProjects').doc(docId).update(updateData);
     renderTurnoverProjects();
   }catch(e){
@@ -11774,6 +11843,31 @@ async function toggleTurnoverItem(projId, idx, checked){
     proj.turnoverItems=items;
     renderTurnoverProjects();
   }catch(e){ toast('Error: '+e.message); }
+}
+
+async function toggleOfficeItem(projId, idx, checked){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.officeChecklist||[];
+  items[idx].checked=checked;
+  const updateData={officeChecklist:items};
+  const allDone=items.length>0&&items.every(i=>i.checked);
+  if(allDone&&proj.status!=='Ready to Rent'){
+    updateData.status='Ready to Rent';
+    updateData.readyToRentDate=new Date().toISOString().slice(0,10);
+    proj.status='Ready to Rent';
+    proj.readyToRentDate=updateData.readyToRentDate;
+  } else if(!allDone&&proj.status==='Ready to Rent'){
+    updateData.status=proj.progress>=100?'Completed':'In Progress';
+    updateData.readyToRentDate='';
+    proj.status=updateData.status;
+    proj.readyToRentDate='';
+  }
+  try{
+    await db.collection('turnoverProjects').doc(projId).update(updateData);
+    proj.officeChecklist=items;
+    renderTurnoverProjects();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 async function archiveTurnoverProject(docId){
