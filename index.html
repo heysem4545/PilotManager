@@ -1148,7 +1148,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
                   <th>Tenant Paid</th>
                   <th onclick="sortBy('collected')">Collected (CMHA/Tenant)</th>
                   <th>Balance (CMHA/Tenant)</th>
-                  <th>Rate</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody id="tableBody"></tbody>
@@ -2625,7 +2625,8 @@ function getMonthProp(p){
   const tenantPortion = md.tenantPortion !== undefined ? md.tenantPortion : 0;
   const collected = cmhaPaid + tenantPaid;
   const balance = Math.max(0, cmha - cmhaPaid) + Math.max(0, tenantPortion - tenantPaid);
-  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status};
+  const monthNote = md.monthNote || '';
+  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status, monthNote};
 }
 
 // ─────────────────────────────────────────────
@@ -3123,7 +3124,7 @@ function renderCollectionMonthlyView(){
       <td class="money">${fmt(cmhaPaid)}</td><td class="money">${fmt(tPaid)}</td>
       <td class="money">${fmt(collected)}</td>
       <td class="money" style="color:${(cmhaBal+tenBal)>0?'var(--red)':'var(--accent)'}">${fmt(cmhaBal)} / ${fmt(tenBal)}</td>
-      <td><div class="rate-pill" style="--pct:${rate}%"><span>${rate}%</span></div></td>
+      <td style="font-size:11px;color:var(--muted)">${escapeHtml(mp.monthNote||'')}</td>
     </tr>`;
   }).join('');
 
@@ -3134,7 +3135,7 @@ function renderCollectionMonthlyView(){
         <table>
           <thead><tr>
             <th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
-            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>Rate</th>
+            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>Notes</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -5373,7 +5374,7 @@ function renderTable(){
       <td id="cell-tenantPaid-${p.id}" class="money">${tPaidCell}</td>
       <td class="money ${mp.collected>0?'m-pos':''}">${fmtD(mp.collected)}</td>
       <td>${balCell}</td>
-      <td>${p.rent>0?`<span class="prog-track"><span class="prog-fill" style="width:${rate}%;background:${rC}"></span></span><span style="font-size:10px;font-family:var(--mono);color:${rC}">${rate}%</span>`:'<span class="m-muted">—</span>'}</td>
+      <td>${edit?`<span class="editable" onclick="inlineEditNote('${p.id}',this)" style="font-size:11px;color:${mp.monthNote?'var(--text)':'var(--muted2)'};max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="${escapeAttr(mp.monthNote||'')}">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`:`<span style="font-size:11px;color:var(--muted)">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`}</td>
     </tr>`;
   }).join('');
   let pag='';
@@ -5696,6 +5697,29 @@ function inlineEditStatus(propId, cell){
       }
     });
   },100);
+}
+
+function inlineEditNote(propId, cell){
+  if(!canEdit())return;
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  const mp=getMonthProp(p);
+  const cur=mp.monthNote||'';
+  const inp=document.createElement('input');
+  inp.type='text';
+  inp.value=cur;
+  inp.placeholder='Add note…';
+  inp.style='font-size:11px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;background:var(--surface2);color:var(--text);outline:none;width:120px;font-family:var(--font)';
+  cell.innerHTML='';
+  cell.appendChild(inp);
+  inp.focus();
+  const save=async()=>{
+    const val=inp.value.trim();
+    await saveMonthField(propId,'monthNote',val);
+    renderTable();
+  };
+  inp.onblur=save;
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=cur;inp.blur();}};
 }
 
 function inlineEditNum(propId, baseField, cell, fieldType){
