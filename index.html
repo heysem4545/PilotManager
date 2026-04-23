@@ -11520,9 +11520,13 @@ function renderTurnoverProjects(){
       <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">✅ Office Checklist (${officeDone}/${officeTotal})</div>
       <div style="display:flex;flex-direction:column;gap:2px">`;
     officeItems.forEach((oi,oIdx)=>{
-      html+=`<label class="to-wo-check"><input type="checkbox" ${oi.checked?'checked':''} onchange="toggleOfficeItem('${proj.id}',${oIdx},this.checked)"> ${escapeHtml(oi.text)}</label>`;
+      html+=`<label class="to-wo-check" style="display:flex;align-items:center;gap:6px"><input type="checkbox" ${oi.checked?'checked':''} onchange="toggleOfficeItem('${proj.id}',${oIdx},this.checked)"> <span style="flex:1">${escapeHtml(oi.text)}</span><button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0 2px" onclick="event.preventDefault();removeOfficeItem('${proj.id}',${oIdx})" title="Remove">×</button></label>`;
     });
     html+=`</div>
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <input type="text" id="officeNewItem_${proj.id}" placeholder="Add item…" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addOfficeItem('${proj.id}')">
+        <button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:10px" onclick="addOfficeItem('${proj.id}')">+</button>
+      </div>
     </div>`;
 
     // Cost summary
@@ -11844,6 +11848,34 @@ async function toggleTurnoverItem(projId, idx, checked){
     proj.turnoverItems=items;
     renderTurnoverProjects();
   }catch(e){ toast('Error: '+e.message); }
+}
+
+async function addOfficeItem(projId){
+  const input=document.getElementById('officeNewItem_'+projId);
+  const text=(input.value||'').trim();
+  if(!text){toast('Type an item');return;}
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.officeChecklist||[];
+  items.push({text,checked:false});
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({officeChecklist:items});
+    proj.officeChecklist=items;
+    input.value='';
+    renderTurnoverProjects();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function removeOfficeItem(projId, idx){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  const items=proj.officeChecklist||[];
+  items.splice(idx,1);
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({officeChecklist:items});
+    proj.officeChecklist=items;
+    renderTurnoverProjects();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 async function toggleOfficeItem(projId, idx, checked){
