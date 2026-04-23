@@ -1952,6 +1952,23 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- TURNOVER NOTES MODAL -->
+<div class="overlay" id="toNotesModal" onclick="if(event.target===this)closeModal('toNotesModal')">
+  <div class="modal" style="width:560px">
+    <div class="modal-title">
+      <span>📝 Project Notes</span>
+      <button class="modal-close" onclick="closeModal('toNotesModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="toNotesModalAddr"></div>
+    <textarea id="toNotesText" rows="10" style="width:100%;font-size:13px;line-height:1.6;padding:12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;resize:vertical"></textarea>
+    <input type="hidden" id="toNotesModalProjId" value="">
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('toNotesModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTurnoverNotes()">Save Notes</button>
+    </div>
+  </div>
+</div>
+
 <!-- DEFAULT TURNOVER ITEMS MODAL -->
 <div class="overlay" id="toDefaultItemsModal" onclick="if(event.target===this)closeModal('toDefaultItemsModal')">
   <div class="modal" style="width:520px">
@@ -11390,10 +11407,12 @@ function renderTurnoverProjects(){
       ${statusBadge} ${daysInfo}
     </div>`;
 
-    // Current Home Info
-    if(proj.currentHomeInfo){
-      html+=`<div style="font-size:11px;color:var(--muted);margin:6px 0;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">${escapeHtml(proj.currentHomeInfo)}</div>`;
-    }
+    // Current Home Info — truncated with click to expand
+    const notePreview = (proj.currentHomeInfo||'').length>80 ? escapeHtml(proj.currentHomeInfo.slice(0,80))+'…' : escapeHtml(proj.currentHomeInfo||'');
+    html+=`<div style="display:flex;align-items:center;gap:6px;margin:6px 0">
+      ${proj.currentHomeInfo?`<div onclick="openTurnoverNotes('${proj.id}')" style="flex:1;font-size:11px;color:var(--muted);padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Click to read/edit">📝 ${notePreview}</div>`:''}
+      <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px;white-space:nowrap;flex-shrink:0" onclick="openTurnoverNotes('${proj.id}')">${proj.currentHomeInfo?'Edit Notes':'+ Add Notes'}</button>
+    </div>`;
 
     // Turnover items checklist
     const toItems = proj.turnoverItems||[];
@@ -11616,6 +11635,28 @@ function saveDefaultTurnoverItems(){
   localStorage.setItem('defaultTurnoverItems',JSON.stringify(items));
   closeModal('toDefaultItemsModal');
   toast('Default items saved ('+items.length+' items)');
+}
+
+function openTurnoverNotes(projId){
+  const proj=turnoverData.find(p=>p.id===projId);
+  if(!proj) return;
+  document.getElementById('toNotesModalProjId').value=projId;
+  document.getElementById('toNotesModalAddr').textContent=proj.propertyAddress||'';
+  document.getElementById('toNotesText').value=proj.currentHomeInfo||'';
+  document.getElementById('toNotesModal').classList.add('open');
+}
+
+async function saveTurnoverNotes(){
+  const projId=document.getElementById('toNotesModalProjId').value;
+  const text=document.getElementById('toNotesText').value.trim();
+  try{
+    await db.collection('turnoverProjects').doc(projId).update({currentHomeInfo:text, updatedAt:new Date()});
+    const proj=turnoverData.find(p=>p.id===projId);
+    if(proj) proj.currentHomeInfo=text;
+    closeModal('toNotesModal');
+    toast('Notes saved');
+    renderTurnoverProjects();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 function openAddTurnover(){
