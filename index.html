@@ -11433,8 +11433,8 @@ function renderTurnoverProjects(){
 
     html+=`<div style="margin:10px 0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔧 Items to Fix${toItemsTotal>0?' — '+toItemsDone+'/'+toItemsTotal+' done ('+toItemsPct+'%)':''}</span>
-        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="openTurnoverItemsModal('${proj.id}')">
+        <span style="font-size:14px;font-weight:700;color:var(--text)">🔧 Items to Fix${toItemsTotal>0?' — <span style="color:var(--accent)">'+toItemsDone+'/'+toItemsTotal+'</span> done ('+toItemsPct+'%)':''}</span>
+        <button class="btn btn-primary btn-sm" style="padding:5px 14px;font-size:12px;font-weight:600" onclick="openTurnoverItemsModal('${proj.id}')">
           ${toItemsTotal>0?'Edit Items ('+toItemsTotal+')':'+ Add Items'}
         </button>
       </div>`;
