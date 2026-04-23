@@ -2936,15 +2936,17 @@ function calcTotals(){
 // ─────────────────────────────────────────────
 // RENDER
 // ─────────────────────────────────────────────
-function renderMetrics(){
+async function renderMetrics(){
   const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mLabel=MNAMES[activeMonth]+' '+activeYear;
   const t=calcTotals();
   const collRate=pct(t.coll,t.rent);
   const occ=pct(t.rented,properties.length);
 
-  // Previous month totals for comparison
+  // Ensure previous month data is loaded before comparing
   const pk = prevMonthKey();
+  const prevLoaded = properties.some(p=>(monthData[p.id]||{})[pk]);
+  if(!prevLoaded) await loadMonthData(pk);
   const pt = calcTotalsForKey(pk);
   const prevOcc = pct(pt.rented, properties.length);
   let pm=activeMonth-1, py=activeYear;
