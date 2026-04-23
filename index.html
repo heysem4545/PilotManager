@@ -3060,9 +3060,9 @@ function renderCollectionPage(){
   const tabsEl=document.getElementById('collectionTabs');
   if(tabsEl){
     tabsEl.innerHTML=`
-      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
-      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
       <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
+      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
+      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
   }
