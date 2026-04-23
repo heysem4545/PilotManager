@@ -2435,6 +2435,8 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   // Start real-time listeners so all users see the same property data.
   startPropertiesListener();
   startMonthDataListener(activeKey());
+  startConstProjectsListener();
+  startTurnoverListener();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -10306,7 +10308,26 @@ function calcTotalProgress(categories){
   return Math.round(total*100)/100;
 }
 
+let _constProjUnsub=null;
+let _constProjRendering=false;
+function startConstProjectsListener(){
+  if(_constProjUnsub) _constProjUnsub();
+  _constProjUnsub=db.collection('constructionProjects').onSnapshot(snap=>{
+    constProjectsData = snap.docs.map(d=>({id:d.id,...d.data()}));
+    constProjectsData.sort((a,b)=>(a.totalProgress||0)-(b.totalProgress||0));
+    if(_constProjRendering) return;
+    const el=document.getElementById('constProjectsView');
+    if(el&&el.innerHTML!==''){
+      _constProjRendering=true;
+      renderConstProjectsView().finally(()=>{_constProjRendering=false;});
+    }
+  },e=>{
+    console.error('constProjects listener error:',e);
+  });
+}
 async function loadConstProjects(){
+  // If listener already populated data, skip
+  if(constProjectsData.length>0) return;
   try{
     const snap = await db.collection('constructionProjects').get();
     constProjectsData = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -11086,7 +11107,24 @@ async function deleteProject(docId){
 let turnoverData = [];
 let turnoverTab = 'projects';
 
+let _turnoverUnsub=null;
+let _turnoverRendering=false;
+function startTurnoverListener(){
+  if(_turnoverUnsub) _turnoverUnsub();
+  _turnoverUnsub=db.collection('turnoverProjects').onSnapshot(snap=>{
+    turnoverData = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(_turnoverRendering) return;
+    const el=document.getElementById('turnoverView');
+    if(el&&el.innerHTML!==''){
+      _turnoverRendering=true;
+      renderTurnoverView().finally(()=>{_turnoverRendering=false;});
+    }
+  },e=>{
+    console.error('turnover listener error:',e);
+  });
+}
 async function loadTurnoverProjects(){
+  if(turnoverData.length>0) return;
   try{
     const snap = await db.collection('turnoverProjects').get();
     turnoverData = snap.docs.map(d=>({id:d.id,...d.data()}));
