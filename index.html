@@ -1081,7 +1081,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <div id="inspectionAlertSection"></div>
         <div class="month-bar" id="dashMonthBar"></div>
         <div class="metrics" id="metricsGrid"></div>
-        <div class="potential-banner" id="potentialBanner"></div>
         <div class="overview-row">
           <div class="ov-card">
             <div class="card-title">Portfolio status</div>
@@ -2943,25 +2942,10 @@ function renderMetrics(){
     <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}</div><div class="mc-sub">${t.cmhaBehind+t.tenantBehind} properties behind · ${mLabel}</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">CMHA ${fmt(Math.max(0,t.cmhaBal))} · ${t.cmhaBehind} behind</span></div><div class="mc-split"><span class="tr" style="background:var(--red-dim);color:var(--red)">Tenant ${fmt(Math.max(0,t.tenantBal))} · ${t.tenantBehind} behind</span></div></div>
     <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
     <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
+    <div class="mc a"><div class="mc-lbl">⚡ Potential Income</div><div class="mc-val a">${fmt(t.totalPotential)}<span style="font-size:12px;font-weight:400">/mo</span></div><div class="mc-sub">${properties.filter(p=>['VACANT','EVICTION','CONSTRUCTION','MOVING PROCESS'].includes((getMonthProp(p).status||'').toUpperCase())).length} non-rented units</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${fmt(t.vacantIncome)}</span><span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${fmt(t.evictionIncome)}</span><span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${fmt(t.constructionIncome)}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${fmt(t.movingIncome)}</span></div></div>
   `;
 }
 
-function renderPotential(){
-  const t=calcTotals();
-  const vN=properties.filter(p=>getMonthProp(p).status==='VACANT').length;
-  const eN=properties.filter(p=>getMonthProp(p).status==='EVICTION').length;
-  const cN=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').length;
-  const mN=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').length;
-  document.getElementById('potentialBanner').innerHTML=`
-    <div class="potential-title">⚡ Potential income — if these units were rented</div>
-    <div class="potential-grid">
-      <div class="pot-item"><div class="pot-lbl" style="color:var(--amber)">Vacant</div><div class="pot-val" style="color:var(--amber)">${fmt(t.vacantIncome)}</div><div class="pot-count">${vN} units</div></div>
-      <div class="pot-item"><div class="pot-lbl" style="color:var(--red)">Eviction</div><div class="pot-val" style="color:var(--red)">${fmt(t.evictionIncome)}</div><div class="pot-count">${eN} units</div></div>
-      <div class="pot-item"><div class="pot-lbl" style="color:var(--purple)">Construction</div><div class="pot-val" style="color:var(--purple)">${fmt(t.constructionIncome)}</div><div class="pot-count">${cN} units</div></div>
-      <div class="pot-item"><div class="pot-lbl" style="color:var(--blue)">Moving</div><div class="pot-val" style="color:var(--blue)">${fmt(t.movingIncome)}</div><div class="pot-count">${mN} units</div></div>
-      <div class="pot-total"><div class="pot-total-lbl">Total potential</div><div class="pot-total-val">${fmt(t.totalPotential)}/mo</div><div class="pot-total-sub">If all ${vN+eN+cN+mN} non-rented units were filled</div></div>
-    </div>`;
-}
 
 function renderStatusBars(){
   const counts={};
@@ -5267,8 +5251,7 @@ async function switchMonth(y,m){
   startMonthDataListener(key);
   renderTable();
   renderMetrics();
-  renderPotential();
-  renderStatusBars();
+   renderStatusBars();
   renderDonut();
   // If on collection monthly view, re-render it too
   if(currentView==='collection' && collectionViewMode==='monthly') renderCollectionMonthlyView();
@@ -7606,8 +7589,7 @@ function showView(v){
     renderInspectionAlerts();
     renderMonthBar();
     renderMetrics();
-    renderPotential();
-    renderStatusBars();
+       renderStatusBars();
     renderDonut();
   }
   if(v==='collection') renderCollectionPage();
