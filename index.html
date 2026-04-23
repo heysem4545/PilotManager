@@ -2862,7 +2862,7 @@ async function sendToCollection(propertyId){
 // ─────────────────────────────────────────────
 function calcTotals(){
   const mProps=properties.map(p=>getMonthProp(p));
-  const rent=properties.reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const rent=properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const coll=mProps.reduce((s,p)=>s+p.collected,0);
   const cmha=mProps.reduce((s,p)=>s+p.cmhaPaid,0);
   const tp=mProps.reduce((s,p)=>s+p.tenantPaid,0);
