@@ -11461,8 +11461,21 @@ function renderTurnoverProjects(){
       html+=tlHtml;
     }
 
-    // Office checklist & cost summary (always visible)
-    html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">`;
+    // Collapsible details bar
+    const officeChecked = [proj.postedAffordable,proj.locksRenewed,proj.updatedSystem,proj.newPictures,proj.forSaleSign].filter(Boolean).length;
+    const officePts = proj.presentableToShowing==='Yes'?1:0;
+    const officeTotal = officeChecked+officePts;
+    const costTotal = (proj.costMaterial||0)+(proj.costOutsource||0);
+    html+=`<div style="margin-top:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden">
+      <div onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'':'none';this.querySelector('.to-detail-arrow').textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);cursor:pointer;user-select:none">
+        <span class="to-detail-arrow" style="font-size:12px;color:var(--muted)">▸</span>
+        <span style="font-size:11px;font-weight:600;color:var(--text)">Details</span>
+        <span style="font-size:10px;color:var(--muted)">✅ Office ${officeTotal}/6</span>
+        ${costTotal>0?`<span style="font-size:10px;color:var(--muted)">💰 ${fmt(costTotal)}</span>`:''}
+        ${proj.status==='Ready to Rent'?`<span style="font-size:10px;color:#4ade80;font-weight:600">🏡 Ready</span>`:''}
+      </div>
+      <div style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px">`;
 
     // Office checklist
     html+=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px">
@@ -11504,7 +11517,7 @@ function renderTurnoverProjects(){
       ${(proj.costMaterial||0)+(proj.costOutsource||0)>0?`<div style="margin-top:8px;font-size:11px;font-family:var(--mono);padding-top:6px;border-top:1px solid var(--border2)">Total Spent: <strong style="color:var(--accent)">${fmt((proj.costMaterial||0)+(proj.costOutsource||0))}</strong></div>`:''}
     </div>`;
 
-    html+=`</div>`;
+    html+=`</div></div></div>`;
 
     html+='</div>';
   });
