@@ -2929,7 +2929,7 @@ async function saveCollectionTask(){
   const assignedUser = isTeam ? null : teamUsersCache.find(u=>u.uid===assignedUid);
   const assignedName = isTeam ? 'Team' : assignedUser?(assignedUser.name||assignedUser.email||''):'';
   const now=new Date();
-  const key=monthKey(now.getFullYear(),now.getMonth());
+  const key=tmMonthKey(now.getFullYear(),now.getMonth());
   try{
     await db.collection('tasks').add({
       task: task,
