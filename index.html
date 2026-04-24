@@ -6706,8 +6706,13 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const rawTasks=tasks[day]||[];
   // Final filter: group view only shows unassigned/team tasks (not personally assigned ones)
   const dayTasks=isGroup
-    ? rawTasks.filter(t=>!t.assignedUid || t.assignedUid==='' || t.assignedUid==='team')
+    ? rawTasks.filter(t=>{
+        const hasAssignee = t.assignedUid && t.assignedUid!=='' && t.assignedUid!=='team';
+        if(hasAssignee) console.log('FILTERED OUT from group:', t.task, 'assignedUid:', t.assignedUid);
+        return !hasAssignee;
+      })
     : rawTasks;
+  if(isGroup && rawTasks.length>0) console.log('Group tab day', day, ':', rawTasks.length, 'raw →', dayTasks.length, 'filtered');
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayName=DNAMES[new Date(tmYear,tmMonth,day).getDay()];
 
