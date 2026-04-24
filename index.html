@@ -2948,7 +2948,7 @@ async function saveCollectionTask(){
       uid: isTeam?'team':(assignedUid||currentUser.uid),
       userName: currentUser.name||currentUser.email,
       userColor: userColor(assignedUid||currentUser.uid),
-      isGroup: true,
+      isGroup: isTeam,
       suspiciousFlag: false,
       createdAt: now,
       updatedAt: now
