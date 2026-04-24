@@ -2881,6 +2881,17 @@ async function updatePropertyField(id, field, value){
   if(p) p[field] = value;
 }
 
+async function getNextRowIdx(key, day, uid){
+  try{
+    let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day);
+    if(uid&&uid!=='team') q=q.where('uid','==',uid);
+    const snap=await q.get();
+    let maxIdx=-1;
+    snap.docs.forEach(d=>{const ri=d.data().rowIdx||0;if(ri>maxIdx)maxIdx=ri;});
+    return maxIdx+1;
+  }catch(e){return 0;}
+}
+
 async function openCollectionTask(propId, addr, monthName){
   document.getElementById('collTaskPropId').value=propId;
   document.getElementById('collTaskAddr').textContent=addr+(monthName?' — '+monthName:'');
@@ -2924,7 +2935,7 @@ async function saveCollectionTask(){
       task: task,
       description: 'Collection task for: '+addr,
       diff: diff,
-      status: 'pending',
+      status: 'notstarted',
       assignedUid: isTeam?'team':(assignedUid||''),
       assignedName,
       dueDate: '',
@@ -2933,8 +2944,8 @@ async function saveCollectionTask(){
       source: 'collection',
       monthKey: key,
       day: day,
-      rowIdx: 0,
-      uid: assignedUid||currentUser.uid,
+      rowIdx: await getNextRowIdx(key, day, isTeam?'team':(assignedUid||currentUser.uid)),
+      uid: isTeam?'team':(assignedUid||currentUser.uid),
       userName: currentUser.name||currentUser.email,
       userColor: userColor(assignedUid||currentUser.uid),
       isGroup: true,
