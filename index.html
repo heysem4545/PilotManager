@@ -2570,7 +2570,7 @@ function startPropertiesListener(){
     }));
     // Re-render the active view if it's data-dependent
     if(currentView==='properties') renderTable();
-    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); renderPotential(); }
+    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); }
   }, err=>{ console.warn('properties listener', err?.message); });
 }
 
@@ -2587,7 +2587,7 @@ function startMonthDataListener(key){
       };
     });
     if(currentView==='properties') renderTable();
-    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); renderPotential(); }
+    if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); }
   }, err=>{ console.warn('monthData listener', err?.message); });
 }
 
