@@ -1968,6 +1968,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <option value="">Select team member…</option>
       </select>
     </div>
+    <div class="fg"><label>Scheduled Day</label>
+      <select id="collTaskDay" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></select>
+    </div>
     <div class="fg"><label>Difficulty</label>
       <select id="collTaskDiff" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <option value="easy">🟢 Easy (1 pt)</option>
@@ -2882,8 +2885,18 @@ async function openCollectionTask(propId, addr){
   document.getElementById('collTaskPropId').value=propId;
   document.getElementById('collTaskAddr').textContent=addr;
   document.getElementById('collTaskText').value='';
-  document.getElementById('collTaskDue').value='';
-  document.getElementById('collTaskPriority').value='Medium';
+  document.getElementById('collTaskDiff').value='medium';
+  // Populate day dropdown with days of current month
+  const now=new Date();
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const daySel=document.getElementById('collTaskDay');
+  daySel.innerHTML='';
+  for(let d=1;d<=daysInMonth;d++){
+    const dn=DNAMES[new Date(now.getFullYear(),now.getMonth(),d).getDay()];
+    const sel=d===now.getDate()?'selected':'';
+    daySel.innerHTML+=`<option value="${d}" ${sel}>${d} - ${dn}</option>`;
+  }
   // Load team users for assignment dropdown
   const users = teamUsersCache.length ? teamUsersCache : await getUsers();
   teamUsersCache = users;
@@ -2900,6 +2913,7 @@ async function saveCollectionTask(){
   if(!task){toast('Please enter a task');return;}
   const assignedUid=document.getElementById('collTaskAssign').value;
   const diff=document.getElementById('collTaskDiff').value;
+  const day=parseInt(document.getElementById('collTaskDay').value,10);
   const assignedUser=teamUsersCache.find(u=>u.uid===assignedUid);
   const assignedName=assignedUser?(assignedUser.name||assignedUser.email||''):'';
   const now=new Date();
@@ -2917,7 +2931,7 @@ async function saveCollectionTask(){
       propertyAddress: addr,
       source: 'collection',
       monthKey: key,
-      day: now.getDate(),
+      day: day,
       rowIdx: 0,
       uid: assignedUid||currentUser.uid,
       userName: currentUser.name||currentUser.email,
