@@ -6703,10 +6703,14 @@ function renderTmStats(tasks, label='This Month'){
 function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const today=new Date();
   const isToday=today.getDate()===day&&today.getMonth()===tmMonth&&today.getFullYear()===tmYear;
-  const dayTasks=tasks[day]||[];
+  const rawTasks=tasks[day]||[];
+  // Final filter: group view only shows unassigned/team tasks (not personally assigned ones)
+  const dayTasks=isGroup
+    ? rawTasks.filter(t=>!t.assignedUid || t.assignedUid==='' || t.assignedUid==='team')
+    : rawTasks;
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayName=DNAMES[new Date(tmYear,tmMonth,day).getDay()];
-  
+
   // Fill to at least 8 rows + 1 empty
   const minRows = Math.max(8, dayTasks.length+2);
   const rows=[];
