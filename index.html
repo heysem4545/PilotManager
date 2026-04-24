@@ -7329,6 +7329,7 @@ async function renderTasksView(){
     html+=`<div class="tm-grid">${weeks.map(([s,e])=>{
       let weekHtml=`<div class="tm-week${cols===3?' cols-3':''}">`;
       for(let d=s;d<=e;d++) weekHtml+=renderTmDay(d,tasks,tmTab==='group',false);
+      if(tmTab==='group') weekHtml+=`<div style="font-size:9px;color:var(--red)">v2-filter-active</div>`;
       weekHtml+='</div>';
       return weekHtml;
     }).join('')}</div>`;
