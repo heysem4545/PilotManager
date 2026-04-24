@@ -2901,7 +2901,7 @@ async function openCollectionTask(propId, addr, monthName){
   const users = teamUsersCache.length ? teamUsersCache : await getUsers();
   teamUsersCache = users;
   const sel=document.getElementById('collTaskAssign');
-  sel.innerHTML='<option value="">Select team member…</option><option value="team">👥 Team (Everyone)</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+  sel.innerHTML='<option value="">Select team member…</option><option value="team">👥 Group Task</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
   document.getElementById('collTaskModal').classList.add('open');
   document.getElementById('collTaskText').focus();
 }
