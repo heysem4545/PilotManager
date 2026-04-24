@@ -1968,14 +1968,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <option value="">Select team member…</option>
       </select>
     </div>
-    <div class="fg"><label>Due Date</label>
-      <input type="date" id="collTaskDue" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
-    </div>
-    <div class="fg"><label>Priority</label>
-      <select id="collTaskPriority" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-        <option value="Medium">🟡 Medium</option>
-        <option value="High">🔴 High</option>
-        <option value="Low">🟢 Low</option>
+    <div class="fg"><label>Difficulty</label>
+      <select id="collTaskDiff" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="easy">🟢 Easy (1 pt)</option>
+        <option value="medium" selected>🟡 Medium (2 pts)</option>
+        <option value="hard">🔴 Hard (3 pts)</option>
       </select>
     </div>
     <div class="modal-foot">
@@ -2902,8 +2899,7 @@ async function saveCollectionTask(){
   const task=document.getElementById('collTaskText').value.trim();
   if(!task){toast('Please enter a task');return;}
   const assignedUid=document.getElementById('collTaskAssign').value;
-  const dueDate=document.getElementById('collTaskDue').value;
-  const priority=document.getElementById('collTaskPriority').value;
+  const diff=document.getElementById('collTaskDiff').value;
   const assignedUser=teamUsersCache.find(u=>u.uid===assignedUid);
   const assignedName=assignedUser?(assignedUser.name||assignedUser.email||''):'';
   const now=new Date();
@@ -2912,11 +2908,11 @@ async function saveCollectionTask(){
     await db.collection('tasks').add({
       task: task,
       description: 'Collection task for: '+addr,
-      diff: priority==='High'?'hard':priority==='Low'?'easy':'medium',
+      diff: diff,
       status: 'pending',
       assignedUid: assignedUid||'',
       assignedName,
-      dueDate: dueDate||'',
+      dueDate: '',
       propertyId: propId,
       propertyAddress: addr,
       source: 'collection',
