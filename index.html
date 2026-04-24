@@ -2901,7 +2901,7 @@ async function openCollectionTask(propId, addr, monthName){
   const users = teamUsersCache.length ? teamUsersCache : await getUsers();
   teamUsersCache = users;
   const sel=document.getElementById('collTaskAssign');
-  sel.innerHTML='<option value="">Select team member…</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+  sel.innerHTML='<option value="">Select team member…</option><option value="team">👥 Team (Everyone)</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
   document.getElementById('collTaskModal').classList.add('open');
   document.getElementById('collTaskText').focus();
 }
@@ -2914,8 +2914,9 @@ async function saveCollectionTask(){
   const assignedUid=document.getElementById('collTaskAssign').value;
   const diff=document.getElementById('collTaskDiff').value;
   const day=parseInt(document.getElementById('collTaskDay').value,10);
-  const assignedUser=teamUsersCache.find(u=>u.uid===assignedUid);
-  const assignedName=assignedUser?(assignedUser.name||assignedUser.email||''):'';
+  const isTeam = assignedUid==='team';
+  const assignedUser = isTeam ? null : teamUsersCache.find(u=>u.uid===assignedUid);
+  const assignedName = isTeam ? 'Team' : assignedUser?(assignedUser.name||assignedUser.email||''):'';
   const now=new Date();
   const key=monthKey(now.getFullYear(),now.getMonth());
   try{
@@ -2924,7 +2925,7 @@ async function saveCollectionTask(){
       description: 'Collection task for: '+addr,
       diff: diff,
       status: 'pending',
-      assignedUid: assignedUid||'',
+      assignedUid: isTeam?'team':(assignedUid||''),
       assignedName,
       dueDate: '',
       propertyId: propId,
