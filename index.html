@@ -1951,6 +1951,40 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- COLLECTION TASK MODAL -->
+<div class="overlay" id="collTaskModal" onclick="if(event.target===this)closeModal('collTaskModal')">
+  <div class="modal" style="width:440px">
+    <div class="modal-title">
+      <span>📋 Create Task from Collection</span>
+      <button class="modal-close" onclick="closeModal('collTaskModal')">×</button>
+    </div>
+    <div class="notes-modal-meta" id="collTaskAddr"></div>
+    <input type="hidden" id="collTaskPropId" value="">
+    <div class="fg"><label>Task</label>
+      <input type="text" id="collTaskText" placeholder="e.g. Call tenant about balance…" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+    </div>
+    <div class="fg"><label>Assign To</label>
+      <select id="collTaskAssign" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="">Select team member…</option>
+      </select>
+    </div>
+    <div class="fg"><label>Due Date</label>
+      <input type="date" id="collTaskDue" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
+    </div>
+    <div class="fg"><label>Priority</label>
+      <select id="collTaskPriority" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="Medium">🟡 Medium</option>
+        <option value="High">🔴 High</option>
+        <option value="Low">🟢 Low</option>
+      </select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('collTaskModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCollectionTask()">Create Task</button>
+    </div>
+  </div>
+</div>
+
 <!-- TURNOVER NOTES MODAL -->
 <div class="overlay" id="toNotesModal" onclick="if(event.target===this)closeModal('toNotesModal')">
   <div class="modal" style="width:560px">
@@ -2847,6 +2881,63 @@ async function updatePropertyField(id, field, value){
   if(p) p[field] = value;
 }
 
+async function openCollectionTask(propId, addr){
+  document.getElementById('collTaskPropId').value=propId;
+  document.getElementById('collTaskAddr').textContent=addr;
+  document.getElementById('collTaskText').value='';
+  document.getElementById('collTaskDue').value='';
+  document.getElementById('collTaskPriority').value='Medium';
+  // Load team users for assignment dropdown
+  const users = teamUsersCache.length ? teamUsersCache : await getUsers();
+  teamUsersCache = users;
+  const sel=document.getElementById('collTaskAssign');
+  sel.innerHTML='<option value="">Select team member…</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+  document.getElementById('collTaskModal').classList.add('open');
+  document.getElementById('collTaskText').focus();
+}
+
+async function saveCollectionTask(){
+  const propId=document.getElementById('collTaskPropId').value;
+  const addr=document.getElementById('collTaskAddr').textContent;
+  const task=document.getElementById('collTaskText').value.trim();
+  if(!task){toast('Please enter a task');return;}
+  const assignedUid=document.getElementById('collTaskAssign').value;
+  const dueDate=document.getElementById('collTaskDue').value;
+  const priority=document.getElementById('collTaskPriority').value;
+  const assignedUser=teamUsersCache.find(u=>u.uid===assignedUid);
+  const assignedName=assignedUser?(assignedUser.name||assignedUser.email||''):'';
+  const now=new Date();
+  const key=monthKey(now.getFullYear(),now.getMonth());
+  try{
+    await db.collection('tasks').add({
+      task: task,
+      description: 'Collection task for: '+addr,
+      diff: priority==='High'?'hard':priority==='Low'?'easy':'medium',
+      status: 'pending',
+      assignedUid: assignedUid||'',
+      assignedName,
+      dueDate: dueDate||'',
+      propertyId: propId,
+      propertyAddress: addr,
+      source: 'collection',
+      monthKey: key,
+      day: now.getDate(),
+      rowIdx: 0,
+      uid: assignedUid||currentUser.uid,
+      userName: currentUser.name||currentUser.email,
+      userColor: userColor(assignedUid||currentUser.uid),
+      isGroup: true,
+      suspiciousFlag: false,
+      createdAt: now,
+      updatedAt: now
+    });
+    closeModal('collTaskModal');
+    toast('Task created'+(assignedName?' for '+assignedName:''));
+  }catch(e){
+    toast('Error: '+e.message);
+  }
+}
+
 async function toggleCollection(propertyId, checked){
   try{
     await updatePropertyField(propertyId, 'sentToCollection', checked);
@@ -3336,6 +3427,7 @@ async function renderBalancesOnly(){
               <th rowspan="2" style="text-align:left;min-width:140px;vertical-align:bottom">Address</th>
               ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📋 Task</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📝 Action Note</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📋 Update</th>
             </tr>
@@ -3354,6 +3446,7 @@ async function renderBalancesOnly(){
                 ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
+                <td style="text-align:center"><button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--blue);border-color:var(--blue-dim,var(--border2))" onclick="openCollectionTask('${r.id}','${escapeAttr(r.addr)}')">+ Task</button></td>
                 <td><input type="text" value="${escapeAttr(r.actionNote)}" placeholder="📝" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:120px" onblur="updatePropertyField('${r.id}','actionNote',this.value)"></td>
                 <td><input type="text" value="${escapeAttr(r.balanceUpdate)}" placeholder="📋" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:120px" onblur="updatePropertyField('${r.id}','balanceUpdate',this.value)"></td>
               </tr>`;
