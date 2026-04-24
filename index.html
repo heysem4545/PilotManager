@@ -2609,9 +2609,11 @@ function startTasksListener(){
     snap.docs.forEach(d=>{
       const t = d.data();
       const dk = t.day;
-      if(!all[dk]) all[dk] = [];
-      all[dk].push({id:d.id,...t});
-      if(t.uid === currentUser.uid){
+      if(t.isGroup){
+        if(!all[dk]) all[dk] = [];
+        all[dk].push({id:d.id,...t});
+      }
+      if(t.uid === currentUser.uid && !t.isGroup){
         if(!own[dk]) own[dk] = [];
         own[dk].push({id:d.id,...t});
       }
@@ -6560,6 +6562,9 @@ async function loadTasksForKey(key, uid=null){
     const data = {};
     snap.docs.forEach(d=>{
       const t=d.data();
+      // Filter: own tab shows non-group tasks, group tab shows group tasks
+      if(tmTab==='own' && t.isGroup) return;
+      if(tmTab==='group' && !t.isGroup) return;
       const dk=t.day;
       if(!data[dk])data[dk]=[];
       data[dk].push({id:d.id,...t});
