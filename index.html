@@ -7048,6 +7048,7 @@ async function renderTasksView(){
   // Start real-time listener for tasks
   startTasksListener();
 
+  const key=tmActiveKey();
   const isAdminUser=currentUser.role==='admin';
   // Count flagged tasks across all users this month (admin only)
   let flaggedCount = 0;
@@ -7064,7 +7065,6 @@ async function renderTasksView(){
     ...(isAdminUser?[{k:'flagged',l:`🚩 Flagged${flaggedCount>0?' ('+flaggedCount+')':''}`}]:[])
   ];
 
-  const key=tmActiveKey();
   let tasks={};
   let teamUsers=[];
 
