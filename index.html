@@ -2609,11 +2609,12 @@ function startTasksListener(){
     snap.docs.forEach(d=>{
       const t = d.data();
       const dk = t.day;
-      if(t.isGroup){
+      const isPersonal = t.assignedUid && t.assignedUid!=='team' && t.assignedUid!=='';
+      if(!isPersonal){
         if(!all[dk]) all[dk] = [];
         all[dk].push({id:d.id,...t});
       }
-      if(t.uid === currentUser.uid && !t.isGroup){
+      if(t.uid === currentUser.uid && isPersonal){
         if(!own[dk]) own[dk] = [];
         own[dk].push({id:d.id,...t});
       }
@@ -7070,11 +7071,21 @@ async function renderTasksView(){
     tasks=await loadTasksForKey(key);
   }
 
-  // Safety filter: own tab only shows personal tasks, group tab only shows group tasks
+  // Safety filter: own tab shows only tasks assigned to current user (not group),
+  // group tab shows only true group tasks (no specific assignee)
   if(tmTab==='own'){
-    Object.keys(tasks).forEach(dk=>{tasks[dk]=tasks[dk].filter(t=>!t.isGroup);});
+    Object.keys(tasks).forEach(dk=>{
+      tasks[dk]=tasks[dk].filter(t=>!t.isGroup && t.uid===currentUser.uid);
+    });
   } else if(tmTab==='group'){
-    Object.keys(tasks).forEach(dk=>{tasks[dk]=tasks[dk].filter(t=>!!t.isGroup);});
+    Object.keys(tasks).forEach(dk=>{
+      tasks[dk]=tasks[dk].filter(t=>{
+        // Show in group if: isGroup is true, OR assignedUid is 'team'/empty and no specific user
+        if(t.isGroup) return true;
+        if(t.assignedUid && t.assignedUid!=='team' && t.assignedUid!=='') return false;
+        return true;
+      });
+    });
   }
 
   const days=getDaysInMonth(tmYear,tmMonth);
