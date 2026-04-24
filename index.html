@@ -7070,6 +7070,13 @@ async function renderTasksView(){
     tasks=await loadTasksForKey(key);
   }
 
+  // Safety filter: own tab only shows personal tasks, group tab only shows group tasks
+  if(tmTab==='own'){
+    Object.keys(tasks).forEach(dk=>{tasks[dk]=tasks[dk].filter(t=>!t.isGroup);});
+  } else if(tmTab==='group'){
+    Object.keys(tasks).forEach(dk=>{tasks[dk]=tasks[dk].filter(t=>!!t.isGroup);});
+  }
+
   const days=getDaysInMonth(tmYear,tmMonth);
   const weeks=[];
   const cols=tmTab==='group'?3:4;
