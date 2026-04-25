@@ -77,17 +77,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .app.sidebar-collapsed{grid-template-columns:52px 1fr}
 .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;padding-bottom:120px;transition:width .25s ease,padding .25s ease;overflow-x:hidden}
 .app.sidebar-collapsed .sidebar{padding:20px 6px;width:52px}
-.app.sidebar-collapsed .sidebar .nav-item span,
-.app.sidebar-collapsed .sidebar .nav-label,
-.app.sidebar-collapsed .sidebar .logo em,
-.app.sidebar-collapsed .sidebar .u-name,
-.app.sidebar-collapsed .sidebar .u-role,
-.app.sidebar-collapsed .sidebar .nav-badge,
-.app.sidebar-collapsed .sidebar .logout-btn span{display:none}
-.app.sidebar-collapsed .sidebar .logo{font-size:14px;padding:4px 4px 18px;text-align:center}
-.app.sidebar-collapsed .sidebar .nav-item{padding:8px;justify-content:center}
+.app.sidebar-collapsed .sidebar .nav-item{font-size:0;padding:8px;justify-content:center;gap:0}
+.app.sidebar-collapsed .sidebar .nav-item svg{width:18px;height:18px}
+.app.sidebar-collapsed .sidebar .nav-label{display:none}
+.app.sidebar-collapsed .sidebar .logo{font-size:0;padding:4px 4px 18px;text-align:center}
+.app.sidebar-collapsed .sidebar .logo::before{content:'P';font-size:16px;font-weight:700;color:var(--accent)}
+.app.sidebar-collapsed .sidebar .logo em{display:none}
+.app.sidebar-collapsed .sidebar .nav-badge{display:none}
 .app.sidebar-collapsed .sidebar .user-row{justify-content:center}
-.app.sidebar-collapsed .sidebar .logout-btn{justify-content:center;padding:6px}
+.app.sidebar-collapsed .sidebar .u-name,
+.app.sidebar-collapsed .sidebar .u-role{display:none}
+.app.sidebar-collapsed .sidebar .logout-btn{font-size:0;justify-content:center;padding:6px}
+.app.sidebar-collapsed .sidebar .logout-btn svg{width:14px;height:14px}
+.app.sidebar-collapsed .sidebar .sidebar-bottom{padding-top:8px}
 .sidebar-toggle{position:absolute;top:12px;right:-12px;width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;color:var(--muted);font-size:12px;transition:transform .25s ease}
 .sidebar-toggle:hover{background:var(--accent-dim);color:var(--accent)}
 .app.sidebar-collapsed .sidebar-toggle{transform:rotate(180deg)}
