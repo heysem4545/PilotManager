@@ -5778,8 +5778,8 @@ function renderTenantLeaseView(){
     const dis=editable?'':'disabled';
     return `<tr class="tl-row" data-search="${escapeAttr((addr+' '+tName).toLowerCase())}">
       <td style="font-weight:500;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(addr)}">${escapeHtml(addr||'—')}</td>
-      <td><input type="date" value="${leaseEff}" style="${ism};width:125px;color-scheme:dark" ${dis} onchange="updatePropertyField('${p.id}','leaseEffective2',this.value)"></td>
-      <td><input type="date" value="${leaseExp}" style="${ism};width:125px;color-scheme:dark;${expStyle}" ${dis} onchange="updatePropertyField('${p.id}','leaseExpire2',this.value)"></td>
+      <td><input type="date" value="${leaseEff}" style="${ism};width:125px;color-scheme:dark" ${dis} onchange="updatePropertyField('${p.id}','leaseEffective2',this.value).then(()=>renderTenantLeaseView())"></td>
+      <td><input type="date" value="${leaseExp}" style="${ism};width:125px;color-scheme:dark;${expStyle}" ${dis} onchange="updatePropertyField('${p.id}','leaseExpire2',this.value).then(()=>renderTenantLeaseView())"></td>
       <td style="text-align:center;font-family:var(--mono);font-size:11px;font-weight:600">${(()=>{
         if(!leaseExp) return '<span style="color:var(--muted2)">—</span>';
         const exp=new Date(leaseExp+'T00:00:00');
