@@ -10100,6 +10100,7 @@ async function renderConstructionView(){
     <button class="ftab ${constructionTab==='monthly'?'active':''}" onclick="switchConstructionTab('monthly')">📅 Monthly Breakdown</button>
     <button class="ftab ${constructionTab==='general'?'active':''}" onclick="switchConstructionTab('general')">🏢 General Expenses</button>
     <button class="ftab ${constructionTab==='list'?'active':''}" onclick="switchConstructionTab('list')">📋 List of Expenses</button>
+    <button class="ftab ${constructionTab==='lookup'?'active':''}" onclick="switchConstructionTab('lookup')">🔍 Property Lookup</button>
   </div>`;
 
   if(constructionTab==='monthly'){
@@ -10112,6 +10113,10 @@ async function renderConstructionView(){
   }
   if(constructionTab==='list'){
     renderExpenseList(el, tabs);
+    return;
+  }
+  if(constructionTab==='lookup'){
+    renderConstructionLookup(el, tabs);
     return;
   }
 
@@ -10511,6 +10516,160 @@ function filterExpenseList(){
   document.querySelectorAll('.exp-list-row').forEach(row=>{
     row.style.display=!q||row.dataset.search.includes(q)?'':'none';
   });
+}
+
+let constLookupAddr='';
+
+function renderConstructionLookup(el, tabs){
+  const MNAMES_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Build address list from construction data
+  const addrs=[...new Set(constructionData.filter(d=>!d.isGeneral).map(d=>d.propertyAddress||''))].filter(Boolean).sort();
+
+  let html=tabs;
+  html+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+    <input id="constLookupSearch" list="constLookupList" value="${escapeAttr(constLookupAddr)}" placeholder="🔍 Search property address…" style="flex:1;max-width:400px;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none"
+      onfocus="this.dataset.prev=this.value;this.value=''"
+      onblur="if(!this.value)this.value=this.dataset.prev||''"
+      onchange="constLookupAddr=this.value;renderConstructionView()">
+    <datalist id="constLookupList">${addrs.map(a=>'<option value="'+escapeAttr(a)+'">').join('')}</datalist>
+  </div>`;
+
+  if(!constLookupAddr){
+    html+=`<div style="padding:40px;text-align:center;color:var(--muted)">Select a property address above to see its full expense breakdown.</div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  // Filter expenses for this property
+  const expenses=constructionData.filter(d=>d.propertyAddress===constLookupAddr&&!d.isGeneral).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const totalSpent=expenses.reduce((s,d)=>s+(d.amount||0),0);
+  const totalLabor=expenses.filter(d=>(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
+  const totalMaterial=expenses.filter(d=>!(d.category||'').toLowerCase().includes('labor')).reduce((s,d)=>s+(d.amount||0),0);
+
+  // Monthly breakdown
+  const byMonth={};
+  expenses.forEach(d=>{
+    const mk=d.date?d.date.slice(0,7):'unknown';
+    if(!byMonth[mk]) byMonth[mk]={labor:0,material:0,count:0};
+    byMonth[mk].count++;
+    if((d.category||'').toLowerCase().includes('labor')) byMonth[mk].labor+=(d.amount||0);
+    else byMonth[mk].material+=(d.amount||0);
+  });
+
+  // Category breakdown
+  const byCat={};
+  expenses.forEach(d=>{
+    const cat=d.category||'Other';
+    if(!byCat[cat]) byCat[cat]={count:0,total:0};
+    byCat[cat].count++;
+    byCat[cat].total+=(d.amount||0);
+  });
+
+  // Payment method breakdown
+  const byMethod={};
+  expenses.forEach(d=>{
+    const pm=d.paidMethod||'Not specified';
+    if(!byMethod[pm]) byMethod[pm]={count:0,total:0};
+    byMethod[pm].count++;
+    byMethod[pm].total+=(d.amount||0);
+  });
+
+  // Stats cards
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--accent)">${fmt(totalSpent)}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Spent</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--blue)">${fmt(totalLabor)}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Labor</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--amber)">${fmt(totalMaterial)}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Material</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${expenses.length}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Expenses</div>
+    </div>
+  </div>`;
+
+  // Monthly breakdown table
+  const sortedMonths=Object.keys(byMonth).sort();
+  if(sortedMonths.length>0){
+    html+=`<div class="table-card" style="margin-bottom:16px">
+      <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600">📅 Monthly Breakdown</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Month</th><th style="text-align:right">Labor</th><th style="text-align:right">Material</th><th style="text-align:right">Total</th><th style="text-align:center">Count</th></tr></thead>
+        <tbody>${sortedMonths.map(mk=>{
+          const d=byMonth[mk];
+          const mTotal=d.labor+d.material;
+          const [y,m]=mk.split('-');
+          const label=m?MNAMES_S[parseInt(m,10)-1]+' '+y:mk;
+          return `<tr>
+            <td>${label}</td>
+            <td style="text-align:right;font-family:var(--mono);color:var(--blue)">${d.labor>0?fmt(d.labor):'—'}</td>
+            <td style="text-align:right;font-family:var(--mono);color:var(--amber)">${d.material>0?fmt(d.material):'—'}</td>
+            <td style="text-align:right;font-family:var(--mono);font-weight:600;color:var(--accent)">${fmt(mTotal)}</td>
+            <td style="text-align:center;font-size:11px;color:var(--muted)">${d.count}</td>
+          </tr>`;
+        }).join('')}
+        <tr style="border-top:2px solid var(--border);font-weight:700">
+          <td>Total</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--blue)">${fmt(totalLabor)}</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--amber)">${fmt(totalMaterial)}</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--accent)">${fmt(totalSpent)}</td>
+          <td style="text-align:center;font-size:11px;color:var(--muted)">${expenses.length}</td>
+        </tr></tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // Category & payment method side by side
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">`;
+
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600">📦 By Category</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:center">Count</th></tr></thead>
+      <tbody>${Object.entries(byCat).sort((a,b)=>b[1].total-a[1].total).map(([cat,d])=>`<tr>
+        <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${(cat||'').toLowerCase().includes('labor')?'var(--blue-dim)':'var(--amber-dim)'};color:${(cat||'').toLowerCase().includes('labor')?'var(--blue)':'var(--amber)'}">${escapeHtml(cat)}</span></td>
+        <td style="text-align:right;font-family:var(--mono)">${fmt(d.total)}</td>
+        <td style="text-align:center;font-size:11px;color:var(--muted)">${d.count}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600">💳 By Payment Method</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Method</th><th style="text-align:right">Amount</th><th style="text-align:center">Count</th></tr></thead>
+      <tbody>${Object.entries(byMethod).sort((a,b)=>b[1].total-a[1].total).map(([pm,d])=>`<tr>
+        <td>${escapeHtml(pm)}</td>
+        <td style="text-align:right;font-family:var(--mono)">${fmt(d.total)}</td>
+        <td style="text-align:center;font-size:11px;color:var(--muted)">${d.count}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+  html+=`</div>`;
+
+  // All expenses detail table
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600">📋 All Expenses</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Date</th><th>Category</th><th>Description</th><th style="text-align:right">Amount</th><th>Paid Method</th></tr></thead>
+      <tbody>${expenses.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(ex=>`<tr>
+        <td style="font-size:11px;font-family:var(--mono)">${ex.date||'—'}</td>
+        <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${(ex.category||'').toLowerCase().includes('labor')?'var(--blue-dim)':'var(--amber-dim)'};color:${(ex.category||'').toLowerCase().includes('labor')?'var(--blue)':'var(--amber)'}">${escapeHtml(ex.category||'Other')}</span></td>
+        <td style="font-size:11px">${escapeHtml(ex.description||'—')}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px">${fmt(ex.amount||0)}</td>
+        <td style="font-size:11px">${escapeHtml(ex.paidMethod||'—')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+
+  el.innerHTML=html;
 }
 
 function openAddGeneralExpense(){
