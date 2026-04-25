@@ -3110,8 +3110,6 @@ async function renderMetrics(){
       </div>`;
     })()}</div>
     <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}${compBadge(utilWater+utilSewer,prevUtilTotal,false)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevUtilTotal)}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
-    <div style="grid-column:1/-1;font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:8px 0 4px;border-top:1px solid var(--border2);margin-top:4px">📋 Operations & Projects</div>
-    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}${compBadge(monthCalls.length,prevCalls,false,true)}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
     ${(()=>{
       const mKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
       let maintTotal=0,maintCost=0;const maintTypes={};
@@ -3146,6 +3144,8 @@ async function renderMetrics(){
       const pestBreakdown=pestTotal>0?`<span class="cs" style="background:var(--accent-dim);color:var(--accent)">Pest Control ${pestTotal}${pestCost>0?' · '+fmt(pestCost):''}</span>`:'';
       return `<div class="mc p"><div class="mc-lbl">Maintenance & Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(combinedCost)}${compBadge(combinedCost,prevMaintTotal,false)}</div><div class="mc-sub">${maintTotal+pestTotal} total · ${maintTotal} maint · ${pestTotal} pest · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevMaintTotal)}</div>${(maintBreakdown||pestBreakdown)?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}${pestBreakdown}</div>`:''}</div>`;
     })()}
+    <div style="grid-column:1/-1;font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:8px 0 4px;border-top:1px solid var(--border2);margin-top:4px">📋 Operations & Projects</div>
+    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}${compBadge(monthCalls.length,prevCalls,false,true)}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
     ${(()=>{
       const cp=typeof constProjectsData!=='undefined'?constProjectsData:[];
       const cpActive=cp.filter(p=>!p.archived);
