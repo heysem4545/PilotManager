@@ -3893,15 +3893,18 @@ async function renderMaintenanceView(){
     <th>Property</th>
     ${MNAMES_S.map(m=>`<th>${m}</th>`).join('')}
     <th>Total</th>
+    <th>Cost</th>
   </tr></thead>`;
 
   const body = sortedProps.map(p=>{
     const propMonths = maintenanceData[p.id] || {};
     let propTotal = 0;
+    let propCost = 0;
     const cells = MNAMES_S.map((_,m)=>{
       const key = `${maintenanceYear}-${String(m+1).padStart(2,'0')}`;
       const visits = propMonths[key] || [];
       propTotal += visits.length;
+      propCost += visits.reduce((s,v)=>s+(parseFloat(v.cost)||0),0);
       const has = visits.length > 0;
       const warn = visits.length >= 3;
       const cls = `maint-cell${warn?' warn':has?' has-visits':' empty'}${editable?'':' disabled'}`;
@@ -3916,6 +3919,7 @@ async function renderMaintenanceView(){
       <td>${addrLabel}</td>
       ${cells}
       <td><div class="maint-cell ${propTotal>0?'has-visits':'empty'}" style="cursor:default">${propTotal>0?propTotal:'—'}</div></td>
+      <td style="font-size:11px;font-family:var(--mono);text-align:right;color:${propCost>0?'var(--red)':'var(--muted2)'}">${propCost>0?fmt(propCost):'—'}</td>
     </tr>`;
   }).join('');
 
