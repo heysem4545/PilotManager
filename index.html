@@ -3046,6 +3046,20 @@ async function renderMetrics(){
 
   // Load maintenance & pest control data for dashboard
   if(Object.keys(maintenanceData).length===0) await loadMaintenanceForYear(activeYear).catch(()=>{});
+  if(py!==activeYear && Object.values(maintenanceData).every(pd=>!pd[prevUtilKey])){
+    await loadMaintenanceForYear(py).catch(()=>{});
+  }
+  // Previous month maintenance/pest totals
+  const prevMaintKey=prevUtilKey;
+  let prevMaintCost=0,prevPestCost=0;
+  const prevMaintIds=new Set(),prevPestIds=new Set();
+  Object.values(maintenanceData).forEach(pd=>{
+    (pd[prevMaintKey]||[]).forEach(v=>{if(v.id&&prevMaintIds.has(v.id))return;if(v.id)prevMaintIds.add(v.id);prevMaintCost+=(parseFloat(v.cost)||0);});
+  });
+  Object.values(pestControlData).forEach(pd=>{
+    (pd[prevMaintKey]||[]).forEach(v=>{if(v.id&&prevPestIds.has(v.id))return;if(v.id)prevPestIds.add(v.id);prevPestCost+=(parseFloat(v.cost)||0);});
+  });
+  const prevMaintTotal=prevMaintCost+prevPestCost;
   if(Object.keys(pestControlData).length===0) await loadPestControlForYear(activeYear).catch(()=>{});
 
   // Utility totals for the active month
@@ -3095,7 +3109,7 @@ async function renderMetrics(){
       </div>`;
     })()}</div>
     <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}${compBadge(utilWater+utilSewer,prevUtilTotal,false)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevUtilTotal)}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
-    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
+    <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}${compBadge(monthCalls.length,prevCalls,false,true)}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
     ${(()=>{
       const mKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
       let maintTotal=0,maintCost=0;const maintTypes={};
@@ -3128,7 +3142,7 @@ async function renderMetrics(){
         .map(([tp,d])=>`<span class="cs" style="background:var(--purple-dim);color:var(--purple)">${escapeHtml(tp)} ${d.count}${d.cost>0?' · '+fmt(d.cost):''}</span>`).join('');
       const combinedCost=maintCost+pestCost;
       const pestBreakdown=pestTotal>0?`<span class="cs" style="background:var(--accent-dim);color:var(--accent)">Pest Control ${pestTotal}${pestCost>0?' · '+fmt(pestCost):''}</span>`:'';
-      return `<div class="mc p"><div class="mc-lbl">Maintenance & Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(combinedCost)}</div><div class="mc-sub">${maintTotal+pestTotal} total · ${maintTotal} maint · ${pestTotal} pest · ${mLabel}</div>${(maintBreakdown||pestBreakdown)?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}${pestBreakdown}</div>`:''}</div>`;
+      return `<div class="mc p"><div class="mc-lbl">Maintenance & Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(combinedCost)}${compBadge(combinedCost,prevMaintTotal,false)}</div><div class="mc-sub">${maintTotal+pestTotal} total · ${maintTotal} maint · ${pestTotal} pest · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevMaintTotal)}</div>${(maintBreakdown||pestBreakdown)?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}${pestBreakdown}</div>`:''}</div>`;
     })()}
   `;
 }
