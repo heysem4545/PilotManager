@@ -3144,6 +3144,21 @@ async function renderMetrics(){
       const pestBreakdown=pestTotal>0?`<span class="cs" style="background:var(--accent-dim);color:var(--accent)">Pest Control ${pestTotal}${pestCost>0?' · '+fmt(pestCost):''}</span>`:'';
       return `<div class="mc p"><div class="mc-lbl">Maintenance & Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(combinedCost)}${compBadge(combinedCost,prevMaintTotal,false)}</div><div class="mc-sub">${maintTotal+pestTotal} total · ${maintTotal} maint · ${pestTotal} pest · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevMaintTotal)}</div>${(maintBreakdown||pestBreakdown)?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}${pestBreakdown}</div>`:''}</div>`;
     })()}
+    ${(()=>{
+      const cp=typeof constProjectsData!=='undefined'?constProjectsData:[];
+      const cpActive=cp.filter(p=>!p.archived);
+      const cpInProgress=cpActive.filter(p=>(p.totalProgress||0)<100);
+      const cpDone=cpActive.filter(p=>(p.totalProgress||0)>=100);
+      const cpAuditDone=cpDone.filter(p=>{const items=p.auditItems||[];return items.length>0&&items.every(i=>i.checked);});
+      const cpAvgProg=cpActive.length>0?Math.round(cpActive.reduce((s,p)=>s+(p.totalProgress||0),0)/cpActive.length):0;
+      // Turnover
+      const tp=typeof turnoverData!=='undefined'?turnoverData:[];
+      const tpActive=tp.filter(p=>!p.archived);
+      const tpInProgress=tpActive.filter(p=>(p.progress||0)<100);
+      const tpDone=tpActive.filter(p=>(p.progress||0)>=100);
+      return `<div class="mc b"><div class="mc-lbl">Construction Projects</div><div class="mc-val" style="color:var(--blue);font-size:22px">${cpActive.length} <span style="font-size:12px;font-weight:400">active</span></div><div class="mc-sub">${cpAvgProg}% avg progress</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">In Progress ${cpInProgress.length}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Reno Done ${cpDone.length}</span><span class="cs" style="background:var(--accent-dim);color:var(--accent)">Audit Done ${cpAuditDone.length}</span></div></div>
+      <div class="mc b"><div class="mc-lbl">TurnOver Projects</div><div class="mc-val" style="color:var(--blue);font-size:22px">${tpActive.length} <span style="font-size:12px;font-weight:400">active</span></div><div class="mc-sub">${tpInProgress.length} in progress · ${tpDone.length} completed</div></div>`;
+    })()}
   `;
 }
 
