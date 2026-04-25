@@ -3156,8 +3156,11 @@ async function renderMetrics(){
       const tpActive=tp.filter(p=>!p.archived);
       const tpInProgress=tpActive.filter(p=>(p.progress||0)<100);
       const tpDone=tpActive.filter(p=>(p.progress||0)>=100);
+      const tpReady=tpActive.filter(p=>p.status==='Ready to Rent');
+      const tpOverdue=tpActive.filter(p=>{if((p.progress||0)>=100||!p.targetDate)return false;const tg=new Date(p.targetDate+'T00:00:00');const now=new Date();now.setHours(0,0,0,0);return tg<now;});
+      const tpAvgProg=tpActive.length>0?Math.round(tpActive.reduce((s,p)=>s+(p.progress||0),0)/tpActive.length):0;
       return `<div class="mc b"><div class="mc-lbl">Construction Projects</div><div class="mc-val" style="color:var(--blue);font-size:22px">${cpActive.length} <span style="font-size:12px;font-weight:400">active</span></div><div class="mc-sub">${cpAvgProg}% avg progress</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">In Progress ${cpInProgress.length}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Reno Done ${cpDone.length}</span><span class="cs" style="background:var(--accent-dim);color:var(--accent)">Audit Done ${cpAuditDone.length}</span></div></div>
-      <div class="mc b"><div class="mc-lbl">TurnOver Projects</div><div class="mc-val" style="color:var(--blue);font-size:22px">${tpActive.length} <span style="font-size:12px;font-weight:400">active</span></div><div class="mc-sub">${tpInProgress.length} in progress · ${tpDone.length} completed</div></div>`;
+      <div class="mc b"><div class="mc-lbl">TurnOver Projects</div><div class="mc-val" style="color:var(--blue);font-size:22px">${tpActive.length} <span style="font-size:12px;font-weight:400">active</span></div><div class="mc-sub">${tpAvgProg}% avg progress</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">In Progress ${tpInProgress.length}</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Completed ${tpDone.length}</span><span class="cs" style="background:var(--accent-dim);color:var(--accent)">Ready to Rent ${tpReady.length}</span>${tpOverdue.length>0?`<span class="cs" style="background:var(--red-dim);color:var(--red)">Overdue ${tpOverdue.length}</span>`:''}</div></div>`;
     })()}
   `;
 }
