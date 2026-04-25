@@ -3044,6 +3044,10 @@ async function renderMetrics(){
   const MNAMES_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const prevLabel = MNAMES_SHORT[pm];
 
+  // Load maintenance & pest control data for dashboard
+  if(Object.keys(maintenanceData).length===0) await loadMaintenanceForYear(activeYear).catch(()=>{});
+  if(Object.keys(pestControlData).length===0) await loadPestControlForYear(activeYear).catch(()=>{});
+
   // Utility totals for the active month
   const utilKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
   let utilWater=0, utilSewer=0, utilProps=0;
@@ -3092,6 +3096,30 @@ async function renderMetrics(){
     })()}</div>
     <div class="mc b"><div class="mc-lbl">Utility Bills</div><div class="mc-val b">${fmt(utilWater+utilSewer)}${compBadge(utilWater+utilSewer,prevUtilTotal,false)}</div><div class="mc-sub">${utilProps} properties · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(prevUtilTotal)}</div><div class="mc-split"><span class="cs">Water ${fmt(utilWater)}</span><span class="ts" style="background:var(--amber-dim);color:var(--amber)">Sewer ${fmt(utilSewer)}</span></div></div>
     <div class="mc b"><div class="mc-lbl">Call Log</div><div class="mc-val b">${monthCalls.length}</div><div class="mc-sub">total calls · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevCalls} calls</div>${callBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:4px">${callBreakdown}</div>`:''}</div>
+    ${(()=>{
+      const mKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
+      let maintTotal=0,maintCost=0;const maintTypes={};
+      let pestTotal=0,pestCost=0;
+      Object.values(maintenanceData).forEach(propData=>{
+        const visits=propData[mKey]||[];
+        visits.forEach(v=>{
+          maintTotal++;
+          maintCost+=(v.cost||0);
+          const tp=v.type||'Other';
+          if(!maintTypes[tp]) maintTypes[tp]={count:0,cost:0};
+          maintTypes[tp].count++;
+          maintTypes[tp].cost+=(v.cost||0);
+        });
+      });
+      Object.values(pestControlData).forEach(propData=>{
+        const entries=propData[mKey]||[];
+        entries.forEach(v=>{pestTotal++;pestCost+=(v.cost||0);});
+      });
+      const maintBreakdown=Object.entries(maintTypes).sort((a,b)=>b[1].count-a[1].count)
+        .map(([tp,d])=>`<span class="cs" style="background:var(--purple-dim);color:var(--purple)">${escapeHtml(tp)} ${d.count}${d.cost>0?' · '+fmt(d.cost):''}</span>`).join('');
+      return `<div class="mc p"><div class="mc-lbl">Maintenance</div><div class="mc-val" style="color:var(--purple);font-size:22px">${maintTotal} <span style="font-size:12px;font-weight:400">visits</span></div><div class="mc-sub">${maintCost>0?'Total spent: '+fmt(maintCost)+' · ':''} ${mLabel}</div>${maintBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}</div>`:''}</div>
+      <div class="mc p"><div class="mc-lbl">Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${pestTotal} <span style="font-size:12px;font-weight:400">services</span></div><div class="mc-sub">${pestCost>0?'Total spent: '+fmt(pestCost)+' · ':''}${mLabel}</div></div>`;
+    })()}
   `;
 }
 
