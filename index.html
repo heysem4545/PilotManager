@@ -73,8 +73,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .login-switch a{color:var(--accent);cursor:pointer;text-decoration:none}
 
 /* ── APP LAYOUT ── */
-.app{display:grid;grid-template-columns:215px 1fr;min-height:100vh}
-.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;padding-bottom:120px}
+.app{display:grid;grid-template-columns:215px 1fr;min-height:100vh;transition:grid-template-columns .25s ease}
+.app.sidebar-collapsed{grid-template-columns:52px 1fr}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;padding-bottom:120px;transition:width .25s ease,padding .25s ease;overflow-x:hidden}
+.app.sidebar-collapsed .sidebar{padding:20px 6px;width:52px}
+.app.sidebar-collapsed .sidebar .nav-item span,
+.app.sidebar-collapsed .sidebar .nav-label,
+.app.sidebar-collapsed .sidebar .logo em,
+.app.sidebar-collapsed .sidebar .u-name,
+.app.sidebar-collapsed .sidebar .u-role,
+.app.sidebar-collapsed .sidebar .nav-badge,
+.app.sidebar-collapsed .sidebar .logout-btn span{display:none}
+.app.sidebar-collapsed .sidebar .logo{font-size:14px;padding:4px 4px 18px;text-align:center}
+.app.sidebar-collapsed .sidebar .nav-item{padding:8px;justify-content:center}
+.app.sidebar-collapsed .sidebar .user-row{justify-content:center}
+.app.sidebar-collapsed .sidebar .logout-btn{justify-content:center;padding:6px}
+.sidebar-toggle{position:absolute;top:12px;right:-12px;width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;color:var(--muted);font-size:12px;transition:transform .25s ease}
+.sidebar-toggle:hover{background:var(--accent-dim);color:var(--accent)}
+.app.sidebar-collapsed .sidebar-toggle{transform:rotate(180deg)}
 .logo{font-size:16px;font-weight:600;letter-spacing:-.02em;padding:4px 8px 18px;border-bottom:1px solid var(--border);margin-bottom:6px}
 .logo em{font-style:normal;color:var(--accent)}
 .nav-label{font-size:10px;font-weight:500;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;padding:14px 8px 4px}
@@ -915,10 +931,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
 <!-- MAIN APP -->
 <div id="appPage" style="display:none">
-  <div class="app">
+  <div class="app" id="appRoot">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside class="sidebar" style="position:relative">
+      <button class="sidebar-toggle" onclick="document.querySelector('.app').classList.toggle('sidebar-collapsed');localStorage.setItem('sidebarCollapsed',document.querySelector('.app').classList.contains('sidebar-collapsed'))" title="Toggle sidebar">◂</button>
       <div class="logo">Pilot<em>Manager</em></div>
       <button class="nav-item active" id="nav-dashboard" onclick="showView('dashboard')">
         <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
@@ -8496,6 +8513,7 @@ function initApp(){
   const MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('viewSub').textContent='Cleveland, OH · '+MNAMES[activeMonth]+' '+activeYear;
   applyTheme(localStorage.getItem('pm-theme') || 'dark');
+  if(localStorage.getItem('sidebarCollapsed')==='true') document.getElementById('appRoot').classList.add('sidebar-collapsed');
   renderCourtAlerts(); // update badge immediately
   renderInspectionAlerts();
   showView('dashboard');
