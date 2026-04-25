@@ -3172,7 +3172,10 @@ function renderDonut(){
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
   el.style.display='';
-  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented'},{k:'VACANT',l:'Vacant'},{k:'EVICTION',l:'Eviction'},{k:'CONSTRUCTION',l:'Construction'},{k:'balance',l:'Has Balance'}];
+  const sc={RENTED:0,VACANT:0,EVICTION:0,CONSTRUCTION:0,'MOVING PROCESS':0};
+  let balCount=0;
+  properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;const mp=getMonthProp(p);if(mp.balance>0)balCount++;});
+  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented ('+sc.RENTED+')'},{k:'VACANT',l:'Vacant ('+sc.VACANT+')'},{k:'EVICTION',l:'Eviction ('+sc.EVICTION+')'},{k:'CONSTRUCTION',l:'Construction ('+sc.CONSTRUCTION+')'},{k:'balance',l:'Has Balance ('+balCount+')'}];
   el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
