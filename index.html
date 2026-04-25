@@ -3126,8 +3126,9 @@ async function renderMetrics(){
       });
       const maintBreakdown=Object.entries(maintTypes).sort((a,b)=>b[1].count-a[1].count)
         .map(([tp,d])=>`<span class="cs" style="background:var(--purple-dim);color:var(--purple)">${escapeHtml(tp)} ${d.count}${d.cost>0?' · '+fmt(d.cost):''}</span>`).join('');
-      return `<div class="mc p"><div class="mc-lbl">Maintenance</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(maintCost)}</div><div class="mc-sub">${maintTotal} visits · ${mLabel}</div>${maintBreakdown?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}</div>`:''}</div>
-      <div class="mc p"><div class="mc-lbl">Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${pestTotal} <span style="font-size:12px;font-weight:400">services</span></div><div class="mc-sub">${pestCost>0?'Total spent: '+fmt(pestCost)+' · ':''}${mLabel}</div></div>`;
+      const combinedCost=maintCost+pestCost;
+      const pestBreakdown=pestTotal>0?`<span class="cs" style="background:var(--accent-dim);color:var(--accent)">Pest Control ${pestTotal}${pestCost>0?' · '+fmt(pestCost):''}</span>`:'';
+      return `<div class="mc p"><div class="mc-lbl">Maintenance & Pest Control</div><div class="mc-val" style="color:var(--purple);font-size:22px">${fmt(combinedCost)}</div><div class="mc-sub">${maintTotal+pestTotal} total · ${maintTotal} maint · ${pestTotal} pest · ${mLabel}</div>${(maintBreakdown||pestBreakdown)?`<div class="mc-split" style="flex-wrap:wrap;gap:3px">${maintBreakdown}${pestBreakdown}</div>`:''}</div>`;
     })()}
   `;
 }
