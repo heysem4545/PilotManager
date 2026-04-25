@@ -5801,7 +5801,7 @@ function renderTenantLeaseView(){
       })()}</td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
-      <td style="text-align:center">${editable&&tName?`<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:9px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTenant('${p.id}')">📦 Archive</button>`:''}</td>
+      <td style="text-align:center">${editable?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTenant('${p.id}')">📦 Archive</button>`:''}</td>
     </tr>`;
   }).join('');
 
