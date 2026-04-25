@@ -6528,7 +6528,7 @@ async function saveTask(day, rowIdx, field, value, uid=null){
 }
 
 function calcStats(tasks){
-  let total=0,done=0,pts=0,maxPts=0;
+  let total=0,done=0,progressing=0,notstarted=0,pts=0,maxPts=0;
   Object.values(tasks).forEach(rows=>{
     rows.forEach(t=>{
       if(!t.task)return;
@@ -6536,13 +6536,15 @@ function calcStats(tasks){
       const p=DIFF_PTS[t.diff]||1;
       maxPts+=p;
       if(t.status==='done'){done++;pts+=p;}
+      else if(t.status==='progressing') progressing++;
+      else notstarted++;
     });
   });
-  return{total,done,pts,maxPts};
+  return{total,done,progressing,notstarted,pts,maxPts};
 }
 
 function renderTmStats(tasks, label='This Month'){
-  const {total,done,pts,maxPts}=calcStats(tasks);
+  const {total,done,progressing,notstarted,pts,maxPts}=calcStats(tasks);
   const pct=total>0?Math.round(done/total*100):0;
   const circ=2*Math.PI*18;
   const dash=circ*pct/100;
@@ -6559,6 +6561,24 @@ function renderTmStats(tasks, label='This Month'){
       <div class="tm-stat-label">${label}</div>
       <div class="tm-stat-val">${done}/${total} tasks</div>
       <div class="tm-stat-pts">⚡ ${pts} pts earned</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--text)">${total}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--accent)">${done}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Done</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--amber)">${progressing}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">In Progress</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--red)">${notstarted}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Not Started</div>
     </div>
   </div>`;
 }
