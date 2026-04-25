@@ -2579,6 +2579,9 @@ function startTasksListener(){
     // Skip the initial snapshot — renderTasksView already rendered the data.
     // Only re-render on subsequent remote changes.
     if(isInitial){ isInitial = false; return; }
+    // Don't re-render if user is actively typing in a task input
+    const activeEl = document.activeElement;
+    if(activeEl && (activeEl.classList.contains('tm-task-input') || activeEl.classList.contains('tm-diff-sel') || activeEl.classList.contains('tm-status-sel'))) return;
     if(currentView === 'tasks') renderTasksView();
   }, err=>{ console.warn('tasks listener', err?.message); });
 }
