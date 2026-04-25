@@ -200,31 +200,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .leg-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid var(--border);font-size:11px}
 .leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 
-/* ── MONTHLY REPORT ── */
-.monthly-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
-.monthly-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
-.monthly-head-title{font-size:13px;font-weight:500}
-.monthly-tabs{display:flex;gap:3px}
-.mtab{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
-.mtab:hover{color:var(--text);background:var(--surface2)}
-.mtab.active{background:var(--surface3);color:var(--text);border-color:var(--border2)}
-.monthly-tbl-wrap{overflow-x:auto}
-.monthly-tbl{width:100%;border-collapse:collapse}
-.monthly-tbl th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 14px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
-.monthly-tbl th:first-child{text-align:left;min-width:160px}
-.monthly-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--muted)}
-.monthly-tbl td:first-child{text-align:left;font-family:var(--font);font-weight:500;font-size:12px;color:var(--text)}
-.monthly-tbl tbody tr:last-child td{border-bottom:none}
-.monthly-tbl tr.row-total td{background:var(--surface2);color:var(--text)!important;font-weight:600}
-.monthly-tbl td.cur{background:rgba(201,245,99,0.05);color:var(--accent)!important;font-weight:500}
-.monthly-tbl th.cur{color:var(--accent)}
-.monthly-tbl td.zero{color:var(--muted2)!important}
-.monthly-tbl td.yr{color:var(--amber)!important;font-weight:600}
-.row-rented td:first-child{color:var(--accent)!important}
-.row-vacant td:first-child{color:var(--amber)!important}
-.row-eviction td:first-child{color:var(--red)!important}
-.row-moving td:first-child{color:var(--blue)!important}
-.row-construction td:first-child{color:var(--purple)!important}
 
 /* ── MONTH SWITCHER ── */
 .month-bar{display:flex;align-items:center;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-wrap:wrap}
@@ -967,10 +942,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Collection
         <span class="nav-badge" id="courtBadge" style="display:none">0</span>
       </button>
-      <button class="nav-item" id="nav-monthly" onclick="showView('monthly')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 6h14M5 3v10M10 3v10"/></svg>
-        Monthly Report
-      </button>
       <div class="nav-label">Admin</div>
       <button class="nav-item" id="nav-team" onclick="showView('team')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><circle cx="11" cy="7" r="2"/><path d="M1 14c0-2.8 2.2-5 5-5"/><path d="M8.5 14c0-2 1.6-3.5 3.5-3.5"/></svg>
@@ -1106,21 +1077,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         </div>
       </div>
 
-      <!-- MONTHLY REPORT VIEW -->
-      <div id="monthlyView" style="display:none">
-        <div class="monthly-card">
-          <div class="monthly-head">
-            <div class="monthly-head-title">Monthly Report — 2026</div>
-            <div class="monthly-tabs">
-              <button class="mtab active" onclick="switchMonthlyView('balance',this)">Balance</button>
-              <button class="mtab" onclick="switchMonthlyView('units',this)">Unit Counts</button>
-            </div>
-          </div>
-          <div class="monthly-tbl-wrap">
-            <table class="monthly-tbl" id="monthlyTable"></table>
-          </div>
-        </div>
-      </div>
 
       <!-- PROPERTIES VIEW -->
       <div id="propsView" style="display:none">
@@ -2185,7 +2141,6 @@ const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV',
 const CUR_MONTH=3;
 
 const rowCls={'Rented Balance':'row-rented','Rented Units':'row-rented','Vacant Balance':'row-vacant','Vacant Units':'row-vacant','Eviction Balance':'row-eviction','Eviction Units':'row-eviction','Moving Process':'row-moving','Moving Units':'row-moving','Construction':'row-construction','Total Balance':'row-total','Total Units':'row-total'};
-let monthlyMode='balance';
 
 // ─────────────────────────────────────────────
 // AUTH
@@ -2683,7 +2638,6 @@ const PERM_SECTIONS = [
   {id:'properties',label:'All Properties'},
   {id:'propertyFilters',label:'By Status filters'},
   {id:'collection',label:'Collection'},
-  {id:'monthly',label:'Monthly Report'},
   {id:'team',label:'Team'},
   {id:'tasks',label:'Task Management'},
   {id:'meetings',label:'Meeting Tracking'},
@@ -5888,96 +5842,6 @@ function inlineEditNum(propId, baseField, cell, fieldType){
   inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=currentVal;inp.blur();}};
 }
 
-function switchMonthlyView(mode,btn){
-  monthlyMode=mode;
-  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderMonthly();
-}
-async function renderMonthly(){
-  const el = document.getElementById('monthlyTable');
-  el.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--muted)">Loading...</td></tr>';
-
-  const today = new Date();
-  const curYear = today.getFullYear();
-  const curMonth = today.getMonth(); // 0-based
-  const isMoney = monthlyMode==='balance';
-
-  // Only show Jan through current month
-  const monthsToShow = [];
-  for(let m=0; m<=curMonth; m++){
-    monthsToShow.push({m, key:`${curYear}-${String(m+1).padStart(2,'0')}`, label:MONTHS[m]});
-  }
-
-  // Load data for all months
-  for(const {key} of monthsToShow){
-    const alreadyLoaded = Object.values(monthData).some(pd=>pd[key]!==undefined);
-    if(!alreadyLoaded) await loadMonthData(key);
-  }
-
-  // Calculate stats for each month
-  const monthStats = monthsToShow.map(({m, key}) => {
-    const savedYear = activeYear, savedMonth = activeMonth;
-    activeYear = curYear; activeMonth = m;
-
-    const counts = {RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
-    const balances = {RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
-
-    properties.forEach(p => {
-      const mp = getMonthProp(p);
-      const st = mp.status;
-      if(st && counts[st]!==undefined){
-        counts[st]++;
-        if(isMoney) balances[st] += Math.max(0,(mp.cmha-mp.cmhaPaid)+(mp.tenantPortion-mp.tenantPaid));
-      }
-    });
-
-    activeYear = savedYear; activeMonth = savedMonth;
-    return {counts, balances};
-  });
-
-  const rows = isMoney ? [
-    {lbl:'Rented Balance', key:'RENTED', cls:'row-rented'},
-    {lbl:'Vacant Balance', key:'VACANT', cls:'row-vacant'},
-    {lbl:'Eviction Balance', key:'EVICTION', cls:'row-eviction'},
-    {lbl:'Moving Process', key:'MOVING PROCESS', cls:'row-moving'},
-    {lbl:'Construction', key:'CONSTRUCTION', cls:'row-construction'},
-  ] : [
-    {lbl:'Rented Units', key:'RENTED', cls:'row-rented'},
-    {lbl:'Vacant Units', key:'VACANT', cls:'row-vacant'},
-    {lbl:'Eviction Units', key:'EVICTION', cls:'row-eviction'},
-    {lbl:'Moving Units', key:'MOVING PROCESS', cls:'row-moving'},
-    {lbl:'Construction', key:'CONSTRUCTION', cls:'row-construction'},
-  ];
-
-  let html=`<thead><tr><th>Category</th>`;
-  monthsToShow.forEach(({m,label})=>html+=`<th class="${m===curMonth?'cur':''}">${label}${m===curMonth?' ★':''}</th>`);
-  html+=`<th class="yr">YTD</th></tr></thead><tbody>`;
-
-  rows.forEach(({lbl,key,cls})=>{
-    const vals = monthStats.map(ms => isMoney?(ms.balances[key]||0):(ms.counts[key]||0));
-    const ytd = vals.reduce((s,v)=>s+v,0);
-    html+=`<tr class="${cls}"><td>${lbl}</td>`;
-    vals.forEach((v,i)=>{
-      const zero=v===0;
-      const disp=zero?'—':isMoney?'$'+Math.round(v).toLocaleString():v;
-      html+=`<td class="${i===curMonth?'cur':''} ${zero?'zero':''}">${disp}</td>`;
-    });
-    const ytdDisp=ytd===0?'—':isMoney?'$'+Math.round(ytd).toLocaleString():ytd;
-    html+=`<td class="yr ${ytd===0?'zero':''}">${ytdDisp}</td></tr>`;
-  });
-
-  const totals = monthStats.map(ms=>Object.values(isMoney?ms.balances:ms.counts).reduce((s,v)=>s+v,0));
-  const totalYtd = totals.reduce((s,v)=>s+v,0);
-  html+=`<tr class="row-total"><td>${isMoney?'Total Balance':'Total Units'}</td>`;
-  totals.forEach((v,i)=>{
-    const zero=v===0;
-    html+=`<td class="${i===curMonth?'cur':''} ${zero?'zero':''}">${zero?'—':isMoney?'$'+Math.round(v).toLocaleString():v}</td>`;
-  });
-  html+=`<td class="yr">${isMoney?'$'+Math.round(totalYtd).toLocaleString():totalYtd}</td></tr>`;
-  html+='</tbody>';
-  el.innerHTML=html;
-}
 
 async function renderTeam(){
   await loadRoles();
@@ -7805,7 +7669,7 @@ function showView(v){
   // Update title
   const titles={
     dashboard:'Portfolio Dashboard', properties:'Properties',
-    monthly:'Monthly Report', team:'Team Management',
+    team:'Team Management',
     tasks:'Task Management', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     notices:'Notice Papers', leads:'Leads',
@@ -7849,7 +7713,6 @@ function showView(v){
     filterSetByNav=false;
     switchPropsTab(propsViewTab);
   }
-  if(v==='monthly') renderMonthly();
   if(v==='tasks') renderTasksView();
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
