@@ -3244,8 +3244,8 @@ function renderCollectionMonthlyView(){
     const tenBal=Math.max(0,tp-tPaid);
     const collected=cmhaPaid+tPaid;
     const rate=(cmha+tp)>0?Math.round(collected/(cmha+tp)*100):0;
-    const st=p.status||'';
-    const badge=st?`<span class="badge ${({RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction',CONSTRUCTION:'b-construction'})[st]||'b-unknown'}">${({RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction',CONSTRUCTION:'Construction'})[st]||st}</span>`:'';
+    const st=mp.status||'';
+    const badge=st?`<span class="badge ${({RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction'})[st]||'b-unknown'}">${({RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction'})[st]||st}</span>`:'';
     return `<tr>
       <td><div class="addr-main">${p.addr||''}</div><div class="addr-sub">${p.unit||''}</div></td>
       <td>${badge}</td>
