@@ -3799,9 +3799,18 @@ async function loadMaintenanceForYear(year){
 
 function maintCellTitle(visits){
   if(!visits || visits.length===0) return 'No visits — click to add';
-  const counts = {};
-  visits.forEach(v => { counts[v.type] = (counts[v.type]||0) + 1; });
-  return Object.entries(counts).map(([t,n])=>`${n} ${t}`).join(', ');
+  const groups = {};
+  visits.forEach(v => {
+    if(!groups[v.type]) groups[v.type]={count:0,cost:0};
+    groups[v.type].count++;
+    groups[v.type].cost+=(v.cost||0);
+  });
+  const totalCost = visits.reduce((s,v)=>s+(v.cost||0),0);
+  const lines = Object.entries(groups).map(([t,g])=>
+    `${g.count} ${t}${g.cost>0?' — $'+Math.round(g.cost).toLocaleString():''}`
+  );
+  if(totalCost>0) lines.push('Total: $'+Math.round(totalCost).toLocaleString());
+  return lines.join('\n');
 }
 
 async function renderMaintenanceView(){
