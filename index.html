@@ -6575,17 +6575,22 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const isToday=today.getDate()===day&&today.getMonth()===tmMonth&&today.getFullYear()===tmYear;
   const rawTasks=tasks[day]||[];
   // Final filter: group view only shows unassigned/team tasks (not personally assigned ones)
-  const dayTasks=isGroup
+  const filteredTasks=isGroup
     ? rawTasks.filter(t=>!t.assignedUid || t.assignedUid==='' || t.assignedUid==='team')
     : rawTasks;
+  // Sort by rowIdx so tasks stay in their original position
+  const dayTasks=[...filteredTasks].sort((a,b)=>(a.rowIdx||0)-(b.rowIdx||0));
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dayName=DNAMES[new Date(tmYear,tmMonth,day).getDay()];
 
-  // Fill to at least 8 rows + 1 empty
-  const minRows = Math.max(8, dayTasks.length+2);
+  // Place tasks at their rowIdx positions, fill gaps with empty rows
+  const maxIdx = dayTasks.length>0 ? Math.max(...dayTasks.map(t=>t.rowIdx||0)) : -1;
+  const minRows = Math.max(8, maxIdx+3);
   const rows=[];
+  const tasksByIdx={};
+  dayTasks.forEach(t=>{tasksByIdx[t.rowIdx||0]=t;});
   for(let i=0;i<minRows;i++){
-    const t=dayTasks[i]||{diff:'',task:'',status:'notstarted'};
+    const t=tasksByIdx[i]||{diff:'',task:'',status:'notstarted'};
     rows.push({...t,rowIdx:i});
   }
 
