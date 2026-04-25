@@ -7214,6 +7214,8 @@ async function renderTasksView(){
 
   // Start real-time listener for tasks
   startTasksListener();
+  // Auto-generate recurring tasks (admin only)
+  await generateRecurringTasks();
 
   const key=tmActiveKey();
   const isAdminUser=currentUser.role==='admin';
@@ -7229,13 +7231,14 @@ async function renderTasksView(){
     {k:'own',l:'My Tasks'},
     {k:'group',l:'Group Tasks'},
     ...(isAdminUser?[{k:'admin',l:'👑 Team Overview'}]:[]),
+    ...(isAdminUser?[{k:'recurring',l:'🔁 Recurring'}]:[]),
     ...(isAdminUser?[{k:'flagged',l:`🚩 Flagged${flaggedCount>0?' ('+flaggedCount+')':''}`}]:[])
   ];
 
   let tasks={};
   let teamUsers=[];
 
-  if(tmTab==='admin'||tmTab==='group'){
+  if(tmTab==='admin'||tmTab==='group'||tmTab==='recurring'){
     // Load all users for assign dropdown and admin view
     teamUsers=await getUsers();
     teamUsersCache=teamUsers;
@@ -7427,6 +7430,11 @@ async function renderTasksView(){
     }).join('')}</div>`;
   }
 
+  if(tmTab==='recurring'){
+    await renderRecurringTab(html, el, tabs);
+    return;
+  }
+
   if(tmTab==='flagged'){
     try{
       // Load ALL tasks this month so we can find matches
@@ -7502,6 +7510,199 @@ async function renderTasksView(){
   }
 
   el.innerHTML=html;
+}
+
+// ─── RECURRING TASKS SYSTEM ───
+function describeRecurrence(rule){
+  const DNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  if(rule.recurrenceType==='weekly_day') return 'Every '+DNAMES[rule.recurrenceValue||0];
+  if(rule.recurrenceType==='month_start') return '1st of every month';
+  if(rule.recurrenceType==='monthly_day') return ordinal(rule.recurrenceValue||1)+' of every month';
+  return '—';
+}
+function ordinal(n){const s=['th','st','nd','rd'];const v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+
+async function generateRecurringTasks(){
+  if(!isAdmin()) return;
+  const key=tmActiveKey();
+  const daysInMonth=getDaysInMonth(tmYear,tmMonth);
+  try{
+    const rulesSnap=await db.collection('recurringTasks').where('active','==',true).get();
+    for(const doc of rulesSnap.docs){
+      const rule=doc.data();
+      if(rule.lastGeneratedMonth===key) continue;
+      const fireDays=[];
+      if(rule.recurrenceType==='month_start'){
+        fireDays.push(1);
+      } else if(rule.recurrenceType==='monthly_day'){
+        const day=rule.recurrenceValue||1;
+        if(day<=daysInMonth) fireDays.push(day);
+      } else if(rule.recurrenceType==='weekly_day'){
+        for(let d=1;d<=daysInMonth;d++){
+          if(new Date(tmYear,tmMonth,d).getDay()===rule.recurrenceValue) fireDays.push(d);
+        }
+      }
+      for(const day of fireDays){
+        const existing=await db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('recurringRuleId','==',doc.id).get();
+        if(!existing.empty) continue;
+        const daySnap=await db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('uid','==',rule.assignedUid||'team').get();
+        const maxRow=daySnap.docs.reduce((mx,d)=>Math.max(mx,d.data().rowIdx||0),-1);
+        await db.collection('tasks').add({
+          monthKey:key, day, rowIdx:maxRow+1,
+          uid:rule.isGroup?'team':rule.assignedUid,
+          userName:rule.assignedName||'',
+          userColor:userColor(rule.isGroup?'team':rule.assignedUid),
+          isGroup:!!rule.isGroup,
+          diff:rule.diff||'medium',
+          task:rule.task||'',
+          status:'notstarted',
+          recurringRuleId:doc.id,
+          assignedUid:rule.isGroup?'team':(rule.assignedUid||''),
+          assignedName:rule.isGroup?'Group Task':(rule.assignedName||''),
+          suspiciousFlag:false,
+          createdAt:new Date(), updatedAt:new Date()
+        });
+      }
+      await doc.ref.update({lastGeneratedMonth:key});
+    }
+  }catch(e){console.warn('generateRecurringTasks',e);}
+}
+
+async function renderRecurringTab(baseHtml, el, tabs){
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+  let rulesSnap;
+  try{rulesSnap=await db.collection('recurringTasks').get();}catch(e){rulesSnap={docs:[]};}
+  const rules=rulesSnap.docs?rulesSnap.docs.map(d=>({id:d.id,...d.data()})):[];
+
+  let html=baseHtml;
+
+  // Creation form
+  html+=`<div class="table-card" style="margin-bottom:16px">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">🔁 Create Recurring Task</div>
+    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="fg"><label>Task</label>
+        <input type="text" id="recTaskText" placeholder="e.g. Submit weekly report" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <div class="fg"><label>Recurrence</label>
+        <select id="recType" onchange="toggleRecFields()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="weekly_day">Every week on…</option>
+          <option value="monthly_day">Every month on day…</option>
+          <option value="month_start">1st of every month</option>
+        </select>
+      </div>
+      <div class="fg" id="recWeeklyField"><label>Day of Week</label>
+        <select id="recWeekDay" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+          <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+        </select>
+      </div>
+      <div class="fg" id="recMonthlyField" style="display:none"><label>Day of Month</label>
+        <input type="number" id="recMonthDay" min="1" max="31" value="1" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <div class="fg"><label>Assign To</label>
+        <select id="recAssign" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="team">👥 Group Task</option>
+          ${users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label>Difficulty</label>
+        <select id="recDiff" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="easy">🟢 Easy (1 pt)</option>
+          <option value="medium" selected>🟡 Medium (2 pts)</option>
+          <option value="hard">🔴 Hard (3 pts)</option>
+        </select>
+      </div>
+    </div>
+    <div style="padding:0 16px 16px;text-align:right">
+      <button class="btn btn-primary btn-sm" onclick="saveRecurringRule()">Create Recurring Task</button>
+    </div>
+  </div>`;
+
+  // Rules list
+  html+=`<div class="table-card">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">${rules.length} recurring rule${rules.length===1?'':'s'}</div>`;
+
+  if(rules.length===0){
+    html+=`<div style="padding:40px;text-align:center;color:var(--muted)">No recurring tasks yet. Create one above.</div>`;
+  } else {
+    rules.forEach(r=>{
+      const diffBadge=r.diff==='hard'?'🔴 Hard (3pts)':r.diff==='easy'?'🟢 Easy (1pt)':'🟡 Medium (2pts)';
+      const assignLabel=r.isGroup?'👥 Group Task':escapeHtml(r.assignedName||'Unknown');
+      const statusColor=r.active?'var(--accent)':'var(--muted)';
+      const statusText=r.active?'Active':'Paused';
+      html+=`<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0"></div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHtml(r.task||'—')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">📅 ${describeRecurrence(r)} · ${diffBadge} · 👤 ${assignLabel}</div>
+        </div>
+        <span style="font-size:10px;padding:3px 8px;border-radius:5px;background:${r.active?'var(--accent-dim)':'var(--surface3)'};color:${statusColor};font-weight:600">${statusText}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="toggleRecurringRule('${r.id}',${!r.active})">${r.active?'Pause':'Resume'}</button>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px;color:var(--blue);border-color:var(--blue-dim,var(--border2))" onclick="forceGenerateRule('${r.id}')">Generate Now</button>
+        <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:10px" onclick="deleteRecurringRule('${r.id}')">Delete</button>
+      </div>`;
+    });
+  }
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function toggleRecFields(){
+  const type=document.getElementById('recType').value;
+  document.getElementById('recWeeklyField').style.display=type==='weekly_day'?'':'none';
+  document.getElementById('recMonthlyField').style.display=type==='monthly_day'?'':'none';
+}
+
+async function saveRecurringRule(){
+  const task=document.getElementById('recTaskText').value.trim();
+  if(!task){toast('Please enter a task');return;}
+  const type=document.getElementById('recType').value;
+  let value=0;
+  if(type==='weekly_day') value=parseInt(document.getElementById('recWeekDay').value,10);
+  else if(type==='monthly_day') value=parseInt(document.getElementById('recMonthDay').value,10)||1;
+  const assignUid=document.getElementById('recAssign').value;
+  const isGroup=assignUid==='team';
+  const diff=document.getElementById('recDiff').value;
+  const assignedUser=isGroup?null:teamUsersCache.find(u=>u.uid===assignUid);
+  const assignedName=isGroup?'Group Task':(assignedUser?(assignedUser.name||assignedUser.email):'');
+  try{
+    await db.collection('recurringTasks').add({
+      task, diff, recurrenceType:type, recurrenceValue:value,
+      assignedUid:isGroup?'':(assignUid||''),
+      assignedName, isGroup,
+      active:true, lastGeneratedMonth:'',
+      createdAt:new Date(), createdBy:currentUser.uid
+    });
+    toast('Recurring task created');
+    await renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteRecurringRule(id){
+  if(!confirm('Delete this recurring task rule?')) return;
+  try{
+    await db.collection('recurringTasks').doc(id).delete();
+    toast('Rule deleted');
+    await renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function toggleRecurringRule(id, active){
+  try{
+    await db.collection('recurringTasks').doc(id).update({active});
+    toast(active?'Rule activated':'Rule paused');
+    await renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function forceGenerateRule(id){
+  try{
+    await db.collection('recurringTasks').doc(id).update({lastGeneratedMonth:''});
+    await generateRecurringTasks();
+    toast('Tasks generated for this month');
+    await renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 async function switchTmTab(tab){
