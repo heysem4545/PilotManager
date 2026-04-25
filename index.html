@@ -3857,11 +3857,18 @@ async function renderMaintenanceView(){
   const tabBar = `<div class="maint-view-tabs">
     <button class="maint-vtab${maintViewMode==='tracking'?' active':''}" onclick="switchMaintViewMode('tracking')">Maintenance Tracking</button>
     <button class="maint-vtab${maintViewMode==='pest'?' active':''}" onclick="switchMaintViewMode('pest')">Pest Control</button>
+    <button class="maint-vtab${maintViewMode==='monthlyMaint'?' active':''}" onclick="switchMaintViewMode('monthlyMaint')">Monthly Maintenance</button>
   </div>`;
 
   if(maintViewMode==='pest'){
     el.innerHTML = tabBar + `<div id="pestControlContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
     await renderPestControlView();
+    return;
+  }
+
+  if(maintViewMode==='monthlyMaint'){
+    el.innerHTML = tabBar + `<div id="monthlyMaintContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+    await renderMonthlyMaintView();
     return;
   }
 
@@ -3951,6 +3958,102 @@ async function renderMaintenanceView(){
 function switchMaintViewMode(mode){
   maintViewMode = mode;
   renderMaintenanceView();
+}
+
+let monthlyMaintMonth = new Date().getMonth(); // 0-based
+
+async function renderMonthlyMaintView(){
+  const el=document.getElementById('monthlyMaintContent');
+  if(!el) return;
+
+  await loadMaintenanceForYear(maintenanceYear);
+
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mKey=`${maintenanceYear}-${String(monthlyMaintMonth+1).padStart(2,'0')}`;
+
+  // Month filter tabs
+  let monthTabs='<div class="month-bar" style="margin-bottom:12px">';
+  monthTabs+='<span class="month-bar-label">Month:</span>';
+  MNAMES_FULL.forEach((name,i)=>{
+    const isActive=i===monthlyMaintMonth;
+    monthTabs+=`<button class="mbtn${isActive?' active':''}" onclick="monthlyMaintMonth=${i};renderMonthlyMaintView()">${name.slice(0,3)}</button>`;
+  });
+  monthTabs+='</div>';
+
+  // Collect all visits for this month across all properties
+  const visits=[];
+  Object.entries(maintenanceData).forEach(([propId,propData])=>{
+    const monthVisits=propData[mKey]||[];
+    const prop=properties.find(p=>p.id===propId);
+    monthVisits.forEach(v=>{
+      visits.push({...v, addr:prop?prop.addr:'Unknown'});
+    });
+  });
+
+  // Stats
+  const totalVisits=visits.length;
+  const totalCost=visits.reduce((s,v)=>s+(parseFloat(v.cost)||0),0);
+  const types={};
+  visits.forEach(v=>{
+    const tp=v.type||'Other';
+    if(!types[tp]) types[tp]={count:0,cost:0};
+    types[tp].count++;
+    types[tp].cost+=(parseFloat(v.cost)||0);
+  });
+  const uniqueProps=new Set(visits.map(v=>v.propertyId)).size;
+
+  // Stats cards
+  let html=monthTabs;
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--purple)">${totalVisits}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Visits</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${totalCost>0?fmt(totalCost):'$0'}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Cost</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${uniqueProps}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
+    </div>
+    ${Object.entries(types).sort((a,b)=>b[1].count-a[1].count).map(([tp,d])=>`
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--amber)">${d.count}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">${escapeHtml(tp)}</div>
+      <div style="font-size:10px;color:var(--red);font-family:var(--mono);margin-top:2px">${d.cost>0?fmt(d.cost):'—'}</div>
+    </div>`).join('')}
+  </div>`;
+
+  if(visits.length===0){
+    html+=`<div class="table-card"><div style="padding:40px;text-align:center;color:var(--muted)">No maintenance visits in ${MNAMES_FULL[monthlyMaintMonth]} ${maintenanceYear}</div></div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  // Table of visits
+  visits.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${visits.length} visits in ${MNAMES_FULL[monthlyMaintMonth]} ${maintenanceYear}</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Address</th><th>Type</th><th>Date</th><th>Cost</th><th>Performed By</th><th>Notes</th>
+        </tr></thead>
+        <tbody>
+          ${visits.map(v=>`<tr>
+            <td>${escapeHtml(v.addr)}</td>
+            <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--purple-dim);color:var(--purple)">${escapeHtml(v.type||'Other')}</span></td>
+            <td style="font-size:11px;font-family:var(--mono)">${v.date||'—'}</td>
+            <td style="font-size:11px;font-family:var(--mono);color:${(parseFloat(v.cost)||0)>0?'var(--red)':'var(--muted2)'}">${(parseFloat(v.cost)||0)>0?fmt(parseFloat(v.cost)):'—'}</td>
+            <td style="font-size:11px">${escapeHtml(v.performedBy||'—')}</td>
+            <td style="font-size:11px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(v.notes||'')}">${escapeHtml(v.notes||'—')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+  el.innerHTML=html;
 }
 
 function getMaintSummaryRangeKeys(){
