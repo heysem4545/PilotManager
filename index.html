@@ -3191,7 +3191,7 @@ function renderCollectionPage(){
     tabsEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
-      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly View</button>
+      <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')">Monthly Balance</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
   }
@@ -3215,7 +3215,7 @@ function renderCollectionPage(){
     if(histView) histView.style.display='block';
     renderCollectionHistory();
   } else {
-    // Monthly View — show balance-filtered properties table with month bar inside collectionContent
+    // Monthly Balance — show balance-filtered properties table with month bar inside collectionContent
     renderCollectionMonthlyView();
   }
 }
