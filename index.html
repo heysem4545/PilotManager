@@ -3100,20 +3100,29 @@ async function renderMetrics(){
       const mKey=activeYear+'-'+String(activeMonth+1).padStart(2,'0');
       let maintTotal=0,maintCost=0;const maintTypes={};
       let pestTotal=0,pestCost=0;
+      const countedMaintIds=new Set();
       Object.values(maintenanceData).forEach(propData=>{
         const visits=propData[mKey]||[];
         visits.forEach(v=>{
+          if(v.id && countedMaintIds.has(v.id)) return;
+          if(v.id) countedMaintIds.add(v.id);
           maintTotal++;
-          maintCost+=(v.cost||0);
+          const c=parseFloat(v.cost)||0;
+          maintCost+=c;
           const tp=v.type||'Other';
           if(!maintTypes[tp]) maintTypes[tp]={count:0,cost:0};
           maintTypes[tp].count++;
-          maintTypes[tp].cost+=(v.cost||0);
+          maintTypes[tp].cost+=c;
         });
       });
+      const countedPestIds=new Set();
       Object.values(pestControlData).forEach(propData=>{
         const entries=propData[mKey]||[];
-        entries.forEach(v=>{pestTotal++;pestCost+=(v.cost||0);});
+        entries.forEach(v=>{
+          if(v.id && countedPestIds.has(v.id)) return;
+          if(v.id) countedPestIds.add(v.id);
+          pestTotal++;pestCost+=(parseFloat(v.cost)||0);
+        });
       });
       const maintBreakdown=Object.entries(maintTypes).sort((a,b)=>b[1].count-a[1].count)
         .map(([tp,d])=>`<span class="cs" style="background:var(--purple-dim);color:var(--purple)">${escapeHtml(tp)} ${d.count}${d.cost>0?' · '+fmt(d.cost):''}</span>`).join('');
