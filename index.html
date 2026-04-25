@@ -2563,12 +2563,10 @@ function startTasksListener(){
     snap.docs.forEach(d=>{
       const t = d.data();
       const dk = t.day;
-      const isPersonal = t.assignedUid && t.assignedUid!=='team' && t.assignedUid!=='';
-      if(!isPersonal){
+      if(t.isGroup){
         if(!all[dk]) all[dk] = [];
         all[dk].push({id:d.id,...t});
-      }
-      if(t.uid === currentUser.uid && isPersonal){
+      } else if(t.uid === currentUser.uid){
         if(!own[dk]) own[dk] = [];
         own[dk].push({id:d.id,...t});
       }
