@@ -2980,8 +2980,8 @@ function compBadge(cur, prev, higherIsGood, noValue){
   const arrow = isUp ? '▲' : '▼';
   const color = noValue ? 'var(--muted)' : (isUp === higherIsGood ? 'var(--accent)' : 'var(--red)');
   const abs = Math.abs(diff);
-  const display = abs >= 1 ? fmt(abs).replace('$','') : abs;
-  return `<span style="font-size:9px;color:${color};font-weight:600;margin-left:4px">${arrow} ${fmt(abs)}</span>`;
+  const display = noValue ? Math.round(abs).toLocaleString() : fmt(abs);
+  return `<span style="font-size:9px;color:${color};font-weight:600;margin-left:4px">${arrow} ${display}</span>`;
 }
 
 function calcTotals(){
