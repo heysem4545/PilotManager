@@ -5731,9 +5731,26 @@ function renderPropertiesList(){
     </div>`;
 }
 
+let tlTab='active'; // 'active' or 'archived'
+
 function renderTenantLeaseView(){
   const el=document.getElementById('tenantLeaseView');
   if(!el) return;
+
+  // Count archived tenants
+  const archivedCount=properties.reduce((s,p)=>s+((p.tenantArchive||[]).length),0);
+
+  // Tabs
+  const tabsHtml=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
+    <button onclick="tlTab='active';renderTenantLeaseView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${tlTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${tlTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">Active Tenants</button>
+    <button onclick="tlTab='archived';renderTenantLeaseView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${tlTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${tlTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">Tenant Archived (${archivedCount})</button>
+  </div>`;
+
+  if(tlTab==='archived'){
+    renderTenantArchived(el, tabsHtml);
+    return;
+  }
+
   const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const editable=canEdit();
   const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
@@ -5784,10 +5801,11 @@ function renderTenantLeaseView(){
       })()}</td>
       <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
+      <td style="text-align:center">${editable&&tName?`<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:9px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTenant('${p.id}')">📦 Archive</button>`:''}</td>
     </tr>`;
   }).join('');
 
-  el.innerHTML=`
+  el.innerHTML=tabsHtml+`
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left"><strong style="color:var(--text)">${sorted.length}</strong> properties · ${searchHtml}</div>
@@ -5805,6 +5823,7 @@ function renderTenantLeaseView(){
             <th>💳 Pay Method With</th>
             <th>📋 Secondary Info</th>
             <th>📝 Notes</th>
+            <th>📦</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -5821,6 +5840,88 @@ async function togglePayMethod(propId, method, checked){
   await updatePropertyField(propId,'payMethods',methods);
   p.payMethods=methods;
   renderTenantLeaseView();
+}
+
+async function archiveTenant(propId){
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  const tName=p.tenantName2||p.tenant||'';
+  if(!tName){toast('No tenant to archive');return;}
+  if(!confirm(`Archive tenant "${tName}" from ${p.addr}? This will save their info to history and clear the fields for a new tenant.`)) return;
+  const archive=Array.isArray(p.tenantArchive)?[...p.tenantArchive]:[];
+  archive.push({
+    tenantName:tName,
+    tenantNumber:p.tenantNumber2||'',
+    tenantEmail:p.tenantEmail||'',
+    leaseEffective:p.leaseEffective2||'',
+    leaseExpire:p.leaseExpire2||'',
+    secondaryInfo:p.secondaryInfo||'',
+    tenantNotes:p.tenantNotes||'',
+    payMethods:p.payMethods||[],
+    archivedDate:new Date().toISOString().slice(0,10)
+  });
+  try{
+    await db.collection('properties').doc(propId).update({
+      tenantArchive:archive,
+      tenantName2:'',tenantNumber2:'',tenantEmail:'',
+      leaseEffective2:'',leaseExpire2:'',
+      secondaryInfo:'',tenantNotes:'',payMethods:[]
+    });
+    p.tenantArchive=archive;
+    p.tenantName2='';p.tenantNumber2='';p.tenantEmail='';
+    p.leaseEffective2='';p.leaseExpire2='';
+    p.secondaryInfo='';p.tenantNotes='';p.payMethods=[];
+    toast('Tenant archived');
+    renderTenantLeaseView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+function renderTenantArchived(el, tabsHtml){
+  const allArchived=[];
+  properties.forEach(p=>{
+    (p.tenantArchive||[]).forEach((t,idx)=>{
+      allArchived.push({...t, addr:p.addr, propId:p.id, idx});
+    });
+  });
+  allArchived.sort((a,b)=>(b.archivedDate||'').localeCompare(a.archivedDate||''));
+
+  let html=tabsHtml;
+  if(allArchived.length===0){
+    html+=`<div style="padding:40px;text-align:center;color:var(--muted)">No archived tenants yet. Archive a tenant from the Active Tenants tab.</div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${allArchived.length} archived tenant${allArchived.length===1?'':'s'}</div>
+    <div class="tbl-wrap">
+      <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th>🏠 Address</th>
+          <th>👤 Tenant Name</th>
+          <th>📞 Number</th>
+          <th>✉ Email</th>
+          <th>📅 Lease Start</th>
+          <th>📅 Lease End</th>
+          <th>💳 Pay Method</th>
+          <th>📝 Notes</th>
+          <th>📦 Archived</th>
+        </tr></thead>
+        <tbody>${allArchived.map(t=>`<tr>
+          <td style="font-weight:500">${escapeHtml(t.addr||'—')}</td>
+          <td>${escapeHtml(t.tenantName||'—')}</td>
+          <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(t.tenantNumber||'—')}</td>
+          <td style="font-size:11px">${escapeHtml(t.tenantEmail||'—')}</td>
+          <td style="font-size:11px;font-family:var(--mono)">${t.leaseEffective||'—'}</td>
+          <td style="font-size:11px;font-family:var(--mono)">${t.leaseExpire||'—'}</td>
+          <td>${(t.payMethods||[]).map(m=>`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--accent-dim);color:var(--accent)">${m}</span>`).join(' ')||'—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${escapeHtml(t.tenantNotes||t.secondaryInfo||'—')}</td>
+          <td style="font-size:11px;font-family:var(--mono);color:var(--muted)">${t.archivedDate||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+  el.innerHTML=html;
 }
 
 function filterTenantLease(){
