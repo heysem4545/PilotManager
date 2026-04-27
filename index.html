@@ -6320,12 +6320,14 @@ async function renderPilotTechView(){
     const dayStatus=window._pilotDayStatuses?.[mKey+'-'+d]||'';
     const statusColors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
     const statusBg=dayStatus?statusColors[dayStatus]||'var(--muted)':'';
-    const statusBorder=dayStatus?statusBg:isToday?'var(--accent)':hasJobs?'rgba(74,222,128,0.3)':'var(--border)';
-    html+=`<div style="background:${dayStatus?statusBg+'10':'var(--surface)'};border:1px solid ${statusBorder};border-radius:8px;padding:8px;min-height:80px;cursor:pointer;transition:background .12s" onclick="openPilotDay(${d})" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+    const isSunday=new Date(pilotYear,pilotMonth,d).getDay()===0;
+    const sundayWorked=isSunday&&workDayJobs.length>0;
+    const statusBorder=dayStatus?statusBg:sundayWorked?'#f5c96a':isToday?'var(--accent)':hasJobs?'rgba(74,222,128,0.3)':'var(--border)';
+    html+=`<div style="background:${sundayWorked?'rgba(245,201,106,0.08)':dayStatus?statusBg+'10':'var(--surface)'};border:${sundayWorked?'2px':'1px'} solid ${statusBorder};border-radius:8px;padding:8px;min-height:80px;cursor:pointer;transition:background .12s" onclick="openPilotDay(${d})" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</span>
+        <span style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}${sundayWorked?' ⭐':''}</span>
         ${dayStatus?`<span style="font-size:8px;padding:1px 5px;border-radius:3px;background:${statusBg}20;color:${statusBg};font-weight:600">${dayStatus}</span>`
-        :hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(74,222,128,0.12);color:#4ade80">${dayJobs.length} job${dayJobs.length>1?'s':''}</span>`:''}
+        :hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${sundayWorked?'rgba(245,201,106,0.15)':'rgba(74,222,128,0.12)'};color:${sundayWorked?'#f5c96a':'#4ade80'}">${sundayWorked?'Sunday ':''}${workDayJobs.length} job${workDayJobs.length>1?'s':''}</span>`:''}
       </div>
       ${dayStatus&&!hasJobs?`<div style="display:flex;align-items:center;justify-content:center;height:40px;font-size:11px;color:${statusBg};font-weight:500">${dayStatus}</div>`
       :hasJobs?workDayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')
