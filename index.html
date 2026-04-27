@@ -4106,6 +4106,7 @@ function switchMaintViewMode(mode){
 }
 
 let monthlyMaintMonth = new Date().getMonth(); // 0-based
+let monthlyMaintPerformer = 'all';
 
 async function renderMonthlyMaintView(){
   const el=document.getElementById('monthlyMaintContent');
@@ -4176,17 +4177,35 @@ async function renderMonthlyMaintView(){
     return;
   }
 
+  // Performed By breakdown & filter
+  const performers={};
+  visits.forEach(v=>{
+    const pb=v.performedBy||'Unknown';
+    if(!performers[pb]) performers[pb]={count:0,cost:0};
+    performers[pb].count++;
+    performers[pb].cost+=(parseFloat(v.cost)||0);
+  });
+  const performerTabs=`<button class="ftab ${monthlyMaintPerformer==='all'?'active':''}" onclick="monthlyMaintPerformer='all';renderMonthlyMaintView()">All (${visits.length})</button>`+
+    Object.entries(performers).sort((a,b)=>b[1].count-a[1].count).map(([pb,d])=>
+      `<button class="ftab ${monthlyMaintPerformer===pb?'active':''}" onclick="monthlyMaintPerformer='${escapeAttr(pb)}';renderMonthlyMaintView()">${escapeHtml(pb)} (${d.count}) · ${fmt(d.cost)}</button>`
+    ).join('');
+
+  const filtered=monthlyMaintPerformer==='all'?visits:visits.filter(v=>(v.performedBy||'Unknown')===monthlyMaintPerformer);
+  filtered.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+
+  const filteredCost=filtered.reduce((s,v)=>s+(parseFloat(v.cost)||0),0);
+
   // Table of visits
-  visits.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
   html+=`<div class="table-card">
-    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${visits.length} visits in ${MNAMES_FULL[monthlyMaintMonth]} ${maintenanceYear}</div>
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${filtered.length} visits in ${MNAMES_FULL[monthlyMaintMonth]} ${maintenanceYear}${monthlyMaintPerformer!=='all'?' · '+escapeHtml(monthlyMaintPerformer)+' · '+fmt(filteredCost):''}</div>
+    <div class="ftabs" style="padding:8px 16px;border-bottom:1px solid var(--border)">${performerTabs}</div>
     <div class="tbl-wrap">
       <table>
         <thead><tr>
           <th>Address</th><th>Type</th><th>Date</th><th>Cost</th><th>Performed By</th><th>Notes</th>
         </tr></thead>
         <tbody>
-          ${visits.map(v=>`<tr>
+          ${filtered.map(v=>`<tr>
             <td>${escapeHtml(v.addr)}</td>
             <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--purple-dim);color:var(--purple)">${escapeHtml(v.type||'Other')}</span></td>
             <td style="font-size:11px;font-family:var(--mono)">${v.date||'—'}</td>
