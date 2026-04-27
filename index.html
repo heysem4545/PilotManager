@@ -4346,17 +4346,18 @@ async function renderLandscapeView(){
   });
 
   let html=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showAllLandscapeRecords()" title="Click to view all records">
       <div style="font-size:22px;font-weight:700;color:#4ade80">${totalRecords}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Services</div>
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">click to view all</div>
     </div>
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showAllLandscapeRecords()" title="Click to view all records">
       <div style="font-size:22px;font-weight:700;color:var(--red)">${fmt(totalCost)}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Cost</div>
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:var(--text)">${landscapeProps.length}</div>
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Active Properties</div>
     </div>
     ${Object.entries(typeCounts).sort((a,b)=>b[1].count-a[1].count).map(([t,d])=>`
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
@@ -4433,6 +4434,50 @@ async function renderLandscapeView(){
   </div>`;
 
   el.innerHTML=html;
+}
+
+function showAllLandscapeRecords(){
+  const allRecords=[];
+  Object.entries(window._landscapeData).forEach(([propId,propData])=>{
+    const prop=properties.find(p=>p.id===propId);
+    Object.values(propData).forEach(records=>{
+      records.forEach(r=>{
+        allRecords.push({...r, addr:prop?prop.addr:'Unknown', isActive:prop?!!prop.landscape:false});
+      });
+    });
+  });
+  allRecords.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='lsHistoryModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:700px">
+    <div class="modal-title"><span>🌿 All Landscape Records — ${landscapeYear}</span><button class="modal-close" onclick="document.getElementById('lsHistoryModal').remove()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">${allRecords.length} records · includes unchecked properties</div>
+    <div style="max-height:60vh;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Address</th>
+          <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Type</th>
+          <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Date</th>
+          <th style="text-align:right;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Cost</th>
+          <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">By</th>
+          <th style="text-align:center;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Active</th>
+        </tr></thead>
+        <tbody>${allRecords.map(r=>`<tr style="${!r.isActive?'opacity:0.5':''}">
+          <td style="padding:6px 8px;font-size:12px;font-weight:500;border-bottom:1px solid var(--border)">${escapeHtml(r.addr)}</td>
+          <td style="padding:6px 8px;font-size:11px;border-bottom:1px solid var(--border)"><span style="padding:2px 6px;border-radius:4px;background:rgba(74,222,128,0.12);color:#4ade80">${escapeHtml(r.serviceType||'Other')}</span></td>
+          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${r.date||'—'}</td>
+          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);text-align:right;color:${(parseFloat(r.cost)||0)>0?'var(--red)':'var(--muted2)'};border-bottom:1px solid var(--border)">${(parseFloat(r.cost)||0)>0?fmt(parseFloat(r.cost)):'—'}</td>
+          <td style="padding:6px 8px;font-size:11px;border-bottom:1px solid var(--border)">${escapeHtml(r.performedBy||'—')}</td>
+          <td style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border)">${r.isActive?'<span style="color:#4ade80">✓</span>':'<span style="color:var(--muted2)">—</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('lsHistoryModal').remove()">Close</button></div>
+  </div>`;
+  document.body.appendChild(modal);
 }
 
 function openLandscapeCell(propId, monthIdx){
