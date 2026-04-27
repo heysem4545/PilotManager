@@ -3276,7 +3276,7 @@ function renderCollectionMonthlyView(){
     const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
     return cmhaBal>0||tenBal>0;
   });
-  list.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  list.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
 
   const rows=list.map(p=>{
     const mp=getMonthProp(p);
