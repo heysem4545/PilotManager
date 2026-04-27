@@ -6405,6 +6405,8 @@ function calcNewPilotDur(){
 }
 
 function openPilotDay(day){
+  const existing=document.getElementById('pilotDayModal');
+  if(existing) existing.remove();
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
   const editable=canEdit();
@@ -6457,8 +6459,9 @@ function openPilotDay(day){
 }
 
 async function addPilotJob(day){
-  const addr=document.getElementById('pjNewAddr').value.trim();
-  if(!addr){toast('Enter an address');return;}
+  const addrEl=document.getElementById('pjNewAddr');
+  const addr=addrEl?addrEl.value.trim():'';
+  if(!addr){toast('Enter an address or task');return;}
   const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
   const prop=properties.find(p=>p.addr===addr);
   try{
@@ -6466,10 +6469,10 @@ async function addPilotJob(day){
       monthKey:mKey, day,
       propertyId:prop?prop.id:'',
       propertyAddress:addr,
-      timeStart:document.getElementById('pjNewStart').value||'',
-      timeEnd:document.getElementById('pjNewEnd').value||'',
-      duration:calcDurFromTimes(document.getElementById('pjNewStart').value,document.getElementById('pjNewEnd').value),
-      notes:document.getElementById('pjNewNotes').value.trim(),
+      timeStart:(document.getElementById('pjNewStart')||{}).value||'',
+      timeEnd:(document.getElementById('pjNewEnd')||{}).value||'',
+      duration:calcDurFromTimes((document.getElementById('pjNewStart')||{}).value||'',(document.getElementById('pjNewEnd')||{}).value||''),
+      notes:(document.getElementById('pjNewNotes')||{}).value?.trim()||'',
       createdAt:new Date()
     });
     document.getElementById('pilotDayModal').remove();
