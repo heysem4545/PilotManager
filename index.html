@@ -5446,7 +5446,7 @@ async function renderTechnicianView(){
 
   const tabBar=`<div class="maint-view-tabs" style="margin-bottom:16px">
     <button class="maint-vtab${techTabMode==='technicians'?' active':''}" onclick="techTabMode='technicians';renderTechnicianView()">Technicians</button>
-    <button class="maint-vtab${techTabMode==='pilot'?' active':''}" onclick="techTabMode='pilot';renderTechnicianView()">🔧 Pilot</button>
+    <button class="maint-vtab${techTabMode==='pilot'?' active':''}" onclick="techTabMode='pilot';renderTechnicianView()">🔧 Pilot Own Technician</button>
   </div>`;
 
   if(techTabMode==='pilot'){
