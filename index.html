@@ -4341,7 +4341,7 @@ async function renderLandscapeView(){
     } else {
       records.forEach((r,ri)=>{
         html+=`<tr>
-          ${ri===0?`<td rowspan="${records.length}" style="font-weight:500;vertical-align:top">${escapeHtml(p.addr)}</td>`:''}
+          <td style="font-weight:500">${escapeHtml(p.addr)}</td>
           <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(74,222,128,0.12);color:#4ade80">${escapeHtml(r.serviceType||'Other')}</span></td>
           <td style="font-size:11px;font-family:var(--mono)">${r.date||'—'}</td>
           <td style="font-size:11px;font-family:var(--mono);color:${(parseFloat(r.cost)||0)>0?'var(--red)':'var(--muted2)'}">${(parseFloat(r.cost)||0)>0?fmt(parseFloat(r.cost)):'—'}</td>
