@@ -6339,7 +6339,7 @@ function showPilotMonthList(){
       dayJobs.forEach((j,ji)=>{
         const dur=j.duration||0;
         tableRows+=`<tr style="${ji===0?'border-top:2px solid var(--border2)':''}">
-          ${ji===0?`<td rowspan="${dayJobs.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:9px;color:var(--blue);font-weight:500;margin-top:2px">${Math.floor(dayMins/60)}h ${dayMins%60}m</div></td>`:''}
+          ${ji===0?`<td rowspan="${dayJobs.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:11px;color:var(--blue);font-weight:700;margin-top:4px;padding:3px 6px;background:var(--blue-dim);border-radius:4px;display:inline-block">${Math.floor(dayMins/60)}h ${dayMins%60}m</div></td>`:''}
           <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)">${escapeHtml(j.propertyAddress||'—')}</td>
           <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeStart||j.time||'—'}</td>
           <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeEnd||'—'}</td>
@@ -6379,6 +6379,27 @@ function showPilotMonthList(){
   }).catch(e=>{toast('Error: '+e.message);});
 }
 
+function pilotTimeSelect(val, cls, onchangeFn, useId){
+  const [h,m]=(val||'').split(':').map(Number);
+  const hVal=isNaN(h)?'':h;
+  const mVal=isNaN(m)?'':m;
+  const ss='font-size:11px;padding:3px 2px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;cursor:pointer';
+  let hOpts='<option value="">--</option>';
+  for(let i=6;i<=22;i++) hOpts+=`<option value="${i}" ${hVal===i?'selected':''}>${i>12?(i-12)+'pm':(i===12?'12pm':i+'am')}</option>`;
+  let mOpts='<option value="">--</option>';
+  [0,15,30,45].forEach(v=>mOpts+=`<option value="${v}" ${mVal===v?'selected':''}>${String(v).padStart(2,'0')}</option>`);
+  const hId=useId?`id="${cls}-h"`:'';
+  const mId=useId?`id="${cls}-m"`:'';
+  return `<select ${hId} class="${cls}-h" style="${ss};width:55px" onchange="${onchangeFn}">${hOpts}</select>:<select ${mId} class="${cls}-m" style="${ss};width:42px" onchange="${onchangeFn}">${mOpts}</select>`;
+}
+
+function getPilotTime(row, cls){
+  const hSel=row.querySelector('.'+cls+'-h');
+  const mSel=row.querySelector('.'+cls+'-m');
+  if(!hSel||!mSel||hSel.value===''||mSel.value==='') return '';
+  return String(hSel.value).padStart(2,'0')+':'+String(mSel.value).padStart(2,'0');
+}
+
 function calcDurFromTimes(start,end){
   if(!start||!end) return 0;
   const [sh,sm]=start.split(':').map(Number);
@@ -6390,18 +6411,23 @@ function calcDurFromTimes(start,end){
 
 function calcPilotDur(el){
   const row=el.closest('.pilot-job-row');
-  const start=row.querySelector('.pj-start').value;
-  const end=row.querySelector('.pj-end').value;
+  const start=getPilotTime(row,'pj-start');
+  const end=getPilotTime(row,'pj-end');
   const dur=calcDurFromTimes(start,end);
   const display=row.querySelector('.pj-dur-display');
   display.textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
 }
 
 function calcNewPilotDur(){
-  const start=document.getElementById('pjNewStart').value;
-  const end=document.getElementById('pjNewEnd').value;
+  const hS=document.getElementById('pjNew-start-h');
+  const mS=document.getElementById('pjNew-start-m');
+  const hE=document.getElementById('pjNew-end-h');
+  const mE=document.getElementById('pjNew-end-m');
+  const start=(hS&&hS.value!==''&&mS&&mS.value!=='')?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';
+  const end=(hE&&hE.value!==''&&mE&&mE.value!=='')?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';
   const dur=calcDurFromTimes(start,end);
-  document.getElementById('pjNewDurDisplay').textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
+  const el=document.getElementById('pjNewDurDisplay');
+  if(el) el.textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
 }
 
 function openPilotDay(day){
@@ -6427,10 +6453,10 @@ function openPilotDay(day){
     let jobRows=jobs.map(j=>{
       const dur=j.duration||0;
       const durDisplay=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
-      return `<div class="pilot-job-row" data-id="${j.id}" style="display:grid;grid-template-columns:1fr 80px 80px 50px 1fr;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;align-items:center">
+      return `<div class="pilot-job-row" data-id="${j.id}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;align-items:center">
       <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
-      <div><input type="time" value="${j.timeStart||j.time||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" class="pj-start" onchange="calcPilotDur(this)"></div>
-      <div><input type="time" value="${j.timeEnd||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" class="pj-end" onchange="calcPilotDur(this)"></div>
+      <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||j.time||'','pj-start','calcPilotDur(this)')}</div>
+      <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','pj-end','calcPilotDur(this)')}</div>
       <div class="pj-dur-display" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">${durDisplay}</div>
       <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="pj-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deletePilotJob('${j.id}')">×</button></div>
     </div>`;}).join('');
@@ -6441,10 +6467,10 @@ function openPilotDay(day){
       <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:50vh;overflow-y:auto">
         ${jobRows||'<div style="text-align:center;color:var(--muted);padding:16px">No jobs yet for this day</div>'}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 80px 80px 50px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center">
+      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center">
         <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
-        <input type="time" id="pjNewStart" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" onchange="calcNewPilotDur()">
-        <input type="time" id="pjNewEnd" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" onchange="calcNewPilotDur()">
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-start','calcNewPilotDur()',true)}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-end','calcNewPilotDur()',true)}</div>
         <div id="pjNewDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">—</div>
         <div style="display:flex;gap:4px"><input type="text" id="pjNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day})"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addPilotJob(${day})">Add</button></div>
       </div>
@@ -6469,9 +6495,9 @@ async function addPilotJob(day){
       monthKey:mKey, day,
       propertyId:prop?prop.id:'',
       propertyAddress:addr,
-      timeStart:(document.getElementById('pjNewStart')||{}).value||'',
-      timeEnd:(document.getElementById('pjNewEnd')||{}).value||'',
-      duration:calcDurFromTimes((document.getElementById('pjNewStart')||{}).value||'',(document.getElementById('pjNewEnd')||{}).value||''),
+      timeStart:(()=>{const h=document.getElementById('pjNew-start-h'),m=document.getElementById('pjNew-start-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
+      timeEnd:(()=>{const h=document.getElementById('pjNew-end-h'),m=document.getElementById('pjNew-end-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
+      duration:(()=>{const hS=document.getElementById('pjNew-start-h'),mS=document.getElementById('pjNew-start-m'),hE=document.getElementById('pjNew-end-h'),mE=document.getElementById('pjNew-end-m');const s=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';const e=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';return calcDurFromTimes(s,e);})(),
       notes:(document.getElementById('pjNewNotes')||{}).value?.trim()||'',
       createdAt:new Date()
     });
@@ -6497,8 +6523,8 @@ async function savePilotDayEdits(day){
   try{
     for(const row of rows){
       const id=row.dataset.id;
-      const startVal=row.querySelector('.pj-start').value||'';
-      const endVal=row.querySelector('.pj-end').value||'';
+      const startVal=getPilotTime(row,'pj-start');
+      const endVal=getPilotTime(row,'pj-end');
       await db.collection('pilotTechWork').doc(id).update({
         propertyAddress:row.querySelector('.pj-addr').value.trim(),
         timeStart:startVal,
