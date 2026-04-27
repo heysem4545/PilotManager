@@ -1007,9 +1007,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Available Units
       </button>
 
-      <button class="nav-item" id="nav-innovation" onclick="showView('innovation')">
+      <button class="nav-item" id="nav-innovation" onclick="showView('innovation')" style="position:relative">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v2M12.5 3.5l-1.4 1.4M15 8h-2M12.5 12.5l-1.4-1.4M8 15v-2M3.5 12.5l1.4-1.4M1 8h2M3.5 3.5l1.4 1.4"/><circle cx="8" cy="8" r="3"/></svg>
         Innovation
+        <span class="nav-badge" id="innovationBadge" style="display:none">0</span>
       </button>
       <button class="nav-item" id="nav-expenses" onclick="showView('expenses')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v8M6 6h4M6 10h4"/></svg>
@@ -2509,6 +2510,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startMonthDataListener(activeKey());
   startConstProjectsListener();
   startTurnoverListener();
+  startInnovationBadge();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -6805,6 +6807,18 @@ async function renderInnovationView(){
   </div>`;
 
   el.innerHTML=html;
+}
+
+function startInnovationBadge(){
+  if(!isAdmin()) return;
+  db.collection('innovation').where('status','==','Open').onSnapshot(snap=>{
+    const count=snap.size;
+    const badge=document.getElementById('innovationBadge');
+    if(badge){
+      badge.textContent=count;
+      badge.style.display=count>0?'':'none';
+    }
+  },()=>{});
 }
 
 async function submitInnovation(){
