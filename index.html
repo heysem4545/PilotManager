@@ -6690,7 +6690,8 @@ async function renderTeamDailyLog(){
 
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const editable=canEdit();
+  const isOwnLog=teamLogUser===currentUser.uid;
+  const editable=isAdmin()||isOwnLog;
   const selectedUser=users.find(u=>u.uid===teamLogUser);
   const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
 
@@ -6793,7 +6794,8 @@ function openTeamLogDay(day){
   if(existing) existing.remove();
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
-  const editable=canEdit();
+  const isOwnLog=teamLogUser===currentUser.uid;
+  const editable=isAdmin()||isOwnLog;
   const selectedUser=teamUsersCache.find(u=>u.uid===teamLogUser);
   const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
 
@@ -6814,12 +6816,13 @@ function openTeamLogDay(day){
       const bc=isExcuse?'rgba(245,112,106,0.3)':'var(--border2)';
       const bg=isExcuse?'rgba(245,112,106,0.05)':'var(--surface2)';
       const dc=isExcuse?'var(--red)':'var(--blue)';
+      const dis=editable?'':'disabled';
       return `<div class="tl-job-row" data-id="${j.id}" data-type="${isExcuse?'excuse':'work'}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:${bg};border:1px solid ${bc};border-radius:6px;align-items:center">
-        <div><input type="text" value="${escapeAttr(j.task||j.propertyAddress||'')}" placeholder="${isExcuse?'Reason…':'Task or activity…'}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="tl-task"></div>
-        <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||'','tl-start','calcTeamLogDur(this)')}</div>
-        <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','tl-end','calcTeamLogDur(this)')}</div>
+        <div><input type="text" value="${escapeAttr(j.task||j.propertyAddress||'')}" ${dis} placeholder="${isExcuse?'Reason…':'Task or activity…'}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="tl-task"></div>
+        ${editable?`<div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||'','tl-start','calcTeamLogDur(this)')}</div>`:`<div style="font-size:11px;font-family:var(--mono);color:var(--text)">${j.timeStart||'—'}</div>`}
+        ${editable?`<div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','tl-end','calcTeamLogDur(this)')}</div>`:`<div style="font-size:11px;font-family:var(--mono);color:var(--text)">${j.timeEnd||'—'}</div>`}
         <div class="tl-dur-display" style="font-size:10px;font-family:var(--mono);color:${dc};text-align:center;font-weight:600">${durDisplay}</div>
-        <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="tl-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deleteTeamLogEntry('${j.id}',${day})">×</button></div>
+        <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" ${dis} placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="tl-notes">${editable?`<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deleteTeamLogEntry('${j.id}',${day})">×</button>`:''}</div>
       </div>`;
     }
 
@@ -6829,7 +6832,7 @@ function openTeamLogDay(day){
     modal.onclick=e=>{if(e.target===modal) modal.remove();};
     modal.innerHTML=`<div class="modal" style="width:700px">
       <div class="modal-title"><span>👤 ${escapeHtml(userName)} — ${MNAMES_FULL[teamLogMonth]} ${day}, ${teamLogYear}</span><button class="modal-close" onclick="document.getElementById('teamLogDayModal').remove()">×</button></div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      ${editable?`<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--muted);padding:5px 0">Day Status:</span>
         ${['','Sick','Day Off','Excused','Holiday','Half Day'].map(s=>{
           const active=ds===s;
@@ -6838,7 +6841,7 @@ function openTeamLogDay(day){
           const label=s||'Working';
           return `<button style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid ${active?col:'var(--border2)'};background:${active?col+'20':'var(--surface2)'};color:${active?col:'var(--muted)'};font-family:var(--font)" onclick="setTeamLogDayStatus(${day},'${s}')">${label}</button>`;
         }).join('')}
-      </div>
+      </div>`:ds?`<div style="margin-bottom:12px"><span style="font-size:11px;padding:4px 10px;border-radius:5px;background:${({'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'}[ds]||'var(--muted)')}20;color:${({'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'}[ds]||'var(--muted)')};font-weight:600">${ds}</span></div>`:''}
       <div style="display:flex;gap:12px;margin-bottom:10px">
         <div style="font-size:12px;font-weight:600;color:var(--blue)">🔧 Work: ${Math.floor(wMins/60)}h ${wMins%60}m</div>
         ${eMins>0?`<div style="font-size:12px;font-weight:600;color:var(--red)">⏸ Excuse: ${Math.floor(eMins/60)}h ${eMins%60}m</div>`:''}
@@ -6847,28 +6850,28 @@ function openTeamLogDay(day){
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         ${workJobs.map(j=>buildRow(j,false)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
+      ${editable?`<div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
         <input type="text" id="tlNewTask" placeholder="Task or activity…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNew-start','calcNewTeamLogDur()',true)}</div>
         <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNew-end','calcNewTeamLogDur()',true)}</div>
         <div id="tlNewDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">—</div>
         <div style="display:flex;gap:4px"><input type="text" id="tlNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'work')"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addTeamLogEntry(${day},'work')">Add</button></div>
-      </div>
+      </div>`:''}
       <div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏸ Excuse / Break</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         ${excuseJobs.map(j=>buildRow(j,true)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Excuse Entries</div>'}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
+      ${editable?`<div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
         <input type="text" id="tlNewExcTask" placeholder="Reason…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewExc-start','calcNewTeamLogExcDur()',true)}</div>
         <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewExc-end','calcNewTeamLogExcDur()',true)}</div>
         <div id="tlNewExcDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--red);text-align:center;font-weight:600">—</div>
         <div style="display:flex;gap:4px"><input type="text" id="tlNewExcNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'excuse')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--red);border-color:rgba(245,112,106,0.3)" onclick="addTeamLogEntry(${day},'excuse')">Add</button></div>
-      </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Task · Start · End · Duration · Notes</div>
+      </div>`:''}
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">${editable?'Task · Start · End · Duration · Notes':'View only — you can only edit your own log'}</div>
       <div class="modal-foot">
-        <button class="btn btn-ghost btn-sm" onclick="saveTeamLogEdits(${day})">Save Changes</button>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('teamLogDayModal').remove()">Done</button>
+        ${editable?`<button class="btn btn-ghost btn-sm" onclick="saveTeamLogEdits(${day})">Save Changes</button>`:''}
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('teamLogDayModal').remove()">${editable?'Done':'Close'}</button>
       </div>
     </div>`;
     document.body.appendChild(modal);
