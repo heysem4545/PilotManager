@@ -5436,21 +5436,39 @@ async function loadTechnicianMonth(name, year, month){
   });
 }
 
+let techTabMode='technicians'; // 'technicians' or 'pilot'
+let pilotYear=new Date().getFullYear();
+let pilotMonth=new Date().getMonth();
+
 async function renderTechnicianView(){
   const el = document.getElementById('technicianView');
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
+
+  const tabBar=`<div class="maint-view-tabs" style="margin-bottom:16px">
+    <button class="maint-vtab${techTabMode==='technicians'?' active':''}" onclick="techTabMode='technicians';renderTechnicianView()">Technicians</button>
+    <button class="maint-vtab${techTabMode==='pilot'?' active':''}" onclick="techTabMode='pilot';renderTechnicianView()">🔧 Pilot</button>
+  </div>`;
+
+  if(techTabMode==='pilot'){
+    el.innerHTML=tabBar+`<div id="pilotTechContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+    await renderPilotTechView();
+    return;
+  }
+
+  el.innerHTML=tabBar+`<div id="techMainContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+  const techEl=document.getElementById('techMainContent');
 
   try{
     await loadTechniciansList();
   }catch(e){
     console.error('loadTechniciansList', e);
-    el.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load technicians</div>${escapeHtml(e.message)}</div></div>`;
+    techEl.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load technicians</div>${escapeHtml(e.message)}</div></div>`;
     return;
   }
 
   // First-run / no technicians yet — show prompt to add one
   if(techNames.length === 0 && !techActiveName){
-    el.innerHTML = `
+    techEl.innerHTML = `
       <div class="table-card">
         <div class="tech-empty">
           <div class="tech-empty-title">No technicians yet</div>
@@ -5467,7 +5485,7 @@ async function renderTechnicianView(){
     await loadTechnicianMonth(techActiveName, techYear, techMonth);
   }catch(e){
     console.error('loadTechnicianMonth', e);
-    el.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load month data</div>${escapeHtml(e.message)}</div></div>`;
+    techEl.innerHTML = `<div class="table-card"><div class="tech-empty"><div class="tech-empty-title">Couldn't load month data</div>${escapeHtml(e.message)}</div></div>`;
     return;
   }
 
@@ -5566,7 +5584,7 @@ async function renderTechnicianView(){
   const techOpts = techNames.map(n=>`<option value="${escapeAttr(n)}" ${n===techActiveName?'selected':''}>${escapeHtml(n)}</option>`).join('')
     + `<option value="__add__">+ Add technician\u2026</option>`;
 
-  el.innerHTML = `
+  techEl.innerHTML = `
     <div class="table-card">
       <div class="tech-toolbar">
         <div class="tech-toolbar-left">
@@ -6205,6 +6223,186 @@ function renderPropertiesList(){
         </table>
       </div>
     </div>`;
+}
+
+// ─── PILOT TECHNICIAN TAB ───
+async function renderPilotTechView(){
+  const el=document.getElementById('pilotTechContent');
+  if(!el) return;
+
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const editable=canEdit();
+
+  // Load pilot tech data for the month
+  const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
+  let pilotJobs=[];
+  try{
+    const snap=await db.collection('pilotTechWork').where('monthKey','==',mKey).get();
+    pilotJobs=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error('loadPilotTech',e);}
+
+  // Group by day
+  const jobsByDay={};
+  pilotJobs.forEach(j=>{
+    const day=j.day||1;
+    if(!jobsByDay[day]) jobsByDay[day]=[];
+    jobsByDay[day].push(j);
+  });
+
+  // Stats
+  const totalJobs=pilotJobs.length;
+  const totalMins=pilotJobs.reduce((s,j)=>s+(j.duration||0),0);
+  const totalHrs=Math.floor(totalMins/60);
+  const remMins=totalMins%60;
+  const uniqueProps=new Set(pilotJobs.map(j=>j.propertyAddress).filter(Boolean)).size;
+
+  // Month nav
+  let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <button class="btn btn-ghost btn-sm" onclick="pilotMonth--;if(pilotMonth<0){pilotMonth=11;pilotYear--;}renderTechnicianView()">‹</button>
+    <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[pilotMonth]} ${pilotYear}</span>
+    <button class="btn btn-ghost btn-sm" onclick="pilotMonth++;if(pilotMonth>11){pilotMonth=0;pilotYear++;}renderTechnicianView()">›</button>
+  </div>`;
+
+  // Stats cards
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalJobs}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Jobs</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--blue)">${totalHrs}h ${remMins}m</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Hours</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${uniqueProps}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
+    </div>
+  </div>`;
+
+  // Calendar grid
+  const daysInMonth=new Date(pilotYear,pilotMonth+1,0).getDate();
+  const firstDow=new Date(pilotYear,pilotMonth,1).getDay();
+  const today=new Date();
+  const isCurrentMonth=today.getFullYear()===pilotYear&&today.getMonth()===pilotMonth;
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px">`;
+  DNAMES.forEach(d=>{html+=`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px">${d}</div>`;});
+  for(let i=0;i<firstDow;i++) html+=`<div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dayJobs=jobsByDay[d]||[];
+    const hasJobs=dayJobs.length>0;
+    const isToday=isCurrentMonth&&d===today.getDate();
+    const totalDayMins=dayJobs.reduce((s,j)=>s+(j.duration||0),0);
+    html+=`<div style="background:var(--surface);border:1px solid ${isToday?'var(--accent)':hasJobs?'rgba(74,222,128,0.3)':'var(--border)'};border-radius:8px;padding:8px;min-height:80px;cursor:pointer;transition:background .12s" onclick="openPilotDay(${d})" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</span>
+        ${hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(74,222,128,0.12);color:#4ade80">${dayJobs.length}</span>`:''}
+      </div>
+      ${dayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')}
+      ${dayJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${dayJobs.length-3} more</div>`:''}
+      ${hasJobs?`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(totalDayMins/60)}h ${totalDayMins%60}m</div>`:''}
+    </div>`;
+  }
+  html+=`</div>`;
+
+  el.innerHTML=html;
+}
+
+function openPilotDay(day){
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
+  const editable=canEdit();
+
+  // Get jobs for this day from current data
+  db.collection('pilotTechWork').where('monthKey','==',mKey).where('day','==',day).get().then(snap=>{
+    const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+
+    const addrOpts=properties.map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
+
+    const modal=document.createElement('div');
+    modal.className='overlay open';
+    modal.id='pilotDayModal';
+    modal.onclick=e=>{if(e.target===modal) modal.remove();};
+
+    let jobRows=jobs.map(j=>`<div class="pilot-job-row" data-id="${j.id}" style="display:grid;grid-template-columns:1fr 80px 80px 1fr;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;align-items:center">
+      <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="Address" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
+      <div><input type="time" value="${j.time||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" class="pj-time"></div>
+      <div><input type="number" value="${j.duration||''}" placeholder="min" min="0" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%" class="pj-dur"></div>
+      <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="pj-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deletePilotJob('${j.id}')">×</button></div>
+    </div>`).join('');
+
+    modal.innerHTML=`<div class="modal" style="width:680px">
+      <div class="modal-title"><span>🔧 Pilot Work — ${MNAMES_FULL[pilotMonth]} ${day}, ${pilotYear}</span><button class="modal-close" onclick="document.getElementById('pilotDayModal').remove()">×</button></div>
+      <datalist id="pilotAddrList">${addrOpts}</datalist>
+      <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:50vh;overflow-y:auto">
+        ${jobRows||'<div style="text-align:center;color:var(--muted);padding:16px">No jobs yet for this day</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 80px 80px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center">
+        <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="time" id="pjNewTime" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark">
+        <input type="number" id="pjNewDur" placeholder="min" min="0" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%">
+        <div style="display:flex;gap:4px"><input type="text" id="pjNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day})"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addPilotJob(${day})">Add</button></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Address · Time · Duration (min) · Notes</div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost btn-sm" onclick="savePilotDayEdits(${day})">Save Changes</button>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('pilotDayModal').remove()">Done</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  });
+}
+
+async function addPilotJob(day){
+  const addr=document.getElementById('pjNewAddr').value.trim();
+  if(!addr){toast('Enter an address');return;}
+  const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
+  const prop=properties.find(p=>p.addr===addr);
+  try{
+    await db.collection('pilotTechWork').add({
+      monthKey:mKey, day,
+      propertyId:prop?prop.id:'',
+      propertyAddress:addr,
+      time:document.getElementById('pjNewTime').value||'',
+      duration:parseInt(document.getElementById('pjNewDur').value)||0,
+      notes:document.getElementById('pjNewNotes').value.trim(),
+      createdAt:new Date()
+    });
+    document.getElementById('pilotDayModal').remove();
+    toast('Job added');
+    renderPilotTechView();
+    openPilotDay(day);
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deletePilotJob(id){
+  if(!confirm('Delete this job?')) return;
+  try{
+    await db.collection('pilotTechWork').doc(id).delete();
+    document.getElementById('pilotDayModal').remove();
+    toast('Job deleted');
+    renderPilotTechView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function savePilotDayEdits(day){
+  const rows=document.querySelectorAll('.pilot-job-row');
+  try{
+    for(const row of rows){
+      const id=row.dataset.id;
+      await db.collection('pilotTechWork').doc(id).update({
+        propertyAddress:row.querySelector('.pj-addr').value.trim(),
+        time:row.querySelector('.pj-time').value||'',
+        duration:parseInt(row.querySelector('.pj-dur').value)||0,
+        notes:row.querySelector('.pj-notes').value.trim(),
+        updatedAt:new Date()
+      });
+    }
+    document.getElementById('pilotDayModal').remove();
+    toast('Changes saved');
+    renderPilotTechView();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 let tlTab='active'; // 'active' or 'archived'
