@@ -8170,13 +8170,19 @@ async function autoLogToDailyLog(uid, taskText, day){
       .where('uid','==',uid).where('task','==',taskText)
       .where('source','==','task-done').get();
     if(!existing.empty) return; // already logged
+    const MNAMES_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const taskMonth=parseInt(tmActiveKey().split('-')[1])-1;
+    const taskLabel=MNAMES_S[taskMonth]+' '+day;
+    const isLate=todayDay!==day||now.getMonth()!==taskMonth;
     await db.collection('teamDailyLog').add({
       monthKey:mKey, day:todayDay, uid,
       jobType:'work',
       task:'✅ '+taskText,
       timeStart:'', timeEnd:'', duration:0,
-      notes:'Auto-logged from Task Management',
+      notes:isLate?'Auto-logged from Task Management (task from '+taskLabel+')':'Auto-logged from Task Management',
       source:'task-done',
+      originalTaskDay:day,
+      originalTaskMonth:tmActiveKey(),
       createdAt:now
     });
   }catch(e){console.warn('autoLogToDailyLog',e);}
