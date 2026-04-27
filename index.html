@@ -2131,6 +2131,7 @@ let filterSetByNav = false;
 let collectionViewMode = 'balancesOnly'; // default to All Balances tab
 let propsViewTab = 'list'; // 'list', 'table', or 'history'
 let allBalancesRange = 'full';
+let allBalancesStatusFilter = 'all';
 let currentPage = 1;
 let sortField = 'rowIndex';
 let sortDir = 1;
@@ -3472,19 +3473,39 @@ async function renderBalancesOnly(){
       if(cmhaBal>0||tenantBal>0) hasAnyBalance=true;
       return {cmhaBal,tenantBal};
     });
-    if(hasAnyBalance) rows.push({id:p.id, addr:p.addr, balances, actionNote:p.actionNote||'', balanceUpdate:p.balanceUpdate||'', sentToCollection:!!p.sentToCollection});
+    if(hasAnyBalance){
+      const curMd=(monthData[p.id]||{})[monthKey(curYear,curMonth)]||{};
+      rows.push({id:p.id, addr:p.addr, status:curMd.status||'', balances, actionNote:p.actionNote||'', balanceUpdate:p.balanceUpdate||'', sentToCollection:!!p.sentToCollection});
+    }
   });
   const totals=monthList.map((_,i)=>{
     let cmhaT=0,tenantT=0;
     rows.forEach(r=>{cmhaT+=r.balances[i].cmhaBal;tenantT+=r.balances[i].tenantBal;});
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
+  // Status filter
+  const statusCounts={all:rows.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
+  rows.forEach(r=>{if(statusCounts[r.status]!==undefined)statusCounts[r.status]++;});
+  const filtered=allBalancesStatusFilter==='all'?rows:rows.filter(r=>r.status===allBalancesStatusFilter);
+  const filteredTotals=monthList.map((_,i)=>{
+    let cmhaT=0,tenantT=0;
+    filtered.forEach(r=>{cmhaT+=r.balances[i].cmhaBal;tenantT+=r.balances[i].tenantBal;});
+    return{cmhaBal:cmhaT,tenantBal:tenantT};
+  });
+
+  const filterTabs=['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].map(s=>{
+    const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s.charAt(0)+s.slice(1).toLowerCase();
+    const cnt=statusCounts[s]||0;
+    return `<button class="ftab ${allBalancesStatusFilter===s?'active':''}" onclick="allBalancesStatusFilter='${s}';renderBalancesOnly()">${label} (${cnt})</button>`;
+  }).join('');
+
   const boEl=document.getElementById('balancesOnlyView');
   boEl.innerHTML=`
     <div class="table-card">
       <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--muted)">${rows.length} properties with balances · Full Year</span>
+        <span style="font-size:11px;color:var(--muted)">${filtered.length} properties with balances</span>
       </div>
+      <div class="ftabs" style="padding:8px 16px;border-bottom:1px solid var(--border)">${filterTabs}</div>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -3502,7 +3523,7 @@ async function renderBalancesOnly(){
             </tr>
           </thead>
           <tbody>
-            ${rows.map(r=>{
+            ${filtered.map(r=>{
               const rowTotalC=r.balances.reduce((s,b)=>s+b.cmhaBal,0);
               const rowTotalT=r.balances.reduce((s,b)=>s+b.tenantBal,0);
               return `<tr style="${r.sentToCollection?'background:rgba(74,222,128,0.06)':''}">
@@ -3517,9 +3538,9 @@ async function renderBalancesOnly(){
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
               <td></td><td>Total</td>
-              ${totals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td><td></td>`).join('')}
-              <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(totals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
-              <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(totals.reduce((s,t)=>s+t.tenantBal,0))}</td>
+              ${filteredTotals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td><td></td>`).join('')}
+              <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(filteredTotals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
+              <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(filteredTotals.reduce((s,t)=>s+t.tenantBal,0))}</td>
               <td colspan="2"></td>
             </tr>
           </tbody>
