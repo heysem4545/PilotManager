@@ -4247,6 +4247,49 @@ function getMaintSummaryRangeKeys(){
   return {startKey, endKey};
 }
 
+function getLandscapeTypes(){
+  const saved=localStorage.getItem('landscapeCategories');
+  if(saved){try{return JSON.parse(saved);}catch(e){}}
+  return ['Lawn Care','Snow Removal','Tree Trimming','Leaf Cleanup','Mulching','Irrigation','Other'];
+}
+
+function openEditLandscapeCategories(){
+  const types=getLandscapeTypes();
+  const list=document.getElementById('maintCatList');
+  list.innerHTML='';
+  types.forEach((t,i)=>{
+    const row=document.createElement('div');
+    row.style='display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px';
+    row.innerHTML=`<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <input type="text" value="${escapeHtml(t)}" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none">
+      <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:10px;width:auto" onclick="this.parentElement.remove()">×</button>`;
+    list.appendChild(row);
+  });
+  document.getElementById('maintCatNew').value='';
+  document.getElementById('maintCatModal').querySelector('.modal-title span').textContent='⚙ Edit Landscape Categories';
+  // Override save button
+  const saveBtn=document.getElementById('maintCatModal').querySelector('.modal-foot .btn-primary');
+  saveBtn.setAttribute('onclick','saveLandscapeCategories()');
+  document.getElementById('maintCatModal').classList.add('open');
+}
+
+function saveLandscapeCategories(){
+  const rows=document.querySelectorAll('#maintCatList > div');
+  const cats=[];
+  rows.forEach(r=>{
+    const name=r.querySelector('input[type=text]').value.trim();
+    if(name) cats.push(name);
+  });
+  if(!cats.length){toast('Add at least one category');return;}
+  localStorage.setItem('landscapeCategories',JSON.stringify(cats));
+  closeModal('maintCatModal');
+  // Restore save button for maintenance
+  const saveBtn=document.getElementById('maintCatModal').querySelector('.modal-foot .btn-primary');
+  saveBtn.setAttribute('onclick','saveMaintCategories()');
+  toast('Landscape categories saved ('+cats.length+')');
+  renderLandscapeView();
+}
+
 async function toggleLandscape(propId, checked){
   try{
     await updatePropertyField(propId,'landscape',checked);
@@ -4371,7 +4414,10 @@ async function renderLandscapeView(){
         <span>•</span>
         <span>${totalRecords} record${totalRecords===1?'':'s'} in ${landscapeYear}</span>
       </div>
-      ${editable?`<button class="btn btn-primary btn-sm" onclick="openAddLandscape()">+ Add Record</button>`:''}
+      <div style="display:flex;gap:6px">
+        ${editable?`<button class="btn btn-primary btn-sm" onclick="openAddLandscape()">+ Add Record</button>`:''}
+        ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="openEditLandscapeCategories()">⚙ Edit Categories</button>`:''}
+      </div>
     </div>
     <div class="tbl-wrap">
       <table style="width:100%;border-collapse:collapse">
@@ -4395,7 +4441,7 @@ function openLandscapeCell(propId, monthIdx){
   // Open add modal pre-filled with this property and month
   const landscapeProps=properties.filter(pp=>pp.landscape).sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const addrOpts=landscapeProps.map(pp=>`<option value="${pp.id}" ${pp.id===propId?'selected':''}>${escapeHtml(pp.addr)}</option>`).join('');
-  const types=['Lawn Care','Snow Removal','Tree Trimming','Leaf Cleanup','Mulching','Irrigation','Other'];
+  const types=getLandscapeTypes();
   const typeOpts=types.map(t=>`<option value="${t}">${t}</option>`).join('');
   const defaultDate=`${landscapeYear}-${String(monthIdx+1).padStart(2,'0')}-01`;
   const modal=document.createElement('div');
@@ -4419,7 +4465,7 @@ function openAddLandscape(){
   const landscapeProps=properties.filter(p=>p.landscape).sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const addrOpts=landscapeProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr)}</option>`).join('');
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const types=['Lawn Care','Snow Removal','Tree Trimming','Leaf Cleanup','Mulching','Irrigation','Other'];
+  const types=getLandscapeTypes();
   const typeOpts=types.map(t=>`<option value="${t}">${t}</option>`).join('');
   const modal=document.createElement('div');
   modal.className='overlay open';
