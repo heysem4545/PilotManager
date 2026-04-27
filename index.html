@@ -6297,11 +6297,12 @@ async function renderPilotTechView(){
     html+=`<div style="background:var(--surface);border:1px solid ${isToday?'var(--accent)':hasJobs?'rgba(74,222,128,0.3)':'var(--border)'};border-radius:8px;padding:8px;min-height:80px;cursor:pointer;transition:background .12s" onclick="openPilotDay(${d})" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</span>
-        ${hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(74,222,128,0.12);color:#4ade80">${dayJobs.length}</span>`:''}
+        ${hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(74,222,128,0.12);color:#4ade80">${dayJobs.length} job${dayJobs.length>1?'s':''}</span>`:''}
       </div>
-      ${dayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')}
-      ${dayJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${dayJobs.length-3} more</div>`:''}
-      ${hasJobs?`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(totalDayMins/60)}h ${totalDayMins%60}m</div>`:''}
+      ${hasJobs?dayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')
+        +(dayJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${dayJobs.length-3} more</div>`:'')
+        +`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(totalDayMins/60)}h ${totalDayMins%60}m</div>`
+      :`<div style="display:flex;align-items:center;justify-content:center;height:50px;color:var(--muted2);font-size:18px">+</div>`}
     </div>`;
   }
   html+=`</div>`;
@@ -6315,7 +6316,8 @@ function openPilotDay(day){
   const editable=canEdit();
 
   // Get jobs for this day from current data
-  db.collection('pilotTechWork').where('monthKey','==',mKey).where('day','==',day).get().then(snap=>{
+  db.collection('pilotTechWork').where('monthKey','==',mKey).where('day','==',day).get().catch(e=>{toast('Error: '+e.message+' — publish Firestore rules for pilotTechWork');}).then(snap=>{
+    if(!snap) return;
     const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 
     const addrOpts=properties.map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
