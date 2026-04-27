@@ -6746,10 +6746,11 @@ async function renderTeamDailyLog(){
       <div style="font-size:22px;font-weight:700;color:var(--blue)">${workHrs}h ${workRem}m</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Work Hours</div>
     </div>
-    ${excMins>0?`<div style="background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
+    <div style="background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--red)">${excHrs}h ${excRem}m</div>
       <div style="font-size:9px;color:var(--red);text-transform:uppercase">Excuse Hours</div>
-    </div>`:''}
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">${excuseJobsAll.length} excuse${excuseJobsAll.length!==1?'s':''}</div>
+    </div>
     ${canSeePrivate&&privateJobsAll.length>0?`<div style="background:rgba(176,106,245,0.06);border:1px solid rgba(176,106,245,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--purple)">${Math.floor(privateJobsAll.reduce((s,j)=>s+(j.duration||0),0)/60)}h ${privateJobsAll.reduce((s,j)=>s+(j.duration||0),0)%60}m</div>
       <div style="font-size:9px;color:var(--purple);text-transform:uppercase">🔒 Private</div>
