@@ -1033,6 +1033,11 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v4"/><path d="M11 2v4"/><path d="M5 9h2M5 11h4"/></svg>
         Daily Log
       </button>
+      <div class="nav-label">Finance</div>
+      <button class="nav-item" id="nav-salaryPool" onclick="showView('salaryPool')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M2 7h12"/><path d="M5 10h2M9 10h2"/></svg>
+        Salary &amp; Pool
+      </button>
       <div class="nav-label">Admin</div>
       <button class="nav-item" id="nav-team" onclick="showView('team')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><circle cx="11" cy="7" r="2"/><path d="M1 14c0-2.8 2.2-5 5-5"/><path d="M8.5 14c0-2 1.6-3.5 3.5-3.5"/></svg>
@@ -1211,6 +1216,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="constructionView" style="display:none"></div>
       <div id="constProjectsView" style="display:none"></div>
       <div id="turnoverView" style="display:none"></div>
+      <div id="salaryPoolView" style="display:none"></div>
 
     </main>
   </div>
@@ -9907,7 +9913,8 @@ function showView(v){
     construction:'constructionView',
     constProjects:'constProjectsView',
     turnover:'turnoverView',
-    collection:'collectionView'
+    collection:'collectionView',
+    salaryPool:'salaryPoolView'
   };
 
   // Hide all views
@@ -9939,7 +9946,8 @@ function showView(v){
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
     turnover:'TurnOver Projects',
-    collection:'Collection'
+    collection:'Collection',
+    salaryPool:'Salary & Pool'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
 
@@ -9991,6 +9999,7 @@ function showView(v){
   if(v==='construction') renderConstructionView();
   if(v==='constProjects') renderConstProjectsView();
   if(v==='turnover') renderTurnoverView();
+  if(v==='salaryPool') renderSalaryPoolView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
@@ -14491,6 +14500,330 @@ async function deleteTurnoverProject(docId){
   }catch(e){
     console.error('deleteTurnoverProject error:',e);
     toast('Error deleting project');
+  }
+}
+
+// ─────────────────────────────────────────────
+// SALARY & POOL MODULE
+// ─────────────────────────────────────────────
+let salaryPoolSelectedUser = '';
+let salaryPoolEditId = null;
+
+async function renderSalaryPoolView(){
+  const el = document.getElementById('salaryPoolView');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+
+  const users = teamUsersCache.length ? teamUsersCache : await getUsers();
+  teamUsersCache = users;
+
+  if(isAdmin()){
+    renderSalaryPoolAdmin(el, users);
+  } else {
+    renderSalaryPoolUser(el);
+  }
+}
+
+async function renderSalaryPoolAdmin(el, users){
+  if(!salaryPoolSelectedUser && users.length) salaryPoolSelectedUser = users[0].uid;
+
+  const userOpts = users.map(u =>
+    `<option value="${escapeAttr(u.uid)}" ${u.uid===salaryPoolSelectedUser?'selected':''}>${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`
+  ).join('');
+
+  // Load records for selected user
+  let records = [];
+  try {
+    const snap = await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).orderBy('monthKey','desc').get();
+    snap.forEach(d => records.push({id:d.id,...d.data()}));
+  } catch(e){ console.error('salary load error:',e); }
+
+  // Compute year stats
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  let totalPaidYear = 0, totalReservesYear = 0, totalBonusesYear = 0;
+  records.forEach(r => {
+    if(r.monthKey && r.monthKey.startsWith(String(thisYear))){
+      totalPaidYear += (Number(r.baseSalary)||0) + sumBonuses(r);
+      totalReservesYear += Number(r.reserveAmount)||0;
+      totalBonusesYear += sumBonuses(r);
+    }
+  });
+
+  // Find release date
+  const selUser = users.find(u=>u.uid===salaryPoolSelectedUser);
+  const latestWithRelease = records.find(r => r.reserveReleaseDate);
+  const releaseDate = latestWithRelease ? latestWithRelease.reserveReleaseDate : '';
+
+  el.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <div class="fg" style="margin-bottom:0;min-width:260px">
+        <label>Select Team Member</label>
+        <select class="role-select" style="padding:8px 12px;font-size:13px;border-radius:8px" onchange="salaryPoolSelectedUser=this.value;renderSalaryPoolView()">
+          ${userOpts}
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:16px" onclick="openSalaryEntryModal()">+ Add Salary Entry</button>
+    </div>
+
+    <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
+      <div class="mc g"><div class="mc-lbl">Total Paid ${thisYear}</div><div class="mc-val g">${fmt(totalPaidYear)}</div></div>
+      <div class="mc b"><div class="mc-lbl">Total Reserves ${thisYear}</div><div class="mc-val b">${fmt(totalReservesYear)}</div></div>
+      <div class="mc p"><div class="mc-lbl">Total Bonuses ${thisYear}</div><div class="mc-val" style="color:var(--purple)">${fmt(totalBonusesYear)}</div></div>
+      <div class="mc a"><div class="mc-lbl">Reserve Release</div><div class="mc-val a" style="font-size:15px">${releaseDate ? escapeHtml(releaseDate) : 'Not set'}</div></div>
+    </div>
+
+    <div class="table-card">
+      <div class="toolbar" style="justify-content:space-between">
+        <div style="font-size:13px;font-weight:500">Salary Records — ${selUser ? escapeHtml(selUser.name) : ''}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Base Salary</th>
+              <th>Bonuses</th>
+              <th>Total Salary</th>
+              <th>Reserve</th>
+              <th>Total Reserve</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${buildSalaryTableRows(records, true)}</tbody>
+        </table>
+      </div>
+    </div>
+    ${releaseDate ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">Reserve release date for ${selUser?escapeHtml(selUser.name):''}: <strong style="color:var(--amber)">${escapeHtml(releaseDate)}</strong></div>` : ''}
+  `;
+}
+
+async function renderSalaryPoolUser(el){
+  let records = [];
+  try {
+    const snap = await db.collection('salaryRecords').where('uid','==',currentUser.uid).orderBy('monthKey','desc').get();
+    snap.forEach(d => records.push({id:d.id,...d.data()}));
+  } catch(e){ console.error('salary load error:',e); }
+
+  const latestWithRelease = records.find(r => r.reserveReleaseDate);
+  const releaseDate = latestWithRelease ? latestWithRelease.reserveReleaseDate : '';
+
+  el.innerHTML = `
+    <div class="table-card">
+      <div class="toolbar" style="justify-content:space-between">
+        <div style="font-size:13px;font-weight:500">My Salary Records</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Base Salary</th>
+              <th>Bonuses</th>
+              <th>Total Salary</th>
+              <th>Reserve</th>
+              <th>Total Reserve</th>
+            </tr>
+          </thead>
+          <tbody>${buildSalaryTableRows(records, false)}</tbody>
+        </table>
+      </div>
+    </div>
+    ${releaseDate ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">Reserve release date: <strong style="color:var(--amber)">${escapeHtml(releaseDate)}</strong></div>` : ''}
+  `;
+}
+
+function sumBonuses(r){
+  let s = 0;
+  for(let i=1;i<=6;i++) s += Number(r['bonus'+i+'Amount'])||0;
+  return s;
+}
+
+function buildSalaryTableRows(records, showActions){
+  if(!records.length) return `<tr><td colspan="${showActions?7:6}" style="text-align:center;padding:30px;color:var(--muted)">No salary records found</td></tr>`;
+
+  // Sort ascending for running reserve total, then reverse for display
+  const sorted = [...records].sort((a,b)=>(a.monthKey||'').localeCompare(b.monthKey||''));
+  let runningReserve = 0;
+  const withRunning = sorted.map(r => {
+    runningReserve += Number(r.reserveAmount)||0;
+    return {...r, runningReserve};
+  });
+  withRunning.reverse();
+
+  return withRunning.map(r => {
+    const bonusTotal = sumBonuses(r);
+    const totalSalary = (Number(r.baseSalary)||0) + bonusTotal;
+
+    // Bonus breakdown tooltip
+    let bonusParts = [];
+    for(let i=1;i<=6;i++){
+      const nm = r['bonus'+i+'Name'];
+      const amt = Number(r['bonus'+i+'Amount'])||0;
+      if(nm || amt) bonusParts.push(`${escapeHtml(nm||'Bonus '+i)}: ${fmt(amt)}`);
+    }
+    const bonusDisplay = bonusParts.length
+      ? `<span title="${escapeAttr(bonusParts.join('\n'))}" style="cursor:help;border-bottom:1px dotted var(--muted)">${fmt(bonusTotal)}</span><span style="font-size:10px;color:var(--muted);margin-left:4px">(${bonusParts.length})</span>`
+      : `<span class="m-muted">$0</span>`;
+
+    const monthLabel = formatMonthKey(r.monthKey);
+    const actions = showActions ? `<td>
+      <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px" onclick="openSalaryEntryModal('${r.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:11px" onclick="deleteSalaryRecord('${r.id}')">Del</button>
+    </td>` : '';
+
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(monthLabel)}</td>
+      <td class="money">${fmt(Number(r.baseSalary)||0)}</td>
+      <td>${bonusDisplay}</td>
+      <td class="money m-pos" style="font-weight:600">${fmt(totalSalary)}</td>
+      <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
+      <td class="money" style="color:var(--purple);font-weight:600">${fmt(r.runningReserve)}</td>
+      ${actions}
+    </tr>`;
+  }).join('');
+}
+
+function formatMonthKey(mk){
+  if(!mk) return '—';
+  const [y,m] = mk.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return (months[parseInt(m,10)-1]||m) + ' ' + y;
+}
+
+function openSalaryEntryModal(editId){
+  salaryPoolEditId = editId || null;
+  const isEdit = !!editId;
+
+  // Build modal HTML
+  let html = `
+<div class="overlay open" id="salaryEntryModal" onclick="if(event.target===this)closeModal('salaryEntryModal')">
+  <div class="modal" style="width:560px;max-width:96vw">
+    <div class="modal-title">
+      <span>${isEdit ? 'Edit' : 'Add'} Salary Entry</span>
+      <button class="modal-close" onclick="closeModal('salaryEntryModal')">×</button>
+    </div>
+    <div id="salaryEntryForm">
+      <div class="frow">
+        <div class="fg"><label>Pay Period (Month)</label><input type="month" id="sf_month"></div>
+        <div class="fg"><label>Base Salary ($)</label><input type="number" id="sf_base" placeholder="0" step="0.01"></div>
+      </div>
+      <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Bonuses (optional)</div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 1 Name</label><input id="sf_b1name" placeholder="e.g. Performance"></div>
+        <div class="fg"><label>Bonus 1 Amount ($)</label><input type="number" id="sf_b1amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 2 Name</label><input id="sf_b2name" placeholder=""></div>
+        <div class="fg"><label>Bonus 2 Amount ($)</label><input type="number" id="sf_b2amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 3 Name</label><input id="sf_b3name" placeholder=""></div>
+        <div class="fg"><label>Bonus 3 Amount ($)</label><input type="number" id="sf_b3amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 4 Name</label><input id="sf_b4name" placeholder=""></div>
+        <div class="fg"><label>Bonus 4 Amount ($)</label><input type="number" id="sf_b4amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 5 Name</label><input id="sf_b5name" placeholder=""></div>
+        <div class="fg"><label>Bonus 5 Amount ($)</label><input type="number" id="sf_b5amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Bonus 6 Name</label><input id="sf_b6name" placeholder=""></div>
+        <div class="fg"><label>Bonus 6 Amount ($)</label><input type="number" id="sf_b6amt" placeholder="0" step="0.01"></div>
+      </div>
+      <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Reserve Pool</div>
+      <div class="frow">
+        <div class="fg"><label>Reserve Amount ($)</label><input type="number" id="sf_reserve" placeholder="0" step="0.01"></div>
+        <div class="fg"><label>Reserve Release Date</label><input type="date" id="sf_releaseDate"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-primary" onclick="saveSalaryRecord()">${isEdit ? 'Update' : 'Save'} Entry</button>
+        <button class="btn btn-ghost" onclick="closeModal('salaryEntryModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+  // Remove existing modal if present
+  const existing = document.getElementById('salaryEntryModal');
+  if(existing) existing.remove();
+
+  document.body.insertAdjacentHTML('beforeend', html);
+
+  // If editing, load existing data
+  if(isEdit) loadSalaryEntryForEdit(editId);
+}
+
+async function loadSalaryEntryForEdit(docId){
+  try {
+    const doc = await db.collection('salaryRecords').doc(docId).get();
+    if(!doc.exists){ toast('Record not found'); return; }
+    const r = doc.data();
+    document.getElementById('sf_month').value = r.monthKey || '';
+    document.getElementById('sf_base').value = r.baseSalary || '';
+    for(let i=1;i<=6;i++){
+      document.getElementById('sf_b'+i+'name').value = r['bonus'+i+'Name'] || '';
+      document.getElementById('sf_b'+i+'amt').value = r['bonus'+i+'Amount'] || '';
+    }
+    document.getElementById('sf_reserve').value = r.reserveAmount || '';
+    document.getElementById('sf_releaseDate').value = r.reserveReleaseDate || '';
+  } catch(e){ toast('Error loading record'); }
+}
+
+async function saveSalaryRecord(){
+  if(!isAdmin()){ toast('Admin only'); return; }
+
+  const monthKey = document.getElementById('sf_month').value;
+  const baseSalary = Number(document.getElementById('sf_base').value)||0;
+
+  if(!monthKey){ toast('Please select a pay period'); return; }
+  if(!salaryPoolSelectedUser){ toast('Please select a user'); return; }
+
+  const selUser = teamUsersCache.find(u=>u.uid===salaryPoolSelectedUser);
+
+  const data = {
+    uid: salaryPoolSelectedUser,
+    userName: selUser ? selUser.name : '',
+    monthKey,
+    baseSalary,
+    reserveAmount: Number(document.getElementById('sf_reserve').value)||0,
+    reserveReleaseDate: document.getElementById('sf_releaseDate').value || ''
+  };
+
+  for(let i=1;i<=6;i++){
+    data['bonus'+i+'Name'] = document.getElementById('sf_b'+i+'name').value.trim();
+    data['bonus'+i+'Amount'] = Number(document.getElementById('sf_b'+i+'amt').value)||0;
+  }
+
+  try {
+    if(salaryPoolEditId){
+      await db.collection('salaryRecords').doc(salaryPoolEditId).update(data);
+      toast('Salary record updated');
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('salaryRecords').add(data);
+      toast('Salary record saved');
+    }
+    closeModal('salaryEntryModal');
+    renderSalaryPoolView();
+  } catch(e){
+    console.error('saveSalaryRecord error:',e);
+    toast('Error saving: '+e.message);
+  }
+}
+
+async function deleteSalaryRecord(docId){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  if(!confirm('Delete this salary record?')) return;
+  try {
+    await db.collection('salaryRecords').doc(docId).delete();
+    toast('Record deleted');
+    renderSalaryPoolView();
+  } catch(e){
+    console.error('deleteSalaryRecord error:',e);
+    toast('Error deleting record');
   }
 }
 
