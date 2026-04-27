@@ -6556,7 +6556,7 @@ function openPilotDay(day){
 
       <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔧 Work</div>
       <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        ${jobRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">No work entries</div>'}
+        ${jobRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
       </div>
       <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
         <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -6568,7 +6568,7 @@ function openPilotDay(day){
 
       <div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏸ Excuse / Break</div>
       <div id="pilotExcuseList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        ${excuseRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">No excuse entries</div>'}
+        ${excuseRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Excuse Entries</div>'}
       </div>
       <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
         <input type="text" id="pjNewExcAddr" placeholder="Reason (Doctor, Bank, Personal…)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
