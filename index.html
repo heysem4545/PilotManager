@@ -6737,9 +6737,8 @@ async function renderInnovationView(){
     <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">💡 Submit New</div>
     <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="fg"><label>Submitted By</label>
-        <select id="innUser" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-          ${users.map(u=>`<option value="${u.uid}" ${u.uid===currentUser.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
-        </select>
+        <input type="text" value="${escapeAttr(currentUser.name||currentUser.email)}" disabled style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="hidden" id="innUser" value="${currentUser.uid}">
       </div>
       <div class="fg"><label>Type</label>
         <select id="innType" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
