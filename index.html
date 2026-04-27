@@ -6383,7 +6383,8 @@ function showPilotMonthList(){
     }
 
     const thStyle='text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)';
-    const tableHead=`<thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Address / Task</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>`;
+    const workHead=`<thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Address / Task</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>`;
+    const excuseHead=`<thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Reason</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>`;
 
     const workRows=buildRows(j=>j.jobType!=='excuse','var(--blue)');
     const excuseRows=buildRows(j=>j.jobType==='excuse','var(--red)');
@@ -6402,11 +6403,11 @@ function showPilotMonthList(){
       </div>
       <div style="max-height:60vh;overflow-y:auto">
         <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;padding:8px 0">🔧 Work Entries</div>
-        <table style="width:100%;border-collapse:collapse">${tableHead}
+        <table style="width:100%;border-collapse:collapse">${workHead}
           <tbody>${workRows||'<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">No work entries</td></tr>'}</tbody>
         </table>
         ${excuseRows?`<div style="font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 8px">⏸ Excuse / Break Entries</div>
-        <table style="width:100%;border-collapse:collapse">${tableHead}
+        <table style="width:100%;border-collapse:collapse">${excuseHead}
           <tbody>${excuseRows}</tbody>
         </table>`:''}
       </div>
