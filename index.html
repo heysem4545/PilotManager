@@ -1917,6 +1917,26 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
+<!-- EDIT MAINT CATEGORIES MODAL -->
+<div class="overlay" id="maintCatModal" onclick="if(event.target===this)closeModal('maintCatModal')">
+  <div class="modal" style="width:420px">
+    <div class="modal-title">
+      <span>⚙ Edit Maintenance Categories</span>
+      <button class="modal-close" onclick="closeModal('maintCatModal')">×</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Add, remove, or rename categories. These are used when adding maintenance visits.</div>
+    <div id="maintCatList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:40vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="maintCatNew" placeholder="New category name…" style="flex:1;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addMaintCategory()">
+      <button class="btn btn-primary btn-sm" onclick="addMaintCategory()">Add</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('maintCatModal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMaintCategories()">Save Categories</button>
+    </div>
+  </div>
+</div>
+
 <!-- COLLECTION TASK MODAL -->
 <div class="overlay" id="collTaskModal" onclick="if(event.target===this)closeModal('collTaskModal')">
   <div class="modal" style="width:440px">
@@ -3878,7 +3898,59 @@ function toggleHistoryDetail(safeId){
 // Firestore: collection 'maintenance', one doc per visit:
 //   {propertyId, year, month, monthKey, type, notes, createdAt, createdBy}
 // ─────────────────────────────────────────────
-const MAINT_TYPES = ['Plumbing','Electrical','Roofing','HVAC','Pest Control','General','Other'];
+function openEditMaintCategories(){
+  const types=getMaintTypes();
+  const list=document.getElementById('maintCatList');
+  list.innerHTML='';
+  types.forEach((t,i)=>{
+    const row=document.createElement('div');
+    row.style='display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px';
+    row.innerHTML=`<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <input type="text" value="${escapeHtml(t)}" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none">
+      <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:10px;width:auto" onclick="this.parentElement.remove()">×</button>`;
+    list.appendChild(row);
+  });
+  document.getElementById('maintCatNew').value='';
+  document.getElementById('maintCatModal').classList.add('open');
+}
+
+function addMaintCategory(){
+  const input=document.getElementById('maintCatNew');
+  const text=(input.value||'').trim();
+  if(!text){toast('Type a category name');return;}
+  const list=document.getElementById('maintCatList');
+  const row=document.createElement('div');
+  row.style='display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px';
+  row.innerHTML=`<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${list.children.length+1}.</span>
+    <input type="text" value="${escapeHtml(text)}" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none">
+    <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:10px;width:auto" onclick="this.parentElement.remove()">×</button>`;
+  list.appendChild(row);
+  input.value='';
+  input.focus();
+}
+
+function saveMaintCategories(){
+  const rows=document.querySelectorAll('#maintCatList > div');
+  const cats=[];
+  rows.forEach(r=>{
+    const name=r.querySelector('input[type=text]').value.trim();
+    if(name) cats.push(name);
+  });
+  if(!cats.length){toast('Add at least one category');return;}
+  localStorage.setItem('maintCategories',JSON.stringify(cats));
+  MAINT_TYPES.length=0;
+  cats.forEach(c=>MAINT_TYPES.push(c));
+  closeModal('maintCatModal');
+  toast('Categories saved ('+cats.length+')');
+  renderMaintenanceView();
+}
+
+function getMaintTypes(){
+  const saved=localStorage.getItem('maintCategories');
+  if(saved){try{return JSON.parse(saved);}catch(e){}}
+  return ['Plumbing','Electrical','Roofing','HVAC','Pest Control','General','Other'];
+}
+const MAINT_TYPES = getMaintTypes();
 let maintenanceData = {}; // { propertyId: { 'YYYY-MM': [visit, ...] } }
 let maintenanceYear = new Date().getFullYear();
 let maintViewMode = 'tracking'; // 'tracking' or 'pest'
@@ -4018,6 +4090,7 @@ async function renderMaintenanceView(){
           <span>${totalVisits} visit${totalVisits===1?'':'s'} in ${maintenanceYear}</span>
         </div>
         ${editable?`<button class="btn btn-primary btn-sm" onclick="openQuickMaintenance()">+ Add Maintenance</button>`:''}
+        ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="openEditMaintCategories()">⚙ Edit Categories</button>`:''}
       </div>
       <div class="tbl-wrap">
         <table class="maint-tbl">${headerRow}<tbody>${body}</tbody></table>
