@@ -6345,7 +6345,8 @@ function openPilotDay(day){
     if(!snap) return;
     const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 
-    const addrOpts=properties.map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
+    const taskOpts=['Bank Deposit','Paper Delivery','Office Run','Supply Pickup','Errand'].map(t=>`<option value="${t}">`).join('')
+      + properties.map(p=>`<option value="${escapeAttr(p.addr)}">`).join('');
 
     const modal=document.createElement('div');
     modal.className='overlay open';
@@ -6356,7 +6357,7 @@ function openPilotDay(day){
       const dur=j.duration||0;
       const durDisplay=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
       return `<div class="pilot-job-row" data-id="${j.id}" style="display:grid;grid-template-columns:1fr 80px 80px 50px 1fr;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;align-items:center">
-      <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="Address" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
+      <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
       <div><input type="time" value="${j.timeStart||j.time||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" class="pj-start" onchange="calcPilotDur(this)"></div>
       <div><input type="time" value="${j.timeEnd||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" class="pj-end" onchange="calcPilotDur(this)"></div>
       <div class="pj-dur-display" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">${durDisplay}</div>
@@ -6365,18 +6366,18 @@ function openPilotDay(day){
 
     modal.innerHTML=`<div class="modal" style="width:680px">
       <div class="modal-title"><span>🔧 Pilot Work — ${MNAMES_FULL[pilotMonth]} ${day}, ${pilotYear}</span><button class="modal-close" onclick="document.getElementById('pilotDayModal').remove()">×</button></div>
-      <datalist id="pilotAddrList">${addrOpts}</datalist>
+      <datalist id="pilotAddrList">${taskOpts}</datalist>
       <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:50vh;overflow-y:auto">
         ${jobRows||'<div style="text-align:center;color:var(--muted);padding:16px">No jobs yet for this day</div>'}
       </div>
       <div style="display:grid;grid-template-columns:1fr 80px 80px 50px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center">
-        <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <input type="time" id="pjNewStart" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" onchange="calcNewPilotDur()">
         <input type="time" id="pjNewEnd" style="font-size:11px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none;width:100%;color-scheme:dark" onchange="calcNewPilotDur()">
         <div id="pjNewDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">—</div>
         <div style="display:flex;gap:4px"><input type="text" id="pjNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day})"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addPilotJob(${day})">Add</button></div>
       </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Address · Start · End · Duration · Notes</div>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Address / Task · Start · End · Duration · Notes</div>
       <div class="modal-foot">
         <button class="btn btn-ghost btn-sm" onclick="savePilotDayEdits(${day})">Save Changes</button>
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('pilotDayModal').remove()">Done</button>
