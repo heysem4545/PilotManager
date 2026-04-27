@@ -6266,17 +6266,20 @@ async function renderPilotTechView(){
 
   // Stats cards
   html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showPilotMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalJobs}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Jobs</div>
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">click to view all</div>
     </div>
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showPilotMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--blue)">${totalHrs}h ${remMins}m</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Hours</div>
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">click to view all</div>
     </div>
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showPilotMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--text)">${uniqueProps}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">click to view all</div>
     </div>
   </div>`;
 
@@ -6308,6 +6311,72 @@ async function renderPilotTechView(){
   html+=`</div>`;
 
   el.innerHTML=html;
+}
+
+function showPilotMonthList(){
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
+
+  db.collection('pilotTechWork').where('monthKey','==',mKey).get().then(snap=>{
+    const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0)||(a.timeStart||a.time||'').localeCompare(b.timeStart||b.time||''));
+
+    const totalMins=jobs.reduce((s,j)=>s+(j.duration||0),0);
+    const totalHrs=Math.floor(totalMins/60);
+    const remMins=totalMins%60;
+
+    // Group by day
+    const byDay={};
+    jobs.forEach(j=>{const d=j.day||0;if(!byDay[d])byDay[d]=[];byDay[d].push(j);});
+
+    const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    let tableRows='';
+    Object.keys(byDay).sort((a,b)=>a-b).forEach(day=>{
+      const dayJobs=byDay[day];
+      const dn=DNAMES[new Date(pilotYear,pilotMonth,day).getDay()];
+      const dayMins=dayJobs.reduce((s,j)=>s+(j.duration||0),0);
+
+      dayJobs.forEach((j,ji)=>{
+        const dur=j.duration||0;
+        tableRows+=`<tr style="${ji===0?'border-top:2px solid var(--border2)':''}">
+          ${ji===0?`<td rowspan="${dayJobs.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:9px;color:var(--blue);font-weight:500;margin-top:2px">${Math.floor(dayMins/60)}h ${dayMins%60}m</div></td>`:''}
+          <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)">${escapeHtml(j.propertyAddress||'—')}</td>
+          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeStart||j.time||'—'}</td>
+          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeEnd||'—'}</td>
+          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);color:var(--blue);font-weight:600;border-bottom:1px solid var(--border)">${dur>0?Math.floor(dur/60)+'h '+dur%60+'m':'—'}</td>
+          <td style="padding:6px 8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${escapeHtml(j.notes||'—')}</td>
+        </tr>`;
+      });
+    });
+
+    const modal=document.createElement('div');
+    modal.className='overlay open';
+    modal.id='pilotMonthModal';
+    modal.onclick=e=>{if(e.target===modal) modal.remove();};
+    modal.innerHTML=`<div class="modal" style="width:750px">
+      <div class="modal-title"><span>🔧 Pilot Work — ${MNAMES_FULL[pilotMonth]} ${pilotYear}</span><button class="modal-close" onclick="document.getElementById('pilotMonthModal').remove()">×</button></div>
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">
+        <span><strong style="color:var(--accent)">${jobs.length}</strong> jobs</span>
+        <span><strong style="color:var(--blue)">${totalHrs}h ${remMins}m</strong> total</span>
+        <span><strong style="color:var(--text)">${new Set(jobs.map(j=>j.propertyAddress).filter(Boolean)).size}</strong> locations</span>
+      </div>
+      <div style="max-height:60vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Day</th>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Address / Task</th>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Start</th>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">End</th>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Duration</th>
+            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Notes</th>
+          </tr></thead>
+          <tbody>${tableRows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No jobs this month</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('pilotMonthModal').remove()">Close</button></div>
+    </div>`;
+    document.body.appendChild(modal);
+  }).catch(e=>{toast('Error: '+e.message);});
 }
 
 function calcDurFromTimes(start,end){
