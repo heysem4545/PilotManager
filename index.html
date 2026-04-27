@@ -6349,34 +6349,44 @@ function showPilotMonthList(){
   db.collection('pilotTechWork').where('monthKey','==',mKey).get().then(snap=>{
     const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0)||(a.timeStart||a.time||'').localeCompare(b.timeStart||b.time||''));
 
-    const totalMins=jobs.reduce((s,j)=>s+(j.duration||0),0);
-    const totalHrs=Math.floor(totalMins/60);
-    const remMins=totalMins%60;
+    const workJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const excuseJobs=jobs.filter(j=>j.jobType==='excuse');
+    const workMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const excuseMins=excuseJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const workHrs=Math.floor(workMins/60), workRem=workMins%60;
+    const excHrs=Math.floor(excuseMins/60), excRem=excuseMins%60;
 
-    // Group by day
+    const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const byDay={};
     jobs.forEach(j=>{const d=j.day||0;if(!byDay[d])byDay[d]=[];byDay[d].push(j);});
 
-    const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-    let tableRows='';
-    Object.keys(byDay).sort((a,b)=>a-b).forEach(day=>{
-      const dayJobs=byDay[day];
-      const dn=DNAMES[new Date(pilotYear,pilotMonth,day).getDay()];
-      const dayMins=dayJobs.reduce((s,j)=>s+(j.duration||0),0);
-
-      dayJobs.forEach((j,ji)=>{
-        const dur=j.duration||0;
-        tableRows+=`<tr style="${ji===0?'border-top:2px solid var(--border2)':''}">
-          ${ji===0?`<td rowspan="${dayJobs.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:11px;color:var(--blue);font-weight:700;margin-top:4px;padding:3px 6px;background:var(--blue-dim);border-radius:4px;display:inline-block">${Math.floor(dayMins/60)}h ${dayMins%60}m</div></td>`:''}
-          <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)">${escapeHtml(j.propertyAddress||'—')}</td>
-          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeStart||j.time||'—'}</td>
-          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeEnd||'—'}</td>
-          <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);color:var(--blue);font-weight:600;border-bottom:1px solid var(--border)">${dur>0?Math.floor(dur/60)+'h '+dur%60+'m':'—'}</td>
-          <td style="padding:6px 8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${escapeHtml(j.notes||'—')}</td>
-        </tr>`;
+    function buildRows(filterFn, durColor){
+      let rows='';
+      Object.keys(byDay).sort((a,b)=>a-b).forEach(day=>{
+        const dayJobs=byDay[day].filter(filterFn);
+        if(!dayJobs.length) return;
+        const dn=DNAMES[new Date(pilotYear,pilotMonth,day).getDay()];
+        const dayMins=dayJobs.reduce((s,j)=>s+(j.duration||0),0);
+        dayJobs.forEach((j,ji)=>{
+          const dur=j.duration||0;
+          rows+=`<tr style="${ji===0?'border-top:2px solid var(--border2)':''}">
+            ${ji===0?`<td rowspan="${dayJobs.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:11px;color:${durColor};font-weight:700;margin-top:4px;padding:3px 6px;background:${durColor}20;border-radius:4px;display:inline-block">${Math.floor(dayMins/60)}h ${dayMins%60}m</div></td>`:''}
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)">${escapeHtml(j.propertyAddress||'—')}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeStart||j.time||'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeEnd||'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);color:${durColor};font-weight:600;border-bottom:1px solid var(--border)">${dur>0?Math.floor(dur/60)+'h '+dur%60+'m':'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${escapeHtml(j.notes||'—')}</td>
+          </tr>`;
+        });
       });
-    });
+      return rows;
+    }
+
+    const thStyle='text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)';
+    const tableHead=`<thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Address / Task</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>`;
+
+    const workRows=buildRows(j=>j.jobType!=='excuse','var(--blue)');
+    const excuseRows=buildRows(j=>j.jobType==='excuse','var(--red)');
 
     const modal=document.createElement('div');
     modal.className='overlay open';
@@ -6385,22 +6395,20 @@ function showPilotMonthList(){
     modal.innerHTML=`<div class="modal" style="width:750px">
       <div class="modal-title"><span>🔧 Pilot Work — ${MNAMES_FULL[pilotMonth]} ${pilotYear}</span><button class="modal-close" onclick="document.getElementById('pilotMonthModal').remove()">×</button></div>
       <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">
-        <span><strong style="color:var(--accent)">${jobs.length}</strong> jobs</span>
-        <span><strong style="color:var(--blue)">${totalHrs}h ${remMins}m</strong> total</span>
-        <span><strong style="color:var(--text)">${new Set(jobs.map(j=>j.propertyAddress).filter(Boolean)).size}</strong> locations</span>
+        <span><strong style="color:var(--accent)">${workJobs.length}</strong> jobs</span>
+        <span><strong style="color:var(--blue)">${workHrs}h ${workRem}m</strong> work</span>
+        ${excuseMins>0?`<span><strong style="color:var(--red)">${excHrs}h ${excRem}m</strong> excuse</span>`:''}
+        <span><strong style="color:var(--text)">${new Set(workJobs.map(j=>j.propertyAddress).filter(Boolean)).size}</strong> locations</span>
       </div>
       <div style="max-height:60vh;overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Day</th>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Address / Task</th>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Start</th>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">End</th>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Duration</th>
-            <th style="text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">Notes</th>
-          </tr></thead>
-          <tbody>${tableRows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No jobs this month</td></tr>'}</tbody>
+        <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;padding:8px 0">🔧 Work Entries</div>
+        <table style="width:100%;border-collapse:collapse">${tableHead}
+          <tbody>${workRows||'<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">No work entries</td></tr>'}</tbody>
         </table>
+        ${excuseRows?`<div style="font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 8px">⏸ Excuse / Break Entries</div>
+        <table style="width:100%;border-collapse:collapse">${tableHead}
+          <tbody>${excuseRows}</tbody>
+        </table>`:''}
       </div>
       <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('pilotMonthModal').remove()">Close</button></div>
     </div>`;
