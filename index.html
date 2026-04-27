@@ -4002,6 +4002,7 @@ async function renderMaintenanceView(){
     <button class="maint-vtab${maintViewMode==='tracking'?' active':''}" onclick="switchMaintViewMode('tracking')">Maintenance Tracking</button>
     <button class="maint-vtab${maintViewMode==='pest'?' active':''}" onclick="switchMaintViewMode('pest')">Pest Control</button>
     <button class="maint-vtab${maintViewMode==='monthlyMaint'?' active':''}" onclick="switchMaintViewMode('monthlyMaint')">Monthly Maintenance</button>
+    <button class="maint-vtab${maintViewMode==='landscape'?' active':''}" onclick="switchMaintViewMode('landscape')">🌿 Landscape</button>
   </div>`;
 
   if(maintViewMode==='pest'){
@@ -4013,6 +4014,12 @@ async function renderMaintenanceView(){
   if(maintViewMode==='monthlyMaint'){
     el.innerHTML = tabBar + `<div id="monthlyMaintContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
     await renderMonthlyMaintView();
+    return;
+  }
+
+  if(maintViewMode==='landscape'){
+    el.innerHTML = tabBar + `<div id="landscapeContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+    await renderLandscapeView();
     return;
   }
 
@@ -4041,6 +4048,7 @@ async function renderMaintenanceView(){
     .reduce((s,arr) => s + arr.length, 0);
 
   const headerRow = `<thead><tr>
+    <th style="text-align:center">🌿</th>
     <th>Property</th>
     ${MNAMES_S.map(m=>`<th>${m}</th>`).join('')}
     <th>Total</th>
@@ -4067,6 +4075,7 @@ async function renderMaintenanceView(){
       ? escapeHtml(p.addr)
       : `<span style="color:var(--muted2);font-style:italic">(no address)</span>`;
     return `<tr>
+      <td style="text-align:center"><input type="checkbox" ${p.landscape?'checked':''} style="accent-color:#4ade80;width:15px;height:15px;cursor:pointer" onchange="toggleLandscape('${p.id}',this.checked)"></td>
       <td>${addrLabel}</td>
       ${cells}
       <td><div class="maint-cell ${propTotal>0?'has-visits':'empty'}" style="cursor:default">${propTotal>0?propTotal:'—'}</div></td>
@@ -4234,6 +4243,175 @@ function getMaintSummaryRangeKeys(){
   const startKey = `${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`;
   const endKey = `${endY}-${String(endM+1).padStart(2,'0')}`;
   return {startKey, endKey};
+}
+
+async function toggleLandscape(propId, checked){
+  try{
+    await updatePropertyField(propId,'landscape',checked);
+    const p=properties.find(x=>x.id===propId);
+    if(p) p.landscape=checked;
+    toast(checked?'Added to Landscape':'Removed from Landscape');
+  }catch(e){toast('Error: '+e.message);}
+}
+
+let landscapeYear=new Date().getFullYear();
+let landscapeMonth=new Date().getMonth();
+
+async function renderLandscapeView(){
+  const el=document.getElementById('landscapeContent');
+  if(!el) return;
+
+  const MNAMES_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const landscapeProps=properties.filter(p=>p.landscape).sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const editable=canEdit();
+
+  // Load landscape data
+  const lKey=`${landscapeYear}-${String(landscapeMonth+1).padStart(2,'0')}`;
+  try{
+    const snap=await db.collection('landscapeRecords').where('monthKey','==',lKey).get();
+    window._landscapeData={};
+    snap.docs.forEach(d=>{
+      const dat={id:d.id,...d.data()};
+      if(!window._landscapeData[dat.propertyId]) window._landscapeData[dat.propertyId]=[];
+      window._landscapeData[dat.propertyId].push(dat);
+    });
+  }catch(e){console.error('loadLandscape',e);window._landscapeData={};}
+
+  // Month tabs
+  let monthTabs='<div class="month-bar" style="margin-bottom:12px">';
+  monthTabs+='<span class="month-bar-label">Month:</span>';
+  MNAMES_FULL.forEach((name,i)=>{
+    monthTabs+=`<button class="mbtn${i===landscapeMonth?' active':''}" onclick="landscapeMonth=${i};renderLandscapeView()">${name.slice(0,3)}</button>`;
+  });
+  monthTabs+='</div>';
+
+  // Stats
+  const allRecords=Object.values(window._landscapeData).flat();
+  const totalRecords=allRecords.length;
+  const totalCost=allRecords.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+  const typeCounts={};
+  allRecords.forEach(r=>{const t=r.serviceType||'Other';if(!typeCounts[t])typeCounts[t]={count:0,cost:0};typeCounts[t].count++;typeCounts[t].cost+=(parseFloat(r.cost)||0);});
+
+  let html=monthTabs;
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:#4ade80">${totalRecords}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Services</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${fmt(totalCost)}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Cost</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${landscapeProps.length}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
+    </div>
+    ${Object.entries(typeCounts).sort((a,b)=>b[1].count-a[1].count).map(([t,d])=>`
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#4ade80">${d.count}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">${escapeHtml(t)}</div>
+      <div style="font-size:10px;color:var(--red);font-family:var(--mono);margin-top:2px">${d.cost>0?fmt(d.cost):'—'}</div>
+    </div>`).join('')}
+  </div>`;
+
+  if(landscapeProps.length===0){
+    html+=`<div class="table-card"><div style="padding:40px;text-align:center;color:var(--muted)">No properties marked for landscape. Go to Maintenance Tracking and check the 🌿 column.</div></div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  // Table per property
+  html+=`<div class="table-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--muted)">${landscapeProps.length} landscape properties · ${MNAMES_FULL[landscapeMonth]} ${landscapeYear}</span>
+      ${editable?`<button class="btn btn-primary btn-sm" onclick="openAddLandscape()">+ Add Record</button>`:''}
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Address</th><th>Service Type</th><th>Date</th><th>Cost</th><th>Performed By</th><th>Notes</th>${editable?'<th></th>':''}
+        </tr></thead>
+        <tbody>`;
+
+  landscapeProps.forEach(p=>{
+    const records=(window._landscapeData[p.id]||[]).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    if(records.length===0){
+      html+=`<tr><td style="font-weight:500">${escapeHtml(p.addr)}</td><td colspan="${editable?6:5}" style="color:var(--muted2);font-size:11px">No records this month</td></tr>`;
+    } else {
+      records.forEach((r,ri)=>{
+        html+=`<tr>
+          ${ri===0?`<td rowspan="${records.length}" style="font-weight:500;vertical-align:top">${escapeHtml(p.addr)}</td>`:''}
+          <td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(74,222,128,0.12);color:#4ade80">${escapeHtml(r.serviceType||'Other')}</span></td>
+          <td style="font-size:11px;font-family:var(--mono)">${r.date||'—'}</td>
+          <td style="font-size:11px;font-family:var(--mono);color:${(parseFloat(r.cost)||0)>0?'var(--red)':'var(--muted2)'}">${(parseFloat(r.cost)||0)>0?fmt(parseFloat(r.cost)):'—'}</td>
+          <td style="font-size:11px">${escapeHtml(r.performedBy||'—')}</td>
+          <td style="font-size:11px;color:var(--muted)">${escapeHtml(r.notes||'—')}</td>
+          ${editable?`<td><button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:9px" onclick="deleteLandscapeRecord('${r.id}')">×</button></td>`:''}
+        </tr>`;
+      });
+    }
+  });
+
+  html+=`</tbody></table></div></div>`;
+  el.innerHTML=html;
+}
+
+function openAddLandscape(){
+  const landscapeProps=properties.filter(p=>p.landscape).sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const addrOpts=landscapeProps.map(p=>`<option value="${p.id}">${escapeHtml(p.addr)}</option>`).join('');
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const types=['Lawn Care','Snow Removal','Tree Trimming','Leaf Cleanup','Mulching','Irrigation','Other'];
+  const typeOpts=types.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='landscapeAddModal';
+  modal.onclick=e=>{if(e.target===modal){modal.remove();}};
+  modal.innerHTML=`<div class="modal" style="width:440px">
+    <div class="modal-title"><span>🌿 Add Landscape Record</span><button class="modal-close" onclick="document.getElementById('landscapeAddModal').remove()">×</button></div>
+    <div class="fg"><label>Property</label><select id="lsProp" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${addrOpts}</select></div>
+    <div class="fg"><label>Service Type</label><select id="lsType" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${typeOpts}</select></div>
+    <div class="fg"><label>Date</label><input type="date" id="lsDate" value="${new Date().toISOString().slice(0,10)}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark"></div>
+    <div class="fg"><label>Cost</label><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:0 12px"><span style="color:var(--muted)">$</span><input type="number" id="lsCost" placeholder="0" step="1" style="border:none;background:none;padding:9px 8px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;width:100%"></div></div>
+    <div class="fg"><label>Performed By</label><input type="text" id="lsPerformer" placeholder="Name" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+    <div class="fg"><label>Notes</label><input type="text" id="lsNotes" placeholder="Optional notes" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+    <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('landscapeAddModal').remove()">Cancel</button><button class="btn btn-primary btn-sm" onclick="saveLandscapeRecord()">Save Record</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function saveLandscapeRecord(){
+  const propId=document.getElementById('lsProp').value;
+  const prop=properties.find(p=>p.id===propId);
+  if(!prop){toast('Select a property');return;}
+  const date=document.getElementById('lsDate').value;
+  const mKey=date?date.slice(0,7):'';
+  if(!mKey){toast('Select a date');return;}
+  try{
+    await db.collection('landscapeRecords').add({
+      propertyId:propId,
+      propertyAddress:prop.addr,
+      serviceType:document.getElementById('lsType').value,
+      date,
+      monthKey:mKey,
+      cost:parseFloat(document.getElementById('lsCost').value)||0,
+      performedBy:document.getElementById('lsPerformer').value.trim(),
+      notes:document.getElementById('lsNotes').value.trim(),
+      createdAt:new Date()
+    });
+    document.getElementById('landscapeAddModal').remove();
+    toast('Landscape record added');
+    renderLandscapeView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteLandscapeRecord(id){
+  if(!confirm('Delete this record?')) return;
+  try{
+    await db.collection('landscapeRecords').doc(id).delete();
+    toast('Record deleted');
+    renderLandscapeView();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 function fmtMonthKey(k){
