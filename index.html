@@ -1007,6 +1007,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Available Units
       </button>
 
+      <button class="nav-item" id="nav-expenses" onclick="showView('expenses')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v8M6 6h4M6 10h4"/></svg>
+        Expenses
+      </button>
       <div class="nav-label">Tracking</div>
       <button class="nav-item" id="nav-utility" onclick="showView('utility')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v4l2 2"/><circle cx="8" cy="8" r="6"/></svg>
@@ -1188,6 +1192,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
       <div id="dailyLogView" style="display:none"></div>
+      <div id="expensesView" style="display:none"><div style="padding:40px;text-align:center;color:var(--muted)">Expenses section coming soon.</div></div>
       <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
@@ -9528,7 +9533,7 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', inspections:'inspectionsView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -9560,7 +9565,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', inspections:'Inspection Tracker',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
