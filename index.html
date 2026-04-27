@@ -6387,7 +6387,7 @@ function pilotTimeSelect(val, cls, onchangeFn, useId){
   let hOpts='<option value="">--</option>';
   for(let i=6;i<=22;i++) hOpts+=`<option value="${i}" ${hVal===i?'selected':''}>${i>12?(i-12)+'pm':(i===12?'12pm':i+'am')}</option>`;
   let mOpts='<option value="">--</option>';
-  [0,15,30,45].forEach(v=>mOpts+=`<option value="${v}" ${mVal===v?'selected':''}>${String(v).padStart(2,'0')}</option>`);
+  for(let i=0;i<60;i+=5) mOpts+=`<option value="${i}" ${mVal===i?'selected':''}>${String(i).padStart(2,'0')}</option>`;
   const hId=useId?`id="${cls}-h"`:'';
   const mId=useId?`id="${cls}-m"`:'';
   return `<select ${hId} class="${cls}-h" style="${ss};width:55px" onchange="${onchangeFn}">${hOpts}</select>:<select ${mId} class="${cls}-m" style="${ss};width:42px" onchange="${onchangeFn}">${mOpts}</select>`;
