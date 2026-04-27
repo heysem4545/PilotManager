@@ -8138,6 +8138,11 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       const updateData = {[field]:value, updatedAt:new Date()};
       if(field === 'task') updateData.suspiciousFlag = suspiciousFlag;
       await snap.docs[0].ref.update(updateData);
+      // Auto-log to Daily Log when task marked as done
+      if(field==='status'&&value==='done'){
+        const taskDoc=snap.docs[0].data();
+        if(taskDoc.task) autoLogToDailyLog(targetUid, taskDoc.task, day);
+      }
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -8152,6 +8157,29 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       });
     }
   }catch(e){console.error('saveTask',e);}
+}
+
+async function autoLogToDailyLog(uid, taskText, day){
+  const now=new Date();
+  const mKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const todayDay=now.getDate();
+  try{
+    // Check if already logged (avoid duplicates)
+    const existing=await db.collection('teamDailyLog')
+      .where('monthKey','==',mKey).where('day','==',todayDay)
+      .where('uid','==',uid).where('task','==',taskText)
+      .where('source','==','task-done').get();
+    if(!existing.empty) return; // already logged
+    await db.collection('teamDailyLog').add({
+      monthKey:mKey, day:todayDay, uid,
+      jobType:'work',
+      task:'✅ '+taskText,
+      timeStart:'', timeEnd:'', duration:0,
+      notes:'Auto-logged from Task Management',
+      source:'task-done',
+      createdAt:now
+    });
+  }catch(e){console.warn('autoLogToDailyLog',e);}
 }
 
 function calcStats(tasks){
@@ -8461,6 +8489,8 @@ async function saveTaskFromModal(){
         createdAt: new Date()
       });
     }
+    // Auto-log to Daily Log when task marked as done
+    if(status==='done'&&task) autoLogToDailyLog(taskUid, task, day);
     closeModal('taskEditModal');
     toast('Task saved');
     await renderTasksView();
