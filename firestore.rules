@@ -176,5 +176,15 @@ service cloud.firestore {
     match /innovation/{docId} {
       allow read, write: if request.auth != null;
     }
+
+    // Notification Rules — authenticated users can read and write.
+    match /notificationRules/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Notification Logs — authenticated users can read and write.
+    match /notificationLogs/{docId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
