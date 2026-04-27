@@ -4048,7 +4048,7 @@ async function renderMaintenanceView(){
     .reduce((s,arr) => s + arr.length, 0);
 
   const headerRow = `<thead><tr>
-    <th style="text-align:center;width:30px;padding:10px 4px">🌿</th>
+    <th style="text-align:center;width:16px;padding:4px 2px;font-size:10px">🌿</th>
     <th>Property</th>
     ${MNAMES_S.map(m=>`<th>${m}</th>`).join('')}
     <th>Total</th>
@@ -4075,7 +4075,7 @@ async function renderMaintenanceView(){
       ? escapeHtml(p.addr)
       : `<span style="color:var(--muted2);font-style:italic">(no address)</span>`;
     return `<tr>
-      <td style="text-align:center;padding:9px 4px"><input type="checkbox" ${p.landscape?'checked':''} style="accent-color:#4ade80;width:14px;height:14px;cursor:pointer" onchange="toggleLandscape('${p.id}',this.checked)"></td>
+      <td style="text-align:center;padding:4px 2px"><input type="checkbox" ${p.landscape?'checked':''} style="accent-color:#4ade80;width:12px;height:12px;cursor:pointer" onchange="toggleLandscape('${p.id}',this.checked)"></td>
       <td>${addrLabel}</td>
       ${cells}
       <td><div class="maint-cell ${propTotal>0?'has-visits':'empty'}" style="cursor:default">${propTotal>0?propTotal:'—'}</div></td>
