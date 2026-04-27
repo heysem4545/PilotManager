@@ -1016,6 +1016,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><path d="M10.5 10.5l3 3"/></svg>
         Inspection Tracker
       </button>
+      <button class="nav-item" id="nav-dailyLog" onclick="showView('dailyLog')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v4"/><path d="M11 2v4"/><path d="M5 9h2M5 11h4"/></svg>
+        Daily Log
+      </button>
       <div class="nav-label">Admin</div>
       <button class="nav-item" id="nav-team" onclick="showView('team')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><circle cx="11" cy="7" r="2"/><path d="M1 14c0-2.8 2.2-5 5-5"/><path d="M8.5 14c0-2 1.6-3.5 3.5-3.5"/></svg>
@@ -1183,6 +1187,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="availableView" style="display:none"></div>
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
+      <div id="dailyLogView" style="display:none"></div>
       <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
@@ -5455,6 +5460,12 @@ async function renderTechnicianView(){
     return;
   }
 
+  if(techTabMode==='teamLog'){
+    el.innerHTML=tabBar+`<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+    await renderTeamDailyLog();
+    return;
+  }
+
   el.innerHTML=tabBar+`<div id="techMainContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
   const techEl=document.getElementById('techMainContent');
 
@@ -6654,6 +6665,388 @@ async function savePilotDayEdits(day){
     toast('Changes saved');
     renderPilotTechView();
   }catch(e){toast('Error: '+e.message);}
+}
+
+// ─── DAILY LOG (standalone section) ───
+async function renderDailyLogView(){
+  const el=document.getElementById('dailyLogView');
+  if(!el) return;
+  el.innerHTML='<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+  await renderTeamDailyLog();
+}
+
+// ─── TEAM DAILY LOG ───
+let teamLogYear=new Date().getFullYear();
+let teamLogMonth=new Date().getMonth();
+let teamLogUser='';
+
+async function renderTeamDailyLog(){
+  const el=document.getElementById('teamLogContent');
+  if(!el) return;
+
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+  if(!teamLogUser&&users.length) teamLogUser=users[0].uid;
+
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const editable=canEdit();
+  const selectedUser=users.find(u=>u.uid===teamLogUser);
+  const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
+
+  // User selector + month nav
+  const userOpts=users.map(u=>`<option value="${u.uid}" ${u.uid===teamLogUser?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('');
+
+  let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <select onchange="teamLogUser=this.value;renderTeamDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>
+    <button class="btn btn-ghost btn-sm" onclick="teamLogMonth--;if(teamLogMonth<0){teamLogMonth=11;teamLogYear--;}renderTeamDailyLog()">‹</button>
+    <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[teamLogMonth]} ${teamLogYear}</span>
+    <button class="btn btn-ghost btn-sm" onclick="teamLogMonth++;if(teamLogMonth>11){teamLogMonth=0;teamLogYear++;}renderTeamDailyLog()">›</button>
+  </div>`;
+
+  // Load data
+  const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  let logJobs=[];
+  try{
+    const snap=await db.collection('teamDailyLog').where('monthKey','==',mKey).where('uid','==',teamLogUser).get();
+    logJobs=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error('loadTeamLog',e);}
+
+  // Load day statuses
+  let dayStatuses={};
+  try{
+    const sSnap=await db.collection('teamLogDayStatus').where('monthKey','==',mKey).where('uid','==',teamLogUser).get();
+    sSnap.docs.forEach(d=>{const dat=d.data();dayStatuses[dat.day]=dat.status||'';});
+  }catch(e){}
+
+  const jobsByDay={};
+  logJobs.forEach(j=>{const d=j.day||1;if(!jobsByDay[d])jobsByDay[d]=[];jobsByDay[d].push(j);});
+
+  // Stats
+  const workJobs=logJobs.filter(j=>j.jobType!=='excuse');
+  const excuseJobsAll=logJobs.filter(j=>j.jobType==='excuse');
+  const totalJobs=workJobs.length;
+  const workMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
+  const excMins=excuseJobsAll.reduce((s,j)=>s+(j.duration||0),0);
+  const workHrs=Math.floor(workMins/60),workRem=workMins%60;
+  const excHrs=Math.floor(excMins/60),excRem=excMins%60;
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
+      <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalJobs}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Tasks</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
+      <div style="font-size:22px;font-weight:700;color:var(--blue)">${workHrs}h ${workRem}m</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Work Hours</div>
+    </div>
+    ${excMins>0?`<div style="background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${excHrs}h ${excRem}m</div>
+      <div style="font-size:9px;color:var(--red);text-transform:uppercase">Excuse Hours</div>
+    </div>`:''}
+  </div>`;
+
+  // Calendar
+  const daysInMonth=new Date(teamLogYear,teamLogMonth+1,0).getDate();
+  const firstDow=new Date(teamLogYear,teamLogMonth,1).getDay();
+  const today=new Date();
+  const isCurrentMonth=today.getFullYear()===teamLogYear&&today.getMonth()===teamLogMonth;
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px">`;
+  DNAMES.forEach(d=>{html+=`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px">${d}</div>`;});
+  for(let i=0;i<firstDow;i++) html+=`<div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dayJobs=jobsByDay[d]||[];
+    const hasJobs=dayJobs.length>0;
+    const isToday=isCurrentMonth&&d===today.getDate();
+    const wJobs=dayJobs.filter(j=>j.jobType!=='excuse');
+    const eJobs=dayJobs.filter(j=>j.jobType==='excuse');
+    const wMins=wJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const eMins=eJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const ds=dayStatuses[d]||'';
+    const statusColors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
+    const sBg=ds?statusColors[ds]||'var(--muted)':'';
+    const isSunday=new Date(teamLogYear,teamLogMonth,d).getDay()===0;
+    const sundayWorked=isSunday&&wJobs.length>0;
+    const border=ds?sBg:sundayWorked?'#f5c96a':isToday?'var(--accent)':hasJobs?'rgba(74,222,128,0.3)':'var(--border)';
+
+    html+=`<div style="background:${sundayWorked?'rgba(245,201,106,0.08)':ds?sBg+'10':'var(--surface)'};border:${sundayWorked?'2px':'1px'} solid ${border};border-radius:8px;padding:8px;min-height:80px;cursor:pointer;transition:opacity .12s" onclick="openTeamLogDay(${d})" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}${sundayWorked?' ⭐':''}</span>
+        ${ds?`<span style="font-size:8px;padding:1px 5px;border-radius:3px;background:${sBg}20;color:${sBg};font-weight:600">${ds}</span>`
+        :hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${sundayWorked?'rgba(245,201,106,0.15)':'rgba(74,222,128,0.12)'};color:${sundayWorked?'#f5c96a':'#4ade80'}">${wJobs.length} task${wJobs.length>1?'s':''}</span>`:''}
+      </div>
+      ${ds&&!hasJobs?`<div style="display:flex;align-items:center;justify-content:center;height:40px;font-size:11px;color:${sBg};font-weight:500">${ds}</div>`
+      :hasJobs?wJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.task||'').substring(0,30))} · ${j.duration||0}m</div>`).join('')
+        +(wJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${wJobs.length-3} more</div>`:'')
+        +`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(wMins/60)}h ${wMins%60}m</div>`
+        +(eMins>0?`<div style="font-size:8px;color:var(--red);margin-top:1px">⏸ ${Math.floor(eMins/60)}h ${eMins%60}m</div>`:'')
+      :`<div style="display:flex;align-items:center;justify-content:center;height:50px;color:var(--muted2);font-size:18px">+</div>`}
+    </div>`;
+  }
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function openTeamLogDay(day){
+  const existing=document.getElementById('teamLogDayModal');
+  if(existing) existing.remove();
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  const editable=canEdit();
+  const selectedUser=teamUsersCache.find(u=>u.uid===teamLogUser);
+  const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
+
+  db.collection('teamDailyLog').where('monthKey','==',mKey).where('day','==',day).where('uid','==',teamLogUser).get().catch(e=>{toast('Error: '+e.message);}).then(snap=>{
+    if(!snap) return;
+    const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.timeStart||'').localeCompare(b.timeStart||''));
+    const workJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const excuseJobs=jobs.filter(j=>j.jobType==='excuse');
+    const wMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const eMins=excuseJobs.reduce((s,j)=>s+(j.duration||0),0);
+
+    // Day status
+    const ds=window._teamLogDayStatuses?.[day]||'';
+
+    function buildRow(j,isExcuse){
+      const dur=j.duration||0;
+      const durDisplay=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
+      const bc=isExcuse?'rgba(245,112,106,0.3)':'var(--border2)';
+      const bg=isExcuse?'rgba(245,112,106,0.05)':'var(--surface2)';
+      const dc=isExcuse?'var(--red)':'var(--blue)';
+      return `<div class="tl-job-row" data-id="${j.id}" data-type="${isExcuse?'excuse':'work'}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:${bg};border:1px solid ${bc};border-radius:6px;align-items:center">
+        <div><input type="text" value="${escapeAttr(j.task||j.propertyAddress||'')}" placeholder="${isExcuse?'Reason…':'Task or activity…'}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="tl-task"></div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||'','tl-start','calcTeamLogDur(this)')}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','tl-end','calcTeamLogDur(this)')}</div>
+        <div class="tl-dur-display" style="font-size:10px;font-family:var(--mono);color:${dc};text-align:center;font-weight:600">${durDisplay}</div>
+        <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="tl-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deleteTeamLogEntry('${j.id}',${day})">×</button></div>
+      </div>`;
+    }
+
+    const modal=document.createElement('div');
+    modal.className='overlay open';
+    modal.id='teamLogDayModal';
+    modal.onclick=e=>{if(e.target===modal) modal.remove();};
+    modal.innerHTML=`<div class="modal" style="width:700px">
+      <div class="modal-title"><span>👤 ${escapeHtml(userName)} — ${MNAMES_FULL[teamLogMonth]} ${day}, ${teamLogYear}</span><button class="modal-close" onclick="document.getElementById('teamLogDayModal').remove()">×</button></div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted);padding:5px 0">Day Status:</span>
+        ${['','Sick','Day Off','Excused','Holiday','Half Day'].map(s=>{
+          const active=ds===s;
+          const colors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
+          const col=colors[s]||'var(--muted)';
+          const label=s||'Working';
+          return `<button style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid ${active?col:'var(--border2)'};background:${active?col+'20':'var(--surface2)'};color:${active?col:'var(--muted)'};font-family:var(--font)" onclick="setTeamLogDayStatus(${day},'${s}')">${label}</button>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--blue)">🔧 Work: ${Math.floor(wMins/60)}h ${wMins%60}m</div>
+        ${eMins>0?`<div style="font-size:12px;font-weight:600;color:var(--red)">⏸ Excuse: ${Math.floor(eMins/60)}h ${eMins%60}m</div>`:''}
+      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔧 Work</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${workJobs.map(j=>buildRow(j,false)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
+        <input type="text" id="tlNewTask" placeholder="Task or activity…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNew-start','calcNewTeamLogDur()',true)}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNew-end','calcNewTeamLogDur()',true)}</div>
+        <div id="tlNewDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">—</div>
+        <div style="display:flex;gap:4px"><input type="text" id="tlNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'work')"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addTeamLogEntry(${day},'work')">Add</button></div>
+      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏸ Excuse / Break</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${excuseJobs.map(j=>buildRow(j,true)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Excuse Entries</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
+        <input type="text" id="tlNewExcTask" placeholder="Reason…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewExc-start','calcNewTeamLogExcDur()',true)}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewExc-end','calcNewTeamLogExcDur()',true)}</div>
+        <div id="tlNewExcDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--red);text-align:center;font-weight:600">—</div>
+        <div style="display:flex;gap:4px"><input type="text" id="tlNewExcNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'excuse')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--red);border-color:rgba(245,112,106,0.3)" onclick="addTeamLogEntry(${day},'excuse')">Add</button></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Task · Start · End · Duration · Notes</div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost btn-sm" onclick="saveTeamLogEdits(${day})">Save Changes</button>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('teamLogDayModal').remove()">Done</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+
+    // Store day statuses for the status buttons
+    window._teamLogDayStatuses=window._teamLogDayStatuses||{};
+    window._teamLogDayStatuses[day]=ds;
+  });
+
+  // Load day statuses
+  db.collection('teamLogDayStatus').where('monthKey','==',mKey).where('uid','==',teamLogUser).get().then(snap=>{
+    window._teamLogDayStatuses={};
+    snap.docs.forEach(d=>{const dat=d.data();window._teamLogDayStatuses[dat.day]=dat.status||'';});
+  }).catch(()=>{});
+}
+
+function calcTeamLogDur(el){
+  const row=el.closest('.tl-job-row');
+  const start=getPilotTime(row,'tl-start');
+  const end=getPilotTime(row,'tl-end');
+  const dur=calcDurFromTimes(start,end);
+  row.querySelector('.tl-dur-display').textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
+}
+
+function calcNewTeamLogDur(){
+  const h1=document.getElementById('tlNew-start-h'),m1=document.getElementById('tlNew-start-m');
+  const h2=document.getElementById('tlNew-end-h'),m2=document.getElementById('tlNew-end-m');
+  const s=h1&&h1.value!==''&&m1&&m1.value!==''?h1.value.padStart(2,'0')+':'+m1.value.padStart(2,'0'):'';
+  const e=h2&&h2.value!==''&&m2&&m2.value!==''?h2.value.padStart(2,'0')+':'+m2.value.padStart(2,'0'):'';
+  const el=document.getElementById('tlNewDurDisplay');
+  if(el) el.textContent=calcDurFromTimes(s,e)>0?`${Math.floor(calcDurFromTimes(s,e)/60)}h ${calcDurFromTimes(s,e)%60}m`:'—';
+}
+
+function calcNewTeamLogExcDur(){
+  const h1=document.getElementById('tlNewExc-start-h'),m1=document.getElementById('tlNewExc-start-m');
+  const h2=document.getElementById('tlNewExc-end-h'),m2=document.getElementById('tlNewExc-end-m');
+  const s=h1&&h1.value!==''&&m1&&m1.value!==''?h1.value.padStart(2,'0')+':'+m1.value.padStart(2,'0'):'';
+  const e=h2&&h2.value!==''&&m2&&m2.value!==''?h2.value.padStart(2,'0')+':'+m2.value.padStart(2,'0'):'';
+  const el=document.getElementById('tlNewExcDurDisplay');
+  if(el) el.textContent=calcDurFromTimes(s,e)>0?`${Math.floor(calcDurFromTimes(s,e)/60)}h ${calcDurFromTimes(s,e)%60}m`:'—';
+}
+
+async function addTeamLogEntry(day, jobType){
+  const isExcuse=jobType==='excuse';
+  const taskEl=document.getElementById(isExcuse?'tlNewExcTask':'tlNewTask');
+  const task=taskEl?taskEl.value.trim():'';
+  if(!task){toast(isExcuse?'Enter a reason':'Enter a task');return;}
+  const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  const prefix=isExcuse?'tlNewExc':'tlNew';
+  const hS=document.getElementById(prefix+'-start-h'),mS=document.getElementById(prefix+'-start-m');
+  const hE=document.getElementById(prefix+'-end-h'),mE=document.getElementById(prefix+'-end-m');
+  const timeStart=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';
+  const timeEnd=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';
+  const notesEl=document.getElementById(isExcuse?'tlNewExcNotes':'tlNewNotes');
+  try{
+    await db.collection('teamDailyLog').add({
+      monthKey:mKey, day, uid:teamLogUser,
+      jobType:jobType||'work',
+      task, timeStart, timeEnd,
+      duration:calcDurFromTimes(timeStart,timeEnd),
+      notes:notesEl?notesEl.value.trim():'',
+      createdAt:new Date()
+    });
+    document.getElementById('teamLogDayModal').remove();
+    toast('Entry added');
+    renderTeamDailyLog();
+    openTeamLogDay(day);
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteTeamLogEntry(id, day){
+  if(!confirm('Delete this entry?')) return;
+  try{
+    await db.collection('teamDailyLog').doc(id).delete();
+    document.getElementById('teamLogDayModal').remove();
+    toast('Entry deleted');
+    renderTeamDailyLog();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function saveTeamLogEdits(day){
+  const rows=document.querySelectorAll('.tl-job-row');
+  try{
+    for(const row of rows){
+      const id=row.dataset.id;
+      const start=getPilotTime(row,'tl-start');
+      const end=getPilotTime(row,'tl-end');
+      await db.collection('teamDailyLog').doc(id).update({
+        task:row.querySelector('.tl-task').value.trim(),
+        timeStart:start, timeEnd:end,
+        duration:calcDurFromTimes(start,end),
+        notes:row.querySelector('.tl-notes').value.trim(),
+        updatedAt:new Date()
+      });
+    }
+    document.getElementById('teamLogDayModal').remove();
+    toast('Changes saved');
+    renderTeamDailyLog();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function setTeamLogDayStatus(day, status){
+  const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  try{
+    const snap=await db.collection('teamLogDayStatus').where('monthKey','==',mKey).where('day','==',day).where('uid','==',teamLogUser).get();
+    if(!snap.empty){
+      await snap.docs[0].ref.update({status});
+    } else {
+      await db.collection('teamLogDayStatus').add({monthKey:mKey, day, uid:teamLogUser, status, createdAt:new Date()});
+    }
+    document.getElementById('teamLogDayModal').remove();
+    toast(status?'Day marked as '+status:'Day status cleared');
+    renderTeamDailyLog();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+function showTeamLogMonthList(){
+  const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  const selectedUser=teamUsersCache.find(u=>u.uid===teamLogUser);
+  const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
+
+  db.collection('teamDailyLog').where('monthKey','==',mKey).where('uid','==',teamLogUser).get().then(snap=>{
+    const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0));
+    const wJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const eJobs=jobs.filter(j=>j.jobType==='excuse');
+    const wMins=wJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const eMins=eJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const thStyle='text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)';
+
+    function buildSection(list, label, durColor){
+      const byDay={};
+      list.forEach(j=>{const d=j.day||0;if(!byDay[d])byDay[d]=[];byDay[d].push(j);});
+      let rows='';
+      Object.keys(byDay).sort((a,b)=>a-b).forEach(day=>{
+        const dj=byDay[day];
+        const dn=DNAMES[new Date(teamLogYear,teamLogMonth,day).getDay()];
+        const dm=dj.reduce((s,j)=>s+(j.duration||0),0);
+        dj.forEach((j,ji)=>{
+          rows+=`<tr style="${ji===0?'border-top:2px solid var(--border2)':''}">
+            ${ji===0?`<td rowspan="${dj.length}" style="vertical-align:top;padding:8px;font-weight:600;color:var(--accent);white-space:nowrap;border-bottom:1px solid var(--border)">${dn} ${day}<div style="font-size:11px;color:${durColor};font-weight:700;margin-top:4px;padding:3px 6px;background:${durColor}20;border-radius:4px;display:inline-block">${Math.floor(dm/60)}h ${dm%60}m</div></td>`:''}
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)">${escapeHtml(j.task||j.propertyAddress||'—')}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeStart||'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);border-bottom:1px solid var(--border)">${j.timeEnd||'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;font-family:var(--mono);color:${durColor};font-weight:600;border-bottom:1px solid var(--border)">${(j.duration||0)>0?Math.floor(j.duration/60)+'h '+j.duration%60+'m':'—'}</td>
+            <td style="padding:6px 8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${escapeHtml(j.notes||'—')}</td>
+          </tr>`;
+        });
+      });
+      return rows;
+    }
+
+    const modal=document.createElement('div');
+    modal.className='overlay open';
+    modal.id='teamLogMonthModal';
+    modal.onclick=e=>{if(e.target===modal) modal.remove();};
+    modal.innerHTML=`<div class="modal" style="width:750px">
+      <div class="modal-title"><span>👤 ${escapeHtml(userName)} — ${MNAMES_FULL[teamLogMonth]} ${teamLogYear}</span><button class="modal-close" onclick="document.getElementById('teamLogMonthModal').remove()">×</button></div>
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">
+        <span><strong style="color:var(--accent)">${wJobs.length}</strong> tasks</span>
+        <span><strong style="color:var(--blue)">${Math.floor(wMins/60)}h ${wMins%60}m</strong> work</span>
+        ${eMins>0?`<span><strong style="color:var(--red)">${Math.floor(eMins/60)}h ${eMins%60}m</strong> excuse</span>`:''}
+      </div>
+      <div style="max-height:60vh;overflow-y:auto">
+        <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;padding:8px 0">🔧 Work</div>
+        <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Task</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>
+          <tbody>${buildSection(wJobs,'Work','var(--blue)')||'<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">No entries</td></tr>'}</tbody>
+        </table>
+        ${eJobs.length?`<div style="font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 8px">⏸ Excuse</div>
+        <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Reason</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>
+          <tbody>${buildSection(eJobs,'Excuse','var(--red)')}</tbody>
+        </table>`:''}
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('teamLogMonthModal').remove()">Close</button></div>
+    </div>`;
+    document.body.appendChild(modal);
+  }).catch(e=>{toast('Error: '+e.message);});
 }
 
 let tlTab='active'; // 'active' or 'archived'
@@ -9057,7 +9450,7 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', tenantLease:'tenantLeaseView', inspections:'inspectionsView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -9089,7 +9482,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', tenantLease:'Tenant & Lease', inspections:'Inspection Tracker',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
@@ -9132,6 +9525,7 @@ function showView(v){
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
+  if(v==='dailyLog') renderDailyLogView();
   if(v==='utility') renderUtilityView();
   if(v==='meetings') renderMeetingsView();
   if(v==='callLog') renderCallLogView();

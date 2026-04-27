@@ -161,5 +161,15 @@ service cloud.firestore {
     match /pilotDayStatus/{docId} {
       allow read, write: if request.auth != null;
     }
+
+    // Team Daily Log — authenticated users can read and write.
+    match /teamDailyLog/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Team Log Day Status — authenticated users can read and write.
+    match /teamLogDayStatus/{docId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
