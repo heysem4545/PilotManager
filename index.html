@@ -1007,6 +1007,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Available Units
       </button>
 
+      <button class="nav-item" id="nav-innovation" onclick="showView('innovation')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v2M12.5 3.5l-1.4 1.4M15 8h-2M12.5 12.5l-1.4-1.4M8 15v-2M3.5 12.5l1.4-1.4M1 8h2M3.5 3.5l1.4 1.4"/><circle cx="8" cy="8" r="3"/></svg>
+        Innovation
+      </button>
       <button class="nav-item" id="nav-expenses" onclick="showView('expenses')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v8M6 6h4M6 10h4"/></svg>
         Expenses
@@ -1193,6 +1197,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="tenantsView" style="display:none"></div>
       <div id="dailyLogView" style="display:none"></div>
       <div id="expensesView" style="display:none"><div style="padding:40px;text-align:center;color:var(--muted)">Expenses section coming soon.</div></div>
+      <div id="innovationView" style="display:none"></div>
       <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
@@ -6672,6 +6677,175 @@ async function savePilotDayEdits(day){
   }catch(e){toast('Error: '+e.message);}
 }
 
+// ─── INNOVATION ───
+async function renderInnovationView(){
+  const el=document.getElementById('innovationView');
+  if(!el) return;
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+
+  let items=[];
+  try{
+    const snap=await db.collection('innovation').orderBy('createdAt','desc').get();
+    items=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    // If index not ready, try without orderBy
+    try{
+      const snap=await db.collection('innovation').get();
+      items=snap.docs.map(d=>({id:d.id,...d.data()}));
+      items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    }catch(e2){console.error('loadInnovation',e2);}
+  }
+
+  const admin=isAdmin();
+  const userOpts=users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+
+  // Stats
+  const bugs=items.filter(i=>i.type==='Bug').length;
+  const ideas=items.filter(i=>i.type==='New Idea').length;
+  const done=items.filter(i=>i.status==='Done').length;
+  const prog=items.filter(i=>i.status==='Progressing').length;
+  const open=items.filter(i=>!i.status||i.status==='Open').length;
+
+  let html=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${items.length}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${bugs}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Bugs</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--accent)">${ideas}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">New Ideas</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:#4ade80">${done}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Done</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--amber)">${prog}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">In Progress</div>
+    </div>
+  </div>`;
+
+  // Add form
+  html+=`<div class="table-card" style="margin-bottom:16px">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">💡 Submit New</div>
+    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="fg"><label>Submitted By</label>
+        <select id="innUser" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          ${users.map(u=>`<option value="${u.uid}" ${u.uid===currentUser.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label>Type</label>
+        <select id="innType" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="Bug">🐛 Bug</option>
+          <option value="New Idea">💡 New Idea</option>
+        </select>
+      </div>
+      <div class="fg"><label>Urgent Level</label>
+        <select id="innUrgent" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="Low">🟢 Low</option>
+          <option value="Medium" selected>🟡 Medium</option>
+          <option value="High">🔴 High</option>
+          <option value="Critical">🚨 Critical</option>
+        </select>
+      </div>
+      <div class="fg"><label>Date</label>
+        <input type="date" id="innDate" value="${new Date().toISOString().slice(0,10)}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
+      </div>
+      <div class="fg" style="grid-column:1/-1"><label>Description</label>
+        <textarea id="innDesc" rows="3" placeholder="Describe the bug or idea in detail…" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div style="padding:0 16px 16px;text-align:right">
+      <button class="btn btn-primary btn-sm" onclick="submitInnovation()">Submit</button>
+    </div>
+  </div>`;
+
+  // Table
+  const is='font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font)';
+  const rows=items.map(item=>{
+    const u=users.find(x=>x.uid===item.uid);
+    const uName=u?(u.name||u.email):'Unknown';
+    const typeBadge=item.type==='Bug'?'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--red-dim);color:var(--red)">🐛 Bug</span>'
+      :'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent)">💡 Idea</span>';
+    const urgentColors={'Low':'var(--accent)','Medium':'var(--amber)','High':'var(--red)','Critical':'var(--red)'};
+    const urgentBg={'Low':'var(--accent-dim)','Medium':'var(--amber-dim)','High':'var(--red-dim)','Critical':'var(--red)'};
+    const urgentText=item.urgentLevel==='Critical'?'#fff':urgentColors[item.urgentLevel]||'var(--muted)';
+    const urgentBadge=`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${urgentBg[item.urgentLevel]||'var(--surface3)'};color:${urgentText}">${item.urgentLevel||'—'}</span>`;
+    const statusOpts=['Open','Progressing','Work Together','Hard to Do','Done'].map(s=>`<option value="${s}" ${item.status===s?'selected':''}>${s}</option>`).join('');
+    const statusColors={'Done':'#4ade80','Progressing':'var(--amber)','Work Together':'var(--blue)','Hard to Do':'var(--red)','Open':'var(--muted)'};
+    const stColor=statusColors[item.status]||'var(--muted)';
+    return `<tr>
+      <td style="font-size:11px;font-family:var(--mono)">${item.date||'—'}</td>
+      <td style="font-size:11px">${escapeHtml(uName)}</td>
+      <td>${typeBadge}</td>
+      <td>${urgentBadge}</td>
+      <td style="font-size:11px;max-width:250px;white-space:normal;line-height:1.4">${escapeHtml(item.description||'—')}</td>
+      <td>${admin?`<select style="${is};cursor:pointer;color:${stColor}" onchange="updateInnovationField('${item.id}','status',this.value)">${statusOpts}</select>`:`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${stColor}20;color:${stColor};font-weight:600">${item.status||'Open'}</span>`}</td>
+      <td>${admin?`<input type="text" value="${escapeAttr(item.adminComment||'')}" placeholder="Admin comment…" style="${is};width:150px" onblur="updateInnovationField('${item.id}','adminComment',this.value)">`:`<span style="font-size:11px;color:var(--muted)">${escapeHtml(item.adminComment||'—')}</span>`}</td>
+      ${admin?`<td style="text-align:center"><button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:9px" onclick="deleteInnovation('${item.id}')">×</button></td>`:''}
+    </tr>`;
+  }).join('');
+
+  html+=`<div class="table-card">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">${items.length} item${items.length!==1?'s':''}</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>User</th><th>Type</th><th>Urgent</th><th>Description</th><th>Status</th><th>Admin Comment</th>${admin?'<th></th>':''}
+        </tr></thead>
+        <tbody>${rows||'<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--muted)">No items yet</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  el.innerHTML=html;
+}
+
+async function submitInnovation(){
+  const uid=document.getElementById('innUser').value;
+  const type=document.getElementById('innType').value;
+  const urgentLevel=document.getElementById('innUrgent').value;
+  const date=document.getElementById('innDate').value;
+  const description=document.getElementById('innDesc').value.trim();
+  if(!description){toast('Please enter a description');return;}
+  const u=teamUsersCache.find(x=>x.uid===uid);
+  try{
+    await db.collection('innovation').add({
+      uid, userName:u?(u.name||u.email):'',
+      type, urgentLevel, date, description,
+      status:'Open', adminComment:'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Submitted!');
+    renderInnovationView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function updateInnovationField(id, field, value){
+  if(!isAdmin()){toast('Admin only');return;}
+  try{
+    await db.collection('innovation').doc(id).update({[field]:value, updatedAt:new Date()});
+    renderInnovationView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteInnovation(id){
+  if(!isAdmin()){toast('Admin only');return;}
+  if(!confirm('Delete this item?')) return;
+  try{
+    await db.collection('innovation').doc(id).delete();
+    toast('Deleted');
+    renderInnovationView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
 // ─── DAILY LOG (standalone section) ───
 async function renderDailyLogView(){
   const el=document.getElementById('dailyLogView');
@@ -9533,7 +9707,7 @@ function showView(v){
     team:'teamView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', inspections:'inspectionsView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', innovation:'innovationView', inspections:'inspectionsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -9565,7 +9739,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', inspections:'Inspection Tracker',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', innovation:'Innovation', inspections:'Inspection Tracker',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
@@ -9609,6 +9783,7 @@ function showView(v){
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
   if(v==='dailyLog') renderDailyLogView();
+  if(v==='innovation') renderInnovationView();
   if(v==='utility') renderUtilityView();
   if(v==='meetings') renderMeetingsView();
   if(v==='callLog') renderCallLogView();

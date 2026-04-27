@@ -171,5 +171,10 @@ service cloud.firestore {
     match /teamLogDayStatus/{docId} {
       allow read, write: if request.auth != null;
     }
+
+    // Innovation — authenticated users can read and write.
+    match /innovation/{docId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
