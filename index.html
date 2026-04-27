@@ -6720,12 +6720,17 @@ async function renderTeamDailyLog(){
     sSnap.docs.forEach(d=>{const dat=d.data();dayStatuses[dat.day]=dat.status||'';});
   }catch(e){}
 
+  // Filter private entries for non-admin
+  const canSeePrivate=isAdmin()||isOwnLog;
+  const visibleJobs=canSeePrivate?logJobs:logJobs.filter(j=>j.jobType!=='private');
+
   const jobsByDay={};
-  logJobs.forEach(j=>{const d=j.day||1;if(!jobsByDay[d])jobsByDay[d]=[];jobsByDay[d].push(j);});
+  visibleJobs.forEach(j=>{const d=j.day||1;if(!jobsByDay[d])jobsByDay[d]=[];jobsByDay[d].push(j);});
 
   // Stats
-  const workJobs=logJobs.filter(j=>j.jobType!=='excuse');
-  const excuseJobsAll=logJobs.filter(j=>j.jobType==='excuse');
+  const workJobs=visibleJobs.filter(j=>j.jobType!=='excuse'&&j.jobType!=='private');
+  const excuseJobsAll=visibleJobs.filter(j=>j.jobType==='excuse');
+  const privateJobsAll=canSeePrivate?visibleJobs.filter(j=>j.jobType==='private'):[];
   const totalJobs=workJobs.length;
   const workMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
   const excMins=excuseJobsAll.reduce((s,j)=>s+(j.duration||0),0);
@@ -6744,6 +6749,10 @@ async function renderTeamDailyLog(){
     ${excMins>0?`<div style="background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
       <div style="font-size:22px;font-weight:700;color:var(--red)">${excHrs}h ${excRem}m</div>
       <div style="font-size:9px;color:var(--red);text-transform:uppercase">Excuse Hours</div>
+    </div>`:''}
+    ${canSeePrivate&&privateJobsAll.length>0?`<div style="background:rgba(176,106,245,0.06);border:1px solid rgba(176,106,245,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showTeamLogMonthList()">
+      <div style="font-size:22px;font-weight:700;color:var(--purple)">${Math.floor(privateJobsAll.reduce((s,j)=>s+(j.duration||0),0)/60)}h ${privateJobsAll.reduce((s,j)=>s+(j.duration||0),0)%60}m</div>
+      <div style="font-size:9px;color:var(--purple);text-transform:uppercase">🔒 Private</div>
     </div>`:''}
   </div>`;
 
@@ -6801,23 +6810,30 @@ function openTeamLogDay(day){
 
   db.collection('teamDailyLog').where('monthKey','==',mKey).where('day','==',day).where('uid','==',teamLogUser).get().catch(e=>{toast('Error: '+e.message);}).then(snap=>{
     if(!snap) return;
-    const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.timeStart||'').localeCompare(b.timeStart||''));
-    const workJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const allJobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.timeStart||'').localeCompare(b.timeStart||''));
+    // Filter private entries - only admin and the user themselves can see
+    const canSeePrivate=isAdmin()||isOwnLog;
+    const jobs=canSeePrivate?allJobs:allJobs.filter(j=>j.jobType!=='private');
+    const workJobs=jobs.filter(j=>j.jobType!=='excuse'&&j.jobType!=='private');
     const excuseJobs=jobs.filter(j=>j.jobType==='excuse');
+    const privateJobs=canSeePrivate?jobs.filter(j=>j.jobType==='private'):[];
     const wMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
     const eMins=excuseJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const pMins=privateJobs.reduce((s,j)=>s+(j.duration||0),0);
 
     // Day status
     const ds=window._teamLogDayStatuses?.[day]||'';
 
-    function buildRow(j,isExcuse){
+    function buildRow(j,rowType){
+      const isExcuse=rowType==='excuse';
+      const isPrivate=rowType==='private';
       const dur=j.duration||0;
       const durDisplay=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
-      const bc=isExcuse?'rgba(245,112,106,0.3)':'var(--border2)';
-      const bg=isExcuse?'rgba(245,112,106,0.05)':'var(--surface2)';
-      const dc=isExcuse?'var(--red)':'var(--blue)';
+      const bc=isExcuse?'rgba(245,112,106,0.3)':isPrivate?'rgba(176,106,245,0.3)':'var(--border2)';
+      const bg=isExcuse?'rgba(245,112,106,0.05)':isPrivate?'rgba(176,106,245,0.05)':'var(--surface2)';
+      const dc=isExcuse?'var(--red)':isPrivate?'var(--purple)':'var(--blue)';
       const dis=editable?'':'disabled';
-      return `<div class="tl-job-row" data-id="${j.id}" data-type="${isExcuse?'excuse':'work'}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:${bg};border:1px solid ${bc};border-radius:6px;align-items:center">
+      return `<div class="tl-job-row" data-id="${j.id}" data-type="${rowType}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:${bg};border:1px solid ${bc};border-radius:6px;align-items:center">
         <div><input type="text" value="${escapeAttr(j.task||j.propertyAddress||'')}" ${dis} placeholder="${isExcuse?'Reason…':'Task or activity…'}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="tl-task"></div>
         ${editable?`<div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||'','tl-start','calcTeamLogDur(this)')}</div>`:`<div style="font-size:11px;font-family:var(--mono);color:var(--text)">${j.timeStart||'—'}</div>`}
         ${editable?`<div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','tl-end','calcTeamLogDur(this)')}</div>`:`<div style="font-size:11px;font-family:var(--mono);color:var(--text)">${j.timeEnd||'—'}</div>`}
@@ -6848,7 +6864,7 @@ function openTeamLogDay(day){
       </div>
       <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔧 Work</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        ${workJobs.map(j=>buildRow(j,false)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
+        ${workJobs.map(j=>buildRow(j,'work')).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
       </div>
       ${editable?`<div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
         <input type="text" id="tlNewTask" placeholder="Task or activity…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -6859,7 +6875,7 @@ function openTeamLogDay(day){
       </div>`:''}
       <div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏸ Excuse / Break</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
-        ${excuseJobs.map(j=>buildRow(j,true)).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Excuse Entries</div>'}
+        ${excuseJobs.map(j=>buildRow(j,'excuse')).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Excuse Entries</div>'}
       </div>
       ${editable?`<div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
         <input type="text" id="tlNewExcTask" placeholder="Reason…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -6868,6 +6884,17 @@ function openTeamLogDay(day){
         <div id="tlNewExcDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--red);text-align:center;font-weight:600">—</div>
         <div style="display:flex;gap:4px"><input type="text" id="tlNewExcNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'excuse')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--red);border-color:rgba(245,112,106,0.3)" onclick="addTeamLogEntry(${day},'excuse')">Add</button></div>
       </div>`:''}
+      ${canSeePrivate?`<div style="font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px">🔒 Private</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${privateJobs.map(j=>buildRow(j,'private')).join('')||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Private Entries</div>'}
+      </div>
+      ${editable?`<div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(176,106,245,0.05);border:1px solid rgba(176,106,245,0.2);border-radius:6px;align-items:center">
+        <input type="text" id="tlNewPvtTask" placeholder="Private task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewPvt-start','calcNewTeamLogPvtDur()',true)}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','tlNewPvt-end','calcNewTeamLogPvtDur()',true)}</div>
+        <div id="tlNewPvtDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--purple);text-align:center;font-weight:600">—</div>
+        <div style="display:flex;gap:4px"><input type="text" id="tlNewPvtNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addTeamLogEntry(${day},'private')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:rgba(176,106,245,0.3)" onclick="addTeamLogEntry(${day},'private')">Add</button></div>
+      </div>`:''}`:''}
       <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">${editable?'Task · Start · End · Duration · Notes':'View only — you can only edit your own log'}</div>
       <div class="modal-foot">
         ${editable?`<button class="btn btn-ghost btn-sm" onclick="saveTeamLogEdits(${day})">Save Changes</button>`:''}
@@ -6896,6 +6923,15 @@ function calcTeamLogDur(el){
   row.querySelector('.tl-dur-display').textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
 }
 
+function calcNewTeamLogPvtDur(){
+  const h1=document.getElementById('tlNewPvt-start-h'),m1=document.getElementById('tlNewPvt-start-m');
+  const h2=document.getElementById('tlNewPvt-end-h'),m2=document.getElementById('tlNewPvt-end-m');
+  const s=h1&&h1.value!==''&&m1&&m1.value!==''?h1.value.padStart(2,'0')+':'+m1.value.padStart(2,'0'):'';
+  const e=h2&&h2.value!==''&&m2&&m2.value!==''?h2.value.padStart(2,'0')+':'+m2.value.padStart(2,'0'):'';
+  const el=document.getElementById('tlNewPvtDurDisplay');
+  if(el) el.textContent=calcDurFromTimes(s,e)>0?`${Math.floor(calcDurFromTimes(s,e)/60)}h ${calcDurFromTimes(s,e)%60}m`:'—';
+}
+
 function calcNewTeamLogDur(){
   const h1=document.getElementById('tlNew-start-h'),m1=document.getElementById('tlNew-start-m');
   const h2=document.getElementById('tlNew-end-h'),m2=document.getElementById('tlNew-end-m');
@@ -6916,16 +6952,18 @@ function calcNewTeamLogExcDur(){
 
 async function addTeamLogEntry(day, jobType){
   const isExcuse=jobType==='excuse';
-  const taskEl=document.getElementById(isExcuse?'tlNewExcTask':'tlNewTask');
+  const isPrivate=jobType==='private';
+  const idPrefix=isPrivate?'tlNewPvt':isExcuse?'tlNewExc':'tlNew';
+  const taskEl=document.getElementById(idPrefix+'Task');
   const task=taskEl?taskEl.value.trim():'';
-  if(!task){toast(isExcuse?'Enter a reason':'Enter a task');return;}
+  if(!task){toast(isExcuse?'Enter a reason':isPrivate?'Enter a private task':'Enter a task');return;}
   const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
-  const prefix=isExcuse?'tlNewExc':'tlNew';
+  const prefix=idPrefix;
   const hS=document.getElementById(prefix+'-start-h'),mS=document.getElementById(prefix+'-start-m');
   const hE=document.getElementById(prefix+'-end-h'),mE=document.getElementById(prefix+'-end-m');
   const timeStart=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';
   const timeEnd=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';
-  const notesEl=document.getElementById(isExcuse?'tlNewExcNotes':'tlNewNotes');
+  const notesEl=document.getElementById(prefix+'Notes');
   try{
     await db.collection('teamDailyLog').add({
       monthKey:mKey, day, uid:teamLogUser,
