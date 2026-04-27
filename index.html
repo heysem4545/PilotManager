@@ -6258,11 +6258,16 @@ async function renderPilotTechView(){
   }catch(e){}
 
   // Stats
-  const totalJobs=pilotJobs.length;
-  const totalMins=pilotJobs.reduce((s,j)=>s+(j.duration||0),0);
+  const workJobs=pilotJobs.filter(j=>j.jobType!=='excuse');
+  const excuseJobsAll=pilotJobs.filter(j=>j.jobType==='excuse');
+  const totalJobs=workJobs.length;
+  const totalMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
   const totalHrs=Math.floor(totalMins/60);
   const remMins=totalMins%60;
-  const uniqueProps=new Set(pilotJobs.map(j=>j.propertyAddress).filter(Boolean)).size;
+  const excuseTotalMins=excuseJobsAll.reduce((s,j)=>s+(j.duration||0),0);
+  const excuseHrs=Math.floor(excuseTotalMins/60);
+  const excuseRem=excuseTotalMins%60;
+  const uniqueProps=new Set(workJobs.map(j=>j.propertyAddress).filter(Boolean)).size;
 
   // Month nav
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -6288,6 +6293,11 @@ async function renderPilotTechView(){
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Properties</div>
       <div style="font-size:8px;color:var(--muted2);margin-top:2px">click to view all</div>
     </div>
+    ${excuseTotalMins>0?`<div style="background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" onclick="showPilotMonthList()">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${excuseHrs}h ${excuseRem}m</div>
+      <div style="font-size:9px;color:var(--red);text-transform:uppercase">Excuse Hours</div>
+      <div style="font-size:8px;color:var(--muted2);margin-top:2px">${excuseJobsAll.length} excuse${excuseJobsAll.length>1?'s':''}</div>
+    </div>`:''}
   </div>`;
 
   // Calendar grid
@@ -6303,7 +6313,10 @@ async function renderPilotTechView(){
     const dayJobs=jobsByDay[d]||[];
     const hasJobs=dayJobs.length>0;
     const isToday=isCurrentMonth&&d===today.getDate();
-    const totalDayMins=dayJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const workDayJobs=dayJobs.filter(j=>j.jobType!=='excuse');
+    const excuseDayJobs=dayJobs.filter(j=>j.jobType==='excuse');
+    const totalDayMins=workDayJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const excuseDayMins=excuseDayJobs.reduce((s,j)=>s+(j.duration||0),0);
     const dayStatus=window._pilotDayStatuses?.[mKey+'-'+d]||'';
     const statusColors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
     const statusBg=dayStatus?statusColors[dayStatus]||'var(--muted)':'';
@@ -6315,9 +6328,10 @@ async function renderPilotTechView(){
         :hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(74,222,128,0.12);color:#4ade80">${dayJobs.length} job${dayJobs.length>1?'s':''}</span>`:''}
       </div>
       ${dayStatus&&!hasJobs?`<div style="display:flex;align-items:center;justify-content:center;height:40px;font-size:11px;color:${statusBg};font-weight:500">${dayStatus}</div>`
-      :hasJobs?dayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')
-        +(dayJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${dayJobs.length-3} more</div>`:'')
+      :hasJobs?workDayJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.propertyAddress||'').replace(/,.*$/,''))} · ${j.duration||0}m</div>`).join('')
+        +(workDayJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${workDayJobs.length-3} more</div>`:'')
         +`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(totalDayMins/60)}h ${totalDayMins%60}m</div>`
+        +(excuseDayMins>0?`<div style="font-size:8px;color:var(--red);margin-top:1px">⏸ ${Math.floor(excuseDayMins/60)}h ${excuseDayMins%60}m</div>`:'')
       :`<div style="display:flex;align-items:center;justify-content:center;height:50px;color:var(--muted2);font-size:18px">+</div>`}
     </div>`;
   }
@@ -6462,6 +6476,18 @@ async function setPilotDayStatus(day, status){
   }catch(e){toast('Error: '+e.message);}
 }
 
+function calcNewExcDur(){
+  const hS=document.getElementById('pjNewExc-start-h');
+  const mS=document.getElementById('pjNewExc-start-m');
+  const hE=document.getElementById('pjNewExc-end-h');
+  const mE=document.getElementById('pjNewExc-end-m');
+  const start=(hS&&hS.value!==''&&mS&&mS.value!=='')?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';
+  const end=(hE&&hE.value!==''&&mE&&mE.value!=='')?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';
+  const dur=calcDurFromTimes(start,end);
+  const el=document.getElementById('pjNewExcDurDisplay');
+  if(el) el.textContent=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
+}
+
 function openPilotDay(day){
   const existing=document.getElementById('pilotDayModal');
   if(existing) existing.remove();
@@ -6482,16 +6508,27 @@ function openPilotDay(day){
     modal.id='pilotDayModal';
     modal.onclick=e=>{if(e.target===modal) modal.remove();};
 
-    let jobRows=jobs.map(j=>{
+    const workJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const excuseJobs=jobs.filter(j=>j.jobType==='excuse');
+    const workMins=workJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const excuseMins=excuseJobs.reduce((s,j)=>s+(j.duration||0),0);
+
+    function buildJobRow(j, isExcuse){
       const dur=j.duration||0;
       const durDisplay=dur>0?`${Math.floor(dur/60)}h ${dur%60}m`:'—';
-      return `<div class="pilot-job-row" data-id="${j.id}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;align-items:center">
-      <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
+      const borderColor=isExcuse?'rgba(245,112,106,0.3)':'var(--border2)';
+      const bgColor=isExcuse?'rgba(245,112,106,0.05)':'var(--surface2)';
+      const durColor=isExcuse?'var(--red)':'var(--blue)';
+      return `<div class="pilot-job-row" data-id="${j.id}" data-type="${isExcuse?'excuse':'work'}" style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:${bgColor};border:1px solid ${borderColor};border-radius:6px;align-items:center">
+      <div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" list="pilotAddrList" placeholder="${isExcuse?'Reason…':'Address or task…'}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>
       <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||j.time||'','pj-start','calcPilotDur(this)')}</div>
       <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','pj-end','calcPilotDur(this)')}</div>
-      <div class="pj-dur-display" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">${durDisplay}</div>
+      <div class="pj-dur-display" style="font-size:10px;font-family:var(--mono);color:${durColor};text-align:center;font-weight:600">${durDisplay}</div>
       <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="pj-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deletePilotJob('${j.id}')">×</button></div>
-    </div>`;}).join('');
+    </div>`;
+    }
+    let jobRows=workJobs.map(j=>buildJobRow(j,false)).join('');
+    let excuseRows=excuseJobs.map(j=>buildJobRow(j,true)).join('');
 
     // Check day status
     const dayStatusKey=mKey+'-'+day;
@@ -6510,17 +6547,34 @@ function openPilotDay(day){
         }).join('')}
       </div>
       <datalist id="pilotAddrList">${taskOpts}</datalist>
-      <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:50vh;overflow-y:auto">
-        ${jobRows||'<div style="text-align:center;color:var(--muted);padding:16px">No jobs yet for this day</div>'}
+      <div style="display:flex;gap:12px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--blue)">🔧 Work: ${Math.floor(workMins/60)}h ${workMins%60}m</div>
+        ${excuseMins>0?`<div style="font-size:12px;font-weight:600;color:var(--red)">⏸ Excuse: ${Math.floor(excuseMins/60)}h ${excuseMins%60}m</div>`:''}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center">
+
+      <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔧 Work</div>
+      <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${jobRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">No work entries</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
         <input type="text" id="pjNewAddr" list="pilotAddrList" placeholder="Address or task…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-start','calcNewPilotDur()',true)}</div>
         <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-end','calcNewPilotDur()',true)}</div>
         <div id="pjNewDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--blue);text-align:center;font-weight:600">—</div>
-        <div style="display:flex;gap:4px"><input type="text" id="pjNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day})"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addPilotJob(${day})">Add</button></div>
+        <div style="display:flex;gap:4px"><input type="text" id="pjNewNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day},'work')"><button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:10px" onclick="addPilotJob(${day},'work')">Add</button></div>
       </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center">Address / Task · Start · End · Duration · Notes</div>
+
+      <div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏸ Excuse / Break</div>
+      <div id="pilotExcuseList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${excuseRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">No excuse entries</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 110px 110px 55px 1fr;gap:8px;padding:8px;background:rgba(245,112,106,0.05);border:1px solid rgba(245,112,106,0.2);border-radius:6px;align-items:center">
+        <input type="text" id="pjNewExcAddr" placeholder="Reason (Doctor, Bank, Personal…)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNewExc-start','calcNewExcDur()',true)}</div>
+        <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNewExc-end','calcNewExcDur()',true)}</div>
+        <div id="pjNewExcDurDisplay" style="font-size:10px;font-family:var(--mono);color:var(--red);text-align:center;font-weight:600">—</div>
+        <div style="display:flex;gap:4px"><input type="text" id="pjNewExcNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day},'excuse')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--red);border-color:rgba(245,112,106,0.3)" onclick="addPilotJob(${day},'excuse')">Add</button></div>
+      </div>
       <div class="modal-foot">
         <button class="btn btn-ghost btn-sm" onclick="savePilotDayEdits(${day})">Save Changes</button>
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('pilotDayModal').remove()">Done</button>
@@ -6530,21 +6584,26 @@ function openPilotDay(day){
   });
 }
 
-async function addPilotJob(day){
-  const addrEl=document.getElementById('pjNewAddr');
+async function addPilotJob(day, jobType){
+  const isExcuse=jobType==='excuse';
+  const prefix=isExcuse?'pjNewExc':'pjNew';
+  const addrEl=document.getElementById(isExcuse?'pjNewExcAddr':'pjNewAddr');
   const addr=addrEl?addrEl.value.trim():'';
-  if(!addr){toast('Enter an address or task');return;}
+  if(!addr){toast(isExcuse?'Enter a reason':'Enter an address or task');return;}
   const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
-  const prop=properties.find(p=>p.addr===addr);
+  const prop=isExcuse?null:properties.find(p=>p.addr===addr);
+  const startPfx=prefix+'-start';
+  const endPfx=prefix+'-end';
   try{
     await db.collection('pilotTechWork').add({
       monthKey:mKey, day,
+      jobType:jobType||'work',
       propertyId:prop?prop.id:'',
       propertyAddress:addr,
-      timeStart:(()=>{const h=document.getElementById('pjNew-start-h'),m=document.getElementById('pjNew-start-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
-      timeEnd:(()=>{const h=document.getElementById('pjNew-end-h'),m=document.getElementById('pjNew-end-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
-      duration:(()=>{const hS=document.getElementById('pjNew-start-h'),mS=document.getElementById('pjNew-start-m'),hE=document.getElementById('pjNew-end-h'),mE=document.getElementById('pjNew-end-m');const s=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';const e=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';return calcDurFromTimes(s,e);})(),
-      notes:(document.getElementById('pjNewNotes')||{}).value?.trim()||'',
+      timeStart:(()=>{const h=document.getElementById(startPfx+'-h'),m=document.getElementById(startPfx+'-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
+      timeEnd:(()=>{const h=document.getElementById(endPfx+'-h'),m=document.getElementById(endPfx+'-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
+      duration:(()=>{const hS=document.getElementById(startPfx+'-h'),mS=document.getElementById(startPfx+'-m'),hE=document.getElementById(endPfx+'-h'),mE=document.getElementById(endPfx+'-m');const s=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';const e=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';return calcDurFromTimes(s,e);})(),
+      notes:(document.getElementById(isExcuse?'pjNewExcNotes':'pjNewNotes')||{}).value?.trim()||'',
       createdAt:new Date()
     });
     document.getElementById('pilotDayModal').remove();
