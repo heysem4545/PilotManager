@@ -14610,7 +14610,43 @@ async function renderSalaryPoolUser(el){
   const latestWithRelease = records.find(r => r.reserveReleaseDate);
   const releaseDate = latestWithRelease ? latestWithRelease.reserveReleaseDate : '';
 
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  let totalPaidYear=0, totalBonusesYear=0, totalReservesYear=0, totalReservesAll=0;
+  records.forEach(r=>{
+    const base=Number(r.baseSalary)||0;
+    const bon=sumBonuses(r);
+    const res=Number(r.reserveAmount)||0;
+    totalReservesAll+=res;
+    if(r.monthKey&&r.monthKey.startsWith(String(thisYear))){
+      totalPaidYear+=base+bon;
+      totalBonusesYear+=bon;
+      totalReservesYear+=res;
+    }
+  });
+  const lastRecord=records[0];
+  const lastSalary=lastRecord?(Number(lastRecord.baseSalary)||0)+sumBonuses(lastRecord):0;
+
   el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${fmt(lastSalary)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Last Salary</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--blue)">${fmt(totalPaidYear)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Paid ${thisYear}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${fmt(totalBonusesYear)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Bonuses ${thisYear}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--purple)">${fmt(totalReservesAll)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Reserve Pool</div>
+        ${releaseDate?`<div style="font-size:8px;color:var(--amber);margin-top:2px">Release: ${releaseDate}</div>`:''}
+      </div>
+    </div>
     <div class="table-card">
       <div class="toolbar" style="justify-content:space-between">
         <div style="font-size:13px;font-weight:500">My Salary Records</div>
