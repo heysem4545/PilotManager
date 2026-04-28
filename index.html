@@ -14509,6 +14509,15 @@ async function deleteTurnoverProject(docId){
 let salaryPoolSelectedUser = '';
 let salaryPoolEditId = null;
 
+let _salaryUnsub=null;
+function startSalaryListener(){
+  const uid=isAdmin()&&salaryPoolSelectedUser?salaryPoolSelectedUser:currentUser.uid;
+  if(_salaryUnsub) _salaryUnsub();
+  _salaryUnsub=db.collection('salaryRecords').where('uid','==',uid).onSnapshot(()=>{
+    if(document.getElementById('salaryPoolView')&&document.getElementById('salaryPoolView').innerHTML!=='') renderSalaryPoolView();
+  },()=>{});
+}
+
 async function renderSalaryPoolView(){
   const el = document.getElementById('salaryPoolView');
   if(!el) return;
@@ -14517,6 +14526,7 @@ async function renderSalaryPoolView(){
   const users = teamUsersCache.length ? teamUsersCache : await getUsers();
   teamUsersCache = users;
 
+  startSalaryListener();
   if(isAdmin()){
     renderSalaryPoolAdmin(el, users);
   } else {
