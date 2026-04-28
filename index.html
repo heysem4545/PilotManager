@@ -3313,6 +3313,7 @@ function renderCollectionPage(){
   }
 }
 
+let collMonthlyStatusFilter='all';
 function renderCollectionMonthlyView(){
   const contentEl=document.getElementById('collectionContent');
   if(!contentEl) return;
@@ -3329,7 +3330,12 @@ function renderCollectionMonthlyView(){
   });
   list.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
 
-  const rows=list.map(p=>{
+  // Status counts and filter
+  const statusCounts={all:list.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
+  list.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(statusCounts[s]!==undefined)statusCounts[s]++;});
+  const filtered=collMonthlyStatusFilter==='all'?list:list.filter(p=>(getMonthProp(p).status||'')===collMonthlyStatusFilter);
+
+  const rows=filtered.map(p=>{
     const mp=getMonthProp(p);
     const cmha=mp.cmha||0,cmhaPaid=mp.cmhaPaid||0;
     const tp=mp.tenantPortion||0,tPaid=mp.tenantPaid||0;
@@ -3352,7 +3358,11 @@ function renderCollectionMonthlyView(){
 
   contentEl.innerHTML=monthBarHtml+`
     <div class="table-card">
-      <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${list.length} properties with balance</div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${filtered.length} properties with balance</div>
+      <div class="ftabs" style="padding:8px 16px;border-bottom:1px solid var(--border)">${['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].map(s=>{
+        const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s.charAt(0)+s.slice(1).toLowerCase();
+        return `<button class="ftab ${collMonthlyStatusFilter===s?'active':''}" onclick="collMonthlyStatusFilter='${s}';renderCollectionMonthlyView()">${label} (${statusCounts[s]||0})</button>`;
+      }).join('')}</div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
