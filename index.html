@@ -2984,7 +2984,8 @@ async function toggleCollection(propertyId, checked){
   try{
     await updatePropertyField(propertyId, 'sentToCollection', checked);
     toast(checked?'Added to Collection Houses':'Removed from Collection Houses');
-    renderBalancesOnly();
+    if(collectionViewMode==='balancesOnly') renderBalancesOnly();
+    else if(collectionViewMode==='monthly') renderCollectionMonthlyView();
   }catch(e){
     console.error('toggleCollection', e);
     toast('Error: '+e.message);
@@ -3345,7 +3346,8 @@ function renderCollectionMonthlyView(){
     const rate=(cmha+tp)>0?Math.round(collected/(cmha+tp)*100):0;
     const st=mp.status||'';
     const badge=st?`<span class="badge ${({RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction'})[st]||'b-unknown'}">${({RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction'})[st]||st}</span>`:'';
-    return `<tr>
+    return `<tr style="${p.sentToCollection?'background:rgba(74,222,128,0.06)':''}">
+      <td style="text-align:center;padding:4px 2px"><input type="checkbox" ${p.sentToCollection?'checked':''} style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer" onchange="toggleCollection('${p.id}',this.checked)" title="Send to Collection Houses"></td>
       <td><div class="addr-main">${p.addr||''}</div><div class="addr-sub">${p.unit||''}</div></td>
       <td>${badge}</td>
       <td class="money">${fmt(cmha)}</td><td class="money">${fmt(tp)}</td>
@@ -3367,7 +3369,7 @@ function renderCollectionMonthlyView(){
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
+            <th style="text-align:center;width:16px;padding:4px 2px">Send Collection</th><th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
             <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>+</th><th>Notes</th>
           </tr></thead>
           <tbody>${rows}</tbody>
