@@ -2687,6 +2687,7 @@ function getMonthProp(p){
 // HELPERS
 // ─────────────────────────────────────────────
 function fmt(n){return '$'+Math.round(n).toLocaleString()}
+function fmtc(n){return '$'+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmtD(n){return(!n||n===0)?'—':'$'+Math.round(n).toLocaleString()}
 function pct(a,b){return b>0?Math.round(a/b*100):0}
 function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
@@ -14588,19 +14589,19 @@ async function renderSalaryPoolAdmin(el, users){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px">
         <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 Salary Summary ${thisYear}</div>
-        <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px">${fmt(totalPaidYear)}</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px">${fmtc(totalPaidYear)}</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Total paid this year</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${[1,2,3,4,5,6].map(i=>{
             const total=records.reduce((s,r)=>s+(Number(r['bonus'+i+'Amount'])||0),0);
-            return total>0?`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue);font-family:var(--mono)">B${i}: ${fmt(total)}</span>`:'';
+            return total>0?`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue);font-family:var(--mono)">B${i}: ${fmtc(total)}</span>`:'';
           }).join('')}
         </div>
       </div>
       <div style="background:linear-gradient(135deg,rgba(176,106,245,0.12),rgba(201,245,99,0.06));border:2px solid rgba(176,106,245,0.3);border-radius:14px;padding:20px;text-align:center;cursor:pointer;position:relative;overflow:hidden" ondblclick="editReleaseDate()" title="Double-click to set release date">
         <div style="position:absolute;top:-20px;right:-20px;font-size:80px;opacity:0.06">💎</div>
         <div style="font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🏦 Reserve Pool</div>
-        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmt(totalReservesAll)}</div>
+        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmtc(totalReservesAll)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px">Saved for ${selUser?escapeHtml(selUser.name):''}</div>
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${releaseDate}</span>
@@ -14665,20 +14666,20 @@ async function renderSalaryPoolUser(el){
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px">
         <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 My Salary</div>
         <div style="display:flex;gap:16px;margin-bottom:10px">
-          <div><div style="font-size:22px;font-weight:700;color:var(--accent)">${fmt(lastSalary)}</div><div style="font-size:9px;color:var(--muted)">Last Pay</div></div>
-          <div><div style="font-size:22px;font-weight:700;color:var(--blue)">${fmt(totalPaidYear)}</div><div style="font-size:9px;color:var(--muted)">Total ${thisYear}</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:var(--accent)">${fmtc(lastSalary)}</div><div style="font-size:9px;color:var(--muted)">Last Pay</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:var(--blue)">${fmtc(totalPaidYear)}</div><div style="font-size:9px;color:var(--muted)">Total ${thisYear}</div></div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${[1,2,3,4,5,6].map(i=>{
             const total=records.reduce((s,r)=>s+(Number(r['bonus'+i+'Amount'])||0),0);
-            return total>0?`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue);font-family:var(--mono)">B${i}: ${fmt(total)}</span>`:'';
+            return total>0?`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue);font-family:var(--mono)">B${i}: ${fmtc(total)}</span>`:'';
           }).join('')}
         </div>
       </div>
       <div style="background:linear-gradient(135deg,rgba(176,106,245,0.12),rgba(201,245,99,0.06));border:2px solid rgba(176,106,245,0.3);border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden">
         <div style="position:absolute;top:-20px;right:-20px;font-size:80px;opacity:0.06">💎</div>
         <div style="font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🏦 My Reserve Pool</div>
-        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmt(totalReservesAll)}</div>
+        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmtc(totalReservesAll)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px">Saved for you</div>
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${releaseDate}</span>
@@ -14729,7 +14730,7 @@ function buildSalaryTableRowsExpanded(records, showActions=true){
       const nm=r['bonus'+i+'Name']||'';
       const amt=Number(r['bonus'+i+'Amount'])||0;
       if(nm||amt){
-        bonusCells+=`<td style="font-size:10px"><div style="color:var(--blue);font-family:var(--mono)">${fmt(amt)}</div><div style="color:var(--muted);font-size:9px">${escapeHtml(nm)}</div></td>`;
+        bonusCells+=`<td style="font-size:10px"><div style="color:var(--blue);font-family:var(--mono)">${fmtc(amt)}</div><div style="color:var(--muted);font-size:9px">${escapeHtml(nm)}</div></td>`;
       } else {
         bonusCells+=`<td style="color:var(--muted2);font-size:10px">—</td>`;
       }
@@ -14737,10 +14738,10 @@ function buildSalaryTableRowsExpanded(records, showActions=true){
     const periodLabel=r.dateFrom&&r.dateTo?r.dateFrom+' → '+r.dateTo:escapeHtml(formatMonthKey(r.monthKey));
     return `<tr>
       <td style="font-weight:500;font-size:10px;font-family:var(--mono);white-space:nowrap">${periodLabel}</td>
-      <td class="money">${fmt(Number(r.baseSalary)||0)}</td>
+      <td class="money">${fmtc(Number(r.baseSalary)||0)}</td>
       ${bonusCells}
-      <td class="money" style="font-weight:600;color:var(--accent)">${fmt(totalSalary)}</td>
-      <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
+      <td class="money" style="font-weight:600;color:var(--accent)">${fmtc(totalSalary)}</td>
+      <td class="money" style="color:var(--blue)">${fmtc(Number(r.reserveAmount)||0)}</td>
       <td>${showActions?`<input type="date" value="${r.paidDate||''}" style="font-size:10px;padding:2px 4px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:${r.paidDate?'var(--accent)':'var(--muted2)'};font-family:var(--mono);outline:none;color-scheme:dark" onchange="db.collection('salaryRecords').doc('${r.id}').update({paidDate:this.value});toast('Paid date saved')">`:`<span style="font-size:10px;font-family:var(--mono);color:${r.paidDate?'var(--accent)':'var(--muted2)'}">${r.paidDate||'—'}</span>`}</td>
       ${showActions?`<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="openSalaryEntryModal('${r.id}')">Edit</button> <button class="btn btn-danger btn-sm" style="padding:3px 6px;font-size:9px" onclick="deleteSalaryRecord('${r.id}')">×</button></td>`:''}
     </tr>`;
@@ -14768,10 +14769,10 @@ function buildSalaryTableRows(records, showActions){
     for(let i=1;i<=6;i++){
       const nm = r['bonus'+i+'Name'];
       const amt = Number(r['bonus'+i+'Amount'])||0;
-      if(nm || amt) bonusParts.push(`${escapeHtml(nm||'Bonus '+i)}: ${fmt(amt)}`);
+      if(nm || amt) bonusParts.push(`${escapeHtml(nm||'Bonus '+i)}: ${fmtc(amt)}`);
     }
     const bonusDisplay = bonusParts.length
-      ? `<span title="${escapeAttr(bonusParts.join('\n'))}" style="cursor:help;border-bottom:1px dotted var(--muted)">${fmt(bonusTotal)}</span><span style="font-size:10px;color:var(--muted);margin-left:4px">(${bonusParts.length})</span>`
+      ? `<span title="${escapeAttr(bonusParts.join('\n'))}" style="cursor:help;border-bottom:1px dotted var(--muted)">${fmtc(bonusTotal)}</span><span style="font-size:10px;color:var(--muted);margin-left:4px">(${bonusParts.length})</span>`
       : `<span class="m-muted">$0</span>`;
 
     const monthLabel = formatMonthKey(r.monthKey);
@@ -14782,10 +14783,10 @@ function buildSalaryTableRows(records, showActions){
 
     return `<tr>
       <td style="font-weight:500">${escapeHtml(monthLabel)}</td>
-      <td class="money">${fmt(Number(r.baseSalary)||0)}</td>
+      <td class="money">${fmtc(Number(r.baseSalary)||0)}</td>
       <td>${bonusDisplay}</td>
-      <td class="money m-pos" style="font-weight:600">${fmt(totalSalary)}</td>
-      <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
+      <td class="money m-pos" style="font-weight:600">${fmtc(totalSalary)}</td>
+      <td class="money" style="color:var(--blue)">${fmtc(Number(r.reserveAmount)||0)}</td>
       ${actions}
     </tr>`;
   }).join('');
