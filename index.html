@@ -14616,7 +14616,6 @@ async function renderSalaryPoolAdmin(el, users){
               <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
               <th>Reserve</th>
-              <th>Total Reserve</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -14693,7 +14692,6 @@ async function renderSalaryPoolUser(el){
               <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
               <th>Reserve</th>
-              <th>Total Reserve</th>
             </tr>
           </thead>
           <tbody>${buildSalaryTableRowsExpanded(records, false)}</tbody>
@@ -14736,7 +14734,6 @@ function buildSalaryTableRowsExpanded(records, showActions=true){
       ${bonusCells}
       <td class="money" style="font-weight:600;color:var(--accent)">${fmt(totalSalary)}</td>
       <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
-      <td class="money" style="color:var(--purple);font-weight:600">${fmt(r.runningReserve)}</td>
       ${showActions?`<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="openSalaryEntryModal('${r.id}')">Edit</button> <button class="btn btn-danger btn-sm" style="padding:3px 6px;font-size:9px" onclick="deleteSalaryRecord('${r.id}')">×</button></td>`:''}
     </tr>`;
   }).join('');
@@ -14781,7 +14778,6 @@ function buildSalaryTableRows(records, showActions){
       <td>${bonusDisplay}</td>
       <td class="money m-pos" style="font-weight:600">${fmt(totalSalary)}</td>
       <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
-      <td class="money" style="color:var(--purple);font-weight:600">${fmt(r.runningReserve)}</td>
       ${actions}
     </tr>`;
   }).join('');
