@@ -14816,7 +14816,10 @@ function openSalaryEntryModal(editId){
         <div class="fg"><label>Pay Period To</label><input type="date" id="sf_dateTo" style="color-scheme:dark"></div>
         <div class="fg"><label>Base Salary ($)</label><input type="number" id="sf_base" placeholder="0" step="0.01"></div>
       </div>
-      <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Bonuses (optional)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px">
+        <span style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Bonuses (optional)</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:9px" onclick="openBonusSettings()">⚙ Bonus Rates</button>
+      </div>
       <div class="frow">
         <div class="fg"><label>Bonus 1 Name</label><input id="sf_b1name" placeholder="e.g. Performance"></div>
         <div class="fg"><label>Bonus 1 Amount ($)</label><input type="number" id="sf_b1amt" placeholder="0" step="0.01"></div>
@@ -14834,18 +14837,20 @@ function openSalaryEntryModal(editId){
         <div class="fg"><label>Bonus 4 Amount ($)</label><input type="number" id="sf_b4amt" placeholder="0" step="0.01"></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Bonus 5 Name</label><input id="sf_b5name" placeholder=""></div>
-        <div class="fg"><label>Bonus 5 Amount ($)</label><input type="number" id="sf_b5amt" placeholder="0" step="0.01"></div>
+        <div class="fg"><label>Bonus 5 — Task Points</label><input id="sf_b5name" value="Task Points" placeholder="Task Points"></div>
+        <div class="fg"><label>Amount ($)</label><div style="display:flex;gap:4px"><input type="number" id="sf_b5amt" placeholder="0" step="0.01" style="flex:1"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:9px;color:var(--blue);white-space:nowrap" onclick="calcTaskBonus()">⚡ Calc</button></div></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Bonus 6 Name</label><input id="sf_b6name" placeholder=""></div>
-        <div class="fg"><label>Bonus 6 Amount ($)</label><input type="number" id="sf_b6amt" placeholder="0" step="0.01"></div>
+        <div class="fg"><label>Bonus 6 — Meeting Stars</label><input id="sf_b6name" value="Meeting Stars" placeholder="Meeting Stars"></div>
+        <div class="fg"><label>Amount ($)</label><div style="display:flex;gap:4px"><input type="number" id="sf_b6amt" placeholder="0" step="0.01" style="flex:1"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:9px;color:var(--purple);white-space:nowrap" onclick="calcMeetingBonus()">⭐ Calc</button></div></div>
       </div>
       <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Reserve Pool</div>
       <div class="frow">
         <div class="fg"><label>Reserve Amount ($)</label><input type="number" id="sf_reserve" placeholder="0" step="0.01"></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:16px">
+      <div id="sf_absenceSummary" style="margin-top:12px;padding:10px;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;font-size:11px;color:var(--muted);display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:16px;align-items:center">
+        <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="loadAbsenceSummary()">📊 Load Absence Data</button>
         <button class="btn btn-primary" onclick="saveSalaryRecord()">${isEdit ? 'Update' : 'Save'} Entry</button>
         <button class="btn btn-ghost" onclick="closeModal('salaryEntryModal')">Cancel</button>
       </div>
@@ -14885,6 +14890,121 @@ async function editReleaseDate(){
     }
     toast('Release date updated');
     renderSalaryPoolView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+// Bonus rate settings
+function getBonusRates(){
+  const saved=localStorage.getItem('bonusRates');
+  if(saved){try{return JSON.parse(saved);}catch(e){}}
+  return {taskPointRate:0.20, meetingStarRate:2.00};
+}
+
+function openBonusSettings(){
+  const rates=getBonusRates();
+  const m=document.createElement('div');
+  m.className='overlay open';m.id='bonusRatesModal';
+  m.onclick=e=>{if(e.target===m)m.remove();};
+  m.innerHTML=`<div class="modal" style="width:380px">
+    <div class="modal-title"><span>⚙ Bonus Rates</span><button class="modal-close" onclick="document.getElementById('bonusRatesModal').remove()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Set the rate per point/star. You can change these anytime.</div>
+    <div class="fg"><label>Task Point Rate ($ per point)</label>
+      <div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:0 12px"><span style="color:var(--muted)">$</span><input type="number" id="br_taskRate" value="${rates.taskPointRate}" step="0.01" min="0" style="border:none;background:none;padding:9px 8px;font-size:13px;color:var(--text);font-family:var(--mono);outline:none;width:100%"></div>
+    </div>
+    <div class="fg"><label>Meeting Star Rate ($ per star)</label>
+      <div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:0 12px"><span style="color:var(--muted)">$</span><input type="number" id="br_meetRate" value="${rates.meetingStarRate}" step="0.01" min="0" style="border:none;background:none;padding:9px 8px;font-size:13px;color:var(--text);font-family:var(--mono);outline:none;width:100%"></div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px">
+      Example: 50 task points × $${rates.taskPointRate} = $${(50*rates.taskPointRate).toFixed(2)}<br>
+      Example: 10 meeting stars × $${rates.meetingStarRate} = $${(10*rates.meetingStarRate).toFixed(2)}
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('bonusRatesModal').remove()">Cancel</button><button class="btn btn-primary btn-sm" onclick="saveBonusRates()">Save Rates</button></div>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function saveBonusRates(){
+  const taskPointRate=parseFloat(document.getElementById('br_taskRate').value)||0;
+  const meetingStarRate=parseFloat(document.getElementById('br_meetRate').value)||0;
+  localStorage.setItem('bonusRates',JSON.stringify({taskPointRate,meetingStarRate}));
+  document.getElementById('bonusRatesModal').remove();
+  toast('Bonus rates saved: Task $'+taskPointRate+'/pt · Meeting $'+meetingStarRate+'/star');
+}
+
+async function calcTaskBonus(){
+  const dateFrom=document.getElementById('sf_dateFrom').value;
+  const dateTo=document.getElementById('sf_dateTo').value;
+  if(!dateFrom||!dateTo){toast('Set pay period dates first');return;}
+  const uid=salaryPoolSelectedUser;
+  const rates=getBonusRates();
+  const mKey=`tm-${dateFrom.slice(0,7)}`;
+  try{
+    const snap=await db.collection('tasks').where('monthKey','==',mKey).where('uid','==',uid).get();
+    const DIFF_PTS={easy:1,medium:2,hard:3};
+    let totalPts=0;
+    snap.docs.forEach(d=>{
+      const t=d.data();
+      if(t.status==='done'&&t.task) totalPts+=DIFF_PTS[t.diff]||1;
+    });
+    const bonus=Math.round(totalPts*rates.taskPointRate*100)/100;
+    document.getElementById('sf_b5name').value='Task Points ('+totalPts+' pts × $'+rates.taskPointRate+')';
+    document.getElementById('sf_b5amt').value=bonus;
+    toast('Task bonus: '+totalPts+' points × $'+rates.taskPointRate+' = $'+bonus);
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function calcMeetingBonus(){
+  const dateFrom=document.getElementById('sf_dateFrom').value;
+  const dateTo=document.getElementById('sf_dateTo').value;
+  if(!dateFrom||!dateTo){toast('Set pay period dates first');return;}
+  const rates=getBonusRates();
+  // Count meetings in this period — for now count all meetings in the month
+  const mKey=dateFrom.slice(0,7);
+  try{
+    const snap=await db.collection('meetings').get();
+    let starCount=0;
+    snap.docs.forEach(d=>{
+      const m=d.data();
+      if(m.date&&m.date>=dateFrom&&m.date<=dateTo) starCount++;
+    });
+    const bonus=Math.round(starCount*rates.meetingStarRate*100)/100;
+    document.getElementById('sf_b6name').value='Meeting Stars ('+starCount+' × $'+rates.meetingStarRate+')';
+    document.getElementById('sf_b6amt').value=bonus;
+    toast('Meeting bonus: '+starCount+' meetings × $'+rates.meetingStarRate+' = $'+bonus);
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function loadAbsenceSummary(){
+  const dateFrom=document.getElementById('sf_dateFrom').value;
+  const dateTo=document.getElementById('sf_dateTo').value;
+  if(!dateFrom||!dateTo){toast('Set pay period dates first');return;}
+  const uid=salaryPoolSelectedUser;
+  const mKey=dateFrom.slice(0,7);
+  const el=document.getElementById('sf_absenceSummary');
+  try{
+    // Load daily log
+    const logSnap=await db.collection('teamDailyLog').where('monthKey','==',mKey).where('uid','==',uid).get();
+    const logs=logSnap.docs.map(d=>d.data());
+    const excuseMins=logs.filter(l=>l.jobType==='excuse').reduce((s,l)=>s+(l.duration||0),0);
+    const privateMins=logs.filter(l=>l.jobType==='private').reduce((s,l)=>s+(l.duration||0),0);
+    const workMins=logs.filter(l=>l.jobType!=='excuse'&&l.jobType!=='private').reduce((s,l)=>s+(l.duration||0),0);
+
+    // Load day statuses
+    const statusSnap=await db.collection('teamLogDayStatus').where('monthKey','==',mKey).where('uid','==',uid).get();
+    const statuses={};
+    statusSnap.docs.forEach(d=>{const dat=d.data();statuses[dat.status]=(statuses[dat.status]||0)+1;});
+
+    el.style.display='';
+    el.innerHTML=`<div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📊 Attendance Summary — ${dateFrom.slice(0,7)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span style="padding:3px 8px;border-radius:4px;background:var(--blue-dim);color:var(--blue);font-family:var(--mono)">Work: ${Math.floor(workMins/60)}h ${workMins%60}m</span>
+        <span style="padding:3px 8px;border-radius:4px;background:var(--red-dim);color:var(--red);font-family:var(--mono)">Excuse: ${Math.floor(excuseMins/60)}h ${excuseMins%60}m</span>
+        <span style="padding:3px 8px;border-radius:4px;background:var(--purple-dim);color:var(--purple);font-family:var(--mono)">Private: ${Math.floor(privateMins/60)}h ${privateMins%60}m</span>
+        ${Object.entries(statuses).map(([s,n])=>{
+          const colors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
+          return `<span style="padding:3px 8px;border-radius:4px;background:${(colors[s]||'var(--muted)')}20;color:${colors[s]||'var(--muted)'};font-family:var(--mono)">${s}: ${n} day${n>1?'s':''}</span>`;
+        }).join('')}
+      </div>`;
   }catch(e){toast('Error: '+e.message);}
 }
 
