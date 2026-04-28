@@ -14510,11 +14510,16 @@ let salaryPoolSelectedUser = '';
 let salaryPoolEditId = null;
 
 let _salaryUnsub=null;
+let _salaryListenerUid='';
 function startSalaryListener(){
   const uid=isAdmin()&&salaryPoolSelectedUser?salaryPoolSelectedUser:currentUser.uid;
+  if(_salaryUnsub&&_salaryListenerUid===uid) return;
   if(_salaryUnsub) _salaryUnsub();
+  _salaryListenerUid=uid;
+  let isInitial=true;
   _salaryUnsub=db.collection('salaryRecords').where('uid','==',uid).onSnapshot(()=>{
-    if(document.getElementById('salaryPoolView')&&document.getElementById('salaryPoolView').innerHTML!=='') renderSalaryPoolView();
+    if(isInitial){isInitial=false;return;}
+    if(currentView==='salaryPool') renderSalaryPoolView();
   },()=>{});
 }
 
