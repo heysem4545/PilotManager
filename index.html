@@ -14527,9 +14527,11 @@ async function renderSalaryPoolView(){
 async function renderSalaryPoolAdmin(el, users){
   if(!salaryPoolSelectedUser && users.length) salaryPoolSelectedUser = users[0].uid;
 
-  const userOpts = users.map(u =>
-    `<option value="${escapeAttr(u.uid)}" ${u.uid===salaryPoolSelectedUser?'selected':''}>${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`
-  ).join('');
+  // User tabs
+  const userTabs=users.map(u=>{
+    const active=u.uid===salaryPoolSelectedUser;
+    return `<button class="ftab ${active?'active':''}" onclick="salaryPoolSelectedUser='${u.uid}';renderSalaryPoolView()">${escapeHtml(u.name||u.email)}</button>`;
+  }).join('');
 
   // Load records for selected user
   let records = [];
@@ -14539,39 +14541,53 @@ async function renderSalaryPoolAdmin(el, users){
     records.sort((a,b)=>(b.monthKey||'').localeCompare(a.monthKey||''));
   } catch(e){ console.error('salary load error:',e); }
 
-  // Compute year stats
   const now = new Date();
   const thisYear = now.getFullYear();
-  let totalPaidYear = 0, totalReservesYear = 0, totalBonusesYear = 0;
-  records.forEach(r => {
-    if(r.monthKey && r.monthKey.startsWith(String(thisYear))){
-      totalPaidYear += (Number(r.baseSalary)||0) + sumBonuses(r);
-      totalReservesYear += Number(r.reserveAmount)||0;
-      totalBonusesYear += sumBonuses(r);
+  let totalPaidYear=0, totalReservesYear=0, totalReservesAll=0;
+  const bonusTotals={};
+  records.forEach(r=>{
+    const base=Number(r.baseSalary)||0;
+    const res=Number(r.reserveAmount)||0;
+    totalReservesAll+=res;
+    for(let i=1;i<=6;i++){
+      const nm=r['bonus'+i+'Name']||'';
+      const amt=Number(r['bonus'+i+'Amount'])||0;
+      if(nm&&amt){if(!bonusTotals[nm])bonusTotals[nm]=0;bonusTotals[nm]+=amt;}
+    }
+    if(r.monthKey&&r.monthKey.startsWith(String(thisYear))){
+      totalPaidYear+=base+sumBonuses(r);
+      totalReservesYear+=res;
     }
   });
 
-  // Find release date
   const selUser = users.find(u=>u.uid===salaryPoolSelectedUser);
   const latestWithRelease = records.find(r => r.reserveReleaseDate);
   const releaseDate = latestWithRelease ? latestWithRelease.reserveReleaseDate : '';
 
   el.innerHTML = `
-    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-      <div class="fg" style="margin-bottom:0;min-width:260px">
-        <label>Select Team Member</label>
-        <select class="role-select" style="padding:8px 12px;font-size:13px;border-radius:8px" onchange="salaryPoolSelectedUser=this.value;renderSalaryPoolView()">
-          ${userOpts}
-        </select>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-top:16px" onclick="openSalaryEntryModal()">+ Add Salary Entry</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div class="ftabs" style="flex-wrap:wrap">${userTabs}</div>
+      <button class="btn btn-primary btn-sm" onclick="openSalaryEntryModal()">+ Add Salary Entry</button>
     </div>
 
-    <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
-      <div class="mc g"><div class="mc-lbl">Total Paid ${thisYear}</div><div class="mc-val g">${fmt(totalPaidYear)}</div></div>
-      <div class="mc b"><div class="mc-lbl">Total Reserves ${thisYear}</div><div class="mc-val b">${fmt(totalReservesYear)}</div></div>
-      <div class="mc p"><div class="mc-lbl">Total Bonuses ${thisYear}</div><div class="mc-val" style="color:var(--purple)">${fmt(totalBonusesYear)}</div></div>
-      <div class="mc a"><div class="mc-lbl">Reserve Release</div><div class="mc-val a" style="font-size:15px">${releaseDate ? escapeHtml(releaseDate) : 'Not set'}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${fmt(totalPaidYear)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Paid ${thisYear}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--purple)">${fmt(totalReservesAll)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Reserve Pool</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${releaseDate||'Not set'}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Release Date</div>
+      </div>
+      ${Object.entries(bonusTotals).map(([nm,amt])=>`
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--blue)">${fmt(amt)}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">${escapeHtml(nm)}</div>
+      </div>`).join('')}
     </div>
 
     <div class="table-card">
@@ -14583,19 +14599,18 @@ async function renderSalaryPoolAdmin(el, users){
           <thead>
             <tr>
               <th>Month</th>
-              <th>Base Salary</th>
-              <th>Bonuses</th>
+              <th>Base</th>
+              <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
               <th>Reserve</th>
               <th>Total Reserve</th>
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody>${buildSalaryTableRows(records, true)}</tbody>
+          <tbody>${buildSalaryTableRowsExpanded(records)}</tbody>
         </table>
       </div>
     </div>
-    ${releaseDate ? `<div style="margin-top:10px;font-size:11px;color:var(--muted)">Reserve release date for ${selUser?escapeHtml(selUser.name):''}: <strong style="color:var(--amber)">${escapeHtml(releaseDate)}</strong></div>` : ''}
   `;
 }
 
@@ -14656,14 +14671,14 @@ async function renderSalaryPoolUser(el){
           <thead>
             <tr>
               <th>Month</th>
-              <th>Base Salary</th>
-              <th>Bonuses</th>
+              <th>Base</th>
+              <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
               <th>Reserve</th>
               <th>Total Reserve</th>
             </tr>
           </thead>
-          <tbody>${buildSalaryTableRows(records, false)}</tbody>
+          <tbody>${buildSalaryTableRowsExpanded(records, false)}</tbody>
         </table>
       </div>
     </div>
@@ -14675,6 +14690,37 @@ function sumBonuses(r){
   let s = 0;
   for(let i=1;i<=6;i++) s += Number(r['bonus'+i+'Amount'])||0;
   return s;
+}
+
+function buildSalaryTableRowsExpanded(records, showActions=true){
+  if(!records.length) return `<tr><td colspan="${showActions?12:11}" style="text-align:center;padding:30px;color:var(--muted)">No salary records found</td></tr>`;
+  const sorted=[...records].sort((a,b)=>(a.monthKey||'').localeCompare(b.monthKey||''));
+  let runningReserve=0;
+  const withRunning=sorted.map(r=>{runningReserve+=Number(r.reserveAmount)||0;return{...r,runningReserve};});
+  withRunning.reverse();
+  return withRunning.map(r=>{
+    const bonusTotal=sumBonuses(r);
+    const totalSalary=(Number(r.baseSalary)||0)+bonusTotal;
+    let bonusCells='';
+    for(let i=1;i<=6;i++){
+      const nm=r['bonus'+i+'Name']||'';
+      const amt=Number(r['bonus'+i+'Amount'])||0;
+      if(nm||amt){
+        bonusCells+=`<td style="font-size:10px"><div style="color:var(--blue);font-family:var(--mono)">${fmt(amt)}</div><div style="color:var(--muted);font-size:9px">${escapeHtml(nm)}</div></td>`;
+      } else {
+        bonusCells+=`<td style="color:var(--muted2);font-size:10px">—</td>`;
+      }
+    }
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(formatMonthKey(r.monthKey))}</td>
+      <td class="money">${fmt(Number(r.baseSalary)||0)}</td>
+      ${bonusCells}
+      <td class="money" style="font-weight:600;color:var(--accent)">${fmt(totalSalary)}</td>
+      <td class="money" style="color:var(--blue)">${fmt(Number(r.reserveAmount)||0)}</td>
+      <td class="money" style="color:var(--purple);font-weight:600">${fmt(r.runningReserve)}</td>
+      ${showActions?`<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="openSalaryEntryModal('${r.id}')">Edit</button> <button class="btn btn-danger btn-sm" style="padding:3px 6px;font-size:9px" onclick="deleteSalaryRecord('${r.id}')">×</button></td>`:''}
+    </tr>`;
+  }).join('');
 }
 
 function buildSalaryTableRows(records, showActions){
