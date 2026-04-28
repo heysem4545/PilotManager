@@ -3352,6 +3352,7 @@ function renderCollectionMonthlyView(){
       <td class="money">${fmt(cmhaPaid)}</td><td class="money">${fmt(tPaid)}</td>
       <td class="money">${fmt(collected)}</td>
       <td class="money" style="color:${(cmhaBal+tenBal)>0?'var(--red)':'var(--accent)'}">${fmt(cmhaBal)} / ${fmt(tenBal)}</td>
+      <td style="text-align:center;padding:1px"><button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:9px;color:var(--blue);cursor:pointer;font-family:var(--font)" onclick="openCollectionTask('${p.id}','${escapeAttr(p.addr)}','${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][activeMonth]}')">+</button></td>
       <td style="font-size:11px;color:var(--muted)">${escapeHtml(mp.monthNote||'')}</td>
     </tr>`;
   }).join('');
@@ -3367,7 +3368,7 @@ function renderCollectionMonthlyView(){
         <table>
           <thead><tr>
             <th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
-            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>Notes</th>
+            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>+</th><th>Notes</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
