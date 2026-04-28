@@ -14583,11 +14583,13 @@ async function renderSalaryPoolAdmin(el, users){
         <div style="font-size:22px;font-weight:700;color:var(--amber)">${releaseDate||'Not set'}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Release Date</div>
       </div>
-      ${Object.entries(bonusTotals).map(([nm,amt])=>`
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:var(--blue)">${fmt(amt)}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">${escapeHtml(nm)}</div>
-      </div>`).join('')}
+      ${[1,2,3,4,5,6].map(i=>{
+        const total=records.reduce((s,r)=>s+(Number(r['bonus'+i+'Amount'])||0),0);
+        return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--blue)">${fmt(total)}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Bonus ${i}</div>
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="table-card">
