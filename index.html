@@ -14534,8 +14534,9 @@ async function renderSalaryPoolAdmin(el, users){
   // Load records for selected user
   let records = [];
   try {
-    const snap = await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).orderBy('monthKey','desc').get();
+    const snap = await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).get();
     snap.forEach(d => records.push({id:d.id,...d.data()}));
+    records.sort((a,b)=>(b.monthKey||'').localeCompare(a.monthKey||''));
   } catch(e){ console.error('salary load error:',e); }
 
   // Compute year stats
@@ -14601,8 +14602,9 @@ async function renderSalaryPoolAdmin(el, users){
 async function renderSalaryPoolUser(el){
   let records = [];
   try {
-    const snap = await db.collection('salaryRecords').where('uid','==',currentUser.uid).orderBy('monthKey','desc').get();
+    const snap = await db.collection('salaryRecords').where('uid','==',currentUser.uid).get();
     snap.forEach(d => records.push({id:d.id,...d.data()}));
+    records.sort((a,b)=>(b.monthKey||'').localeCompare(a.monthKey||''));
   } catch(e){ console.error('salary load error:',e); }
 
   const latestWithRelease = records.find(r => r.reserveReleaseDate);
