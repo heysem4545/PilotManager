@@ -14579,9 +14579,10 @@ async function renderSalaryPoolAdmin(el, users){
         <div style="font-size:22px;font-weight:700;color:var(--purple)">${fmt(totalReservesAll)}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Reserve Pool</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--amber)">${releaseDate||'Not set'}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Release Date</div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer" ondblclick="editReleaseDate()" title="Double-click to set release date">
+        <div style="font-size:16px;font-weight:700;color:var(--amber)">${releaseDate||'Not set'}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Reserve Release</div>
+        ${releaseDate?`<div style="font-size:8px;color:var(--amber);margin-top:2px">pay by ${releaseDate}</div>`:'<div style="font-size:8px;color:var(--muted2);margin-top:2px">double-click to set</div>'}
       </div>
       ${[1,2,3,4,5,6].map(i=>{
         const total=records.reduce((s,r)=>s+(Number(r['bonus'+i+'Amount'])||0),0);
@@ -14600,7 +14601,7 @@ async function renderSalaryPoolAdmin(el, users){
         <table>
           <thead>
             <tr>
-              <th>Month</th>
+              <th>Pay Period</th>
               <th>Base</th>
               <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
@@ -14661,7 +14662,7 @@ async function renderSalaryPoolUser(el){
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
         <div style="font-size:22px;font-weight:700;color:var(--purple)">${fmt(totalReservesAll)}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Reserve Pool</div>
-        ${releaseDate?`<div style="font-size:8px;color:var(--amber);margin-top:2px">Release: ${releaseDate}</div>`:''}
+        ${releaseDate?`<div style="font-size:8px;color:var(--amber);margin-top:2px">pay by ${releaseDate}</div>`:''}
       </div>
     </div>
     <div class="table-card">
@@ -14672,7 +14673,7 @@ async function renderSalaryPoolUser(el){
         <table>
           <thead>
             <tr>
-              <th>Month</th>
+              <th>Pay Period</th>
               <th>Base</th>
               <th>Bonus 1</th><th>Bonus 2</th><th>Bonus 3</th><th>Bonus 4</th><th>Bonus 5</th><th>Bonus 6</th>
               <th>Total Salary</th>
@@ -14713,8 +14714,9 @@ function buildSalaryTableRowsExpanded(records, showActions=true){
         bonusCells+=`<td style="color:var(--muted2);font-size:10px">—</td>`;
       }
     }
+    const periodLabel=r.dateFrom&&r.dateTo?r.dateFrom+' → '+r.dateTo:escapeHtml(formatMonthKey(r.monthKey));
     return `<tr>
-      <td style="font-weight:500">${escapeHtml(formatMonthKey(r.monthKey))}</td>
+      <td style="font-weight:500;font-size:10px;font-family:var(--mono);white-space:nowrap">${periodLabel}</td>
       <td class="money">${fmt(Number(r.baseSalary)||0)}</td>
       ${bonusCells}
       <td class="money" style="font-weight:600;color:var(--accent)">${fmt(totalSalary)}</td>
@@ -14791,7 +14793,8 @@ function openSalaryEntryModal(editId){
     </div>
     <div id="salaryEntryForm">
       <div class="frow">
-        <div class="fg"><label>Pay Period (Month)</label><input type="month" id="sf_month"></div>
+        <div class="fg"><label>Pay Period From</label><input type="date" id="sf_dateFrom" style="color-scheme:dark"></div>
+        <div class="fg"><label>Pay Period To</label><input type="date" id="sf_dateTo" style="color-scheme:dark"></div>
         <div class="fg"><label>Base Salary ($)</label><input type="number" id="sf_base" placeholder="0" step="0.01"></div>
       </div>
       <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Bonuses (optional)</div>
@@ -14822,7 +14825,6 @@ function openSalaryEntryModal(editId){
       <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Reserve Pool</div>
       <div class="frow">
         <div class="fg"><label>Reserve Amount ($)</label><input type="number" id="sf_reserve" placeholder="0" step="0.01"></div>
-        <div class="fg"><label>Reserve Release Date</label><input type="date" id="sf_releaseDate"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn btn-primary" onclick="saveSalaryRecord()">${isEdit ? 'Update' : 'Save'} Entry</button>
@@ -14842,40 +14844,67 @@ function openSalaryEntryModal(editId){
   if(isEdit) loadSalaryEntryForEdit(editId);
 }
 
+async function editReleaseDate(){
+  if(!isAdmin()) return;
+  const current=await (async()=>{
+    try{
+      const snap=await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).get();
+      const rec=snap.docs.map(d=>d.data()).find(r=>r.reserveReleaseDate);
+      return rec?rec.reserveReleaseDate:'';
+    }catch(e){return '';}
+  })();
+  const newDate=prompt('Enter reserve release date (YYYY-MM-DD):',current);
+  if(newDate===null) return;
+  try{
+    // Save release date on a special doc for this user
+    const snap=await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).get();
+    if(snap.empty){
+      await db.collection('salaryRecords').add({uid:salaryPoolSelectedUser,userName:(teamUsersCache.find(u=>u.uid===salaryPoolSelectedUser)||{}).name||'',reserveReleaseDate:newDate,monthKey:'release',baseSalary:0,reserveAmount:0,createdAt:new Date()});
+    } else {
+      // Update the first record with the release date
+      await snap.docs[0].ref.update({reserveReleaseDate:newDate});
+    }
+    toast('Release date updated');
+    renderSalaryPoolView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
 async function loadSalaryEntryForEdit(docId){
   try {
     const doc = await db.collection('salaryRecords').doc(docId).get();
     if(!doc.exists){ toast('Record not found'); return; }
     const r = doc.data();
-    document.getElementById('sf_month').value = r.monthKey || '';
+    document.getElementById('sf_dateFrom').value = r.dateFrom || '';
+    document.getElementById('sf_dateTo').value = r.dateTo || '';
     document.getElementById('sf_base').value = r.baseSalary || '';
     for(let i=1;i<=6;i++){
       document.getElementById('sf_b'+i+'name').value = r['bonus'+i+'Name'] || '';
       document.getElementById('sf_b'+i+'amt').value = r['bonus'+i+'Amount'] || '';
     }
     document.getElementById('sf_reserve').value = r.reserveAmount || '';
-    document.getElementById('sf_releaseDate').value = r.reserveReleaseDate || '';
   } catch(e){ toast('Error loading record'); }
 }
 
 async function saveSalaryRecord(){
   if(!isAdmin()){ toast('Admin only'); return; }
 
-  const monthKey = document.getElementById('sf_month').value;
+  const dateFrom = document.getElementById('sf_dateFrom').value;
+  const dateTo = document.getElementById('sf_dateTo').value;
   const baseSalary = Number(document.getElementById('sf_base').value)||0;
 
-  if(!monthKey){ toast('Please select a pay period'); return; }
+  if(!dateFrom||!dateTo){ toast('Please enter pay period dates'); return; }
   if(!salaryPoolSelectedUser){ toast('Please select a user'); return; }
 
   const selUser = teamUsersCache.find(u=>u.uid===salaryPoolSelectedUser);
+  const monthKey = dateFrom.slice(0,7);
 
   const data = {
     uid: salaryPoolSelectedUser,
     userName: selUser ? selUser.name : '',
     monthKey,
+    dateFrom, dateTo,
     baseSalary,
-    reserveAmount: Number(document.getElementById('sf_reserve').value)||0,
-    reserveReleaseDate: document.getElementById('sf_releaseDate').value || ''
+    reserveAmount: Number(document.getElementById('sf_reserve').value)||0
   };
 
   for(let i=1;i<=6;i++){
