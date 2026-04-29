@@ -7430,7 +7430,6 @@ async function addTeamLogEntry(day, jobType){
     document.getElementById('teamLogDayModal').remove();
     toast('Entry added');
     await renderTeamDailyLog();
-    setTimeout(()=>openTeamLogDay(day),500);
   }catch(e){toast('Error: '+e.message);}
 }
 
