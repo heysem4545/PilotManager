@@ -1061,6 +1061,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
             <span class="u-role" id="sidebarRole"></span>
           </div>
         </div>
+        <button class="logout-btn" style="color:var(--muted);margin-top:0" onclick="openChangePassword()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/></svg>
+          Change Password
+        </button>
         <button class="logout-btn" onclick="signOut()">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6"/></svg>
           Sign out
@@ -2316,6 +2320,42 @@ async function registerEmail(){
     }
   }catch(e){
     document.getElementById('regErr').textContent=e.message;
+  }
+}
+
+function openChangePassword(){
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='changePwModal';
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:380px">
+    <div class="modal-title"><span>🔒 Change Password</span><button class="modal-close" onclick="document.getElementById('changePwModal').remove()">×</button></div>
+    <div class="fg"><label>Current Password</label><input type="password" id="cpCurrent" placeholder="Enter current password" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+    <div class="fg"><label>New Password</label><input type="password" id="cpNew" placeholder="Enter new password" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+    <div class="fg"><label>Confirm New Password</label><input type="password" id="cpConfirm" placeholder="Confirm new password" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('changePwModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="changePassword()">Update Password</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function changePassword(){
+  const current=document.getElementById('cpCurrent').value;
+  const newPw=document.getElementById('cpNew').value;
+  const confirm=document.getElementById('cpConfirm').value;
+  if(!current){toast('Enter current password');return;}
+  if(!newPw||newPw.length<6){toast('New password must be at least 6 characters');return;}
+  if(newPw!==confirm){toast('Passwords do not match');return;}
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(auth.currentUser.email,current);
+    await auth.currentUser.reauthenticateWithCredential(cred);
+    await auth.currentUser.updatePassword(newPw);
+    document.getElementById('changePwModal').remove();
+    toast('Password updated successfully');
+  }catch(e){
+    toast('Error: '+(e.message||'').replace('Firebase:','').trim());
   }
 }
 
