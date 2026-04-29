@@ -9192,14 +9192,15 @@ async function renderTasksView(){
         donutRings += `<circle cx="${chartCenter}" cy="${chartCenter}" r="${r}" fill="none" stroke="${tier.color}" stroke-width="${ringW}" stroke-linecap="round" stroke-dasharray="${filled} ${circ}" style="transition:stroke-dasharray .8s ease;${isCurrent?'filter:drop-shadow(0 0 4px '+tier.color+')':''}"/>`;
       }
       // Legend row
-      const pts = Math.min(Math.max(totalPts - tier.from, 0), 200);
+      const tierSize=tier.to-tier.from;
+      const pts = Math.min(Math.max(totalPts - tier.from, 0), tierSize);
       const check = isComplete ? '✅' : isCurrent ? '🔥' : '⬜';
       tierLegend += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;${isCurrent?'':'opacity:'+(isComplete?'1':'0.4')}">
         <span style="font-size:12px">${check}</span>
         <span style="width:10px;height:10px;border-radius:50%;background:${tier.color};flex-shrink:0${isComplete?';box-shadow:0 0 6px '+tier.color:''}"></span>
         <span style="font-size:12px;font-weight:${isCurrent?'700':'500'};color:${isCurrent?tier.color:'var(--text)'};flex:1">${tier.name}</span>
         <span style="font-size:12px;font-weight:700;font-family:var(--mono);color:${isComplete?tier.color:isCurrent?tier.color:'var(--muted)'}">${pts}</span>
-        <span style="font-size:10px;color:var(--muted2)">/ 200</span>
+        <span style="font-size:10px;color:var(--muted2)">/ ${tierSize}</span>
       </div>`;
     });
     const viewBox = chartCenter + baseR + TIERS.length * (ringW + ringGap) + 10;
@@ -9218,7 +9219,7 @@ async function renderTasksView(){
         <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">🏆 Point Tiers — ${MNAMES_FULL[tmMonth]} ${tmYear}</div>
         ${tierLegend}
         <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.5">
-          ${totalPts >= 1000 ? '🎉 All tiers complete! You\'re a legend!' : `${200 - ((totalPts - TIERS[activeTierIdx].from) % 200)} pts to next tier`}
+          ${totalPts >= 600 ? '🎉 All tiers complete! You\'re a legend!' : `${TIERS[activeTierIdx].to - totalPts} pts to next tier`}
         </div>
       </div>
     </div>`;
