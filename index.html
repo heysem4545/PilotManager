@@ -3241,15 +3241,34 @@ function renderDonut(){
   const cmhaRate=pct(t.cmha,expCmha);
   const tenantRate=pct(t.tp,expTenant);
 
-  function buildDonut(label,rate,collected,expected,color,subLabel){
+  function buildDonut(label,rate,collected,expected,color,subLabel,target){
     const circ=2*Math.PI*42;
     const dash=circ*rate/100;
     const rateColor=rate>=90?'#4ade80':rate>=70?'var(--amber)':'var(--red)';
+    let targetHtml='';
+    if(target){
+      const gap=target-rate;
+      const remaining=Math.max(0,Math.round(expected*target/100)-collected);
+      if(rate>=target){
+        targetHtml=`<div style="margin-top:8px;padding:6px 10px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:6px">
+          <div style="font-size:10px;font-weight:700;color:#4ade80">🏆 TARGET HIT! ${target}%</div>
+          <div style="font-size:9px;color:#4ade80;margin-top:2px">Bonus Eligible!</div>
+        </div>`;
+      } else {
+        targetHtml=`<div style="margin-top:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
+          <div style="font-size:9px;color:var(--muted)">🎯 Target: <strong style="color:var(--text)">${target}%</strong></div>
+          <div style="font-size:9px;color:var(--red);margin-top:2px">${gap}% more needed · <strong>${fmt(remaining)}</strong> to collect</div>
+        </div>`;
+      }
+    }
+    // Target line on donut
+    const targetDash=target?circ*target/100:0;
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
       <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">${label}</div>
       <div style="position:relative;width:100px;height:100px;margin:0 auto">
         <svg viewBox="0 0 100 100" style="width:100px;height:100px;transform:rotate(-90deg)">
           <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+          ${target?`<circle cx="50" cy="50" r="42" fill="none" stroke="rgba(245,201,106,0.15)" stroke-width="8" stroke-dasharray="${targetDash} ${circ}"/>`:''}
           <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
             stroke-dasharray="${dash} ${circ}" style="transition:stroke-dasharray .8s ease"/>
         </svg>
@@ -3259,6 +3278,7 @@ function renderDonut(){
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--text);font-weight:500">${fmt(collected)} <span style="color:var(--muted);font-weight:400">of ${fmt(expected)}</span></div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">${subLabel}</div>
+      ${targetHtml}
     </div>`;
   }
 
@@ -3266,7 +3286,7 @@ function renderDonut(){
   if(el) el.innerHTML=
     buildDonut('Total Collection',totalRate,t.coll,t.rent,'var(--accent)',t.rented+' rented properties')+
     buildDonut('CMHA Collection',cmhaRate,t.cmha,expCmha,'var(--blue)','CMHA payments')+
-    buildDonut('Tenant Collection',tenantRate,t.tp,expTenant,'var(--amber)','Tenant payments');
+    buildDonut('Tenant Collection',tenantRate,t.tp,expTenant,'var(--amber)','Tenant payments',95);
 }
 
 function renderFilterTabs(){
