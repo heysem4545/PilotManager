@@ -8699,29 +8699,39 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     </div>`;
     return `<div class="tm-task-row">
       ${flagDot}
-      ${isGroup?`<select class="tm-diff-sel" onchange="onTmAssignNew(${day},${i},this)" style="cursor:pointer;font-size:10px;padding:2px 3px;min-width:70px">
-        <option value="" ${!t.assignedUid?'selected':''}>👤 Assign</option>
+      ${isGroup?`
+      <span style="font-size:10px;color:var(--muted);min-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.userName?escapeHtml(t.userName):'—'}</span>
+      <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Type task…"
+        onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
+      <select class="tm-diff-sel" onchange="onTmAssignNew(${day},${i},this)" style="cursor:pointer;font-size:10px;padding:2px 3px;min-width:70px">
+        <option value="" ${!t.assignedUid?'selected':''}>👤 Assign To</option>
         ${assignOpts}
-      </select>`:`<select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
-        <option value="" ${!t.diff?'selected':''}>Difficulty</option>
-        <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
-        <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
-        <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
-      </select>`}
-      <div style="display:flex;align-items:center;gap:3px;min-width:0"
-        onmouseenter="showTaskNoteTip(this.querySelector('input').value,this)"
-        onmouseleave="hideTaskNoteTip()"
-        onfocusin="hideTaskNoteTip()">
-        ${userDot}
-        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="${isGroup?'Assign a task...':'Add task...'}"
-          onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
-      </div>
-      ${isGroup&&t.userName?`<span style="font-size:8px;color:var(--muted2);white-space:nowrap">by ${escapeHtml(t.userName)}</span>`:''}
+      </select>
       <select class="tm-status-sel ${statusClass}" onchange="onTmStatus(${day},${i},this)">
         <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
         <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
       </select>
+      `:`
+      <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
+        <option value="" ${!t.diff?'selected':''}>Difficulty</option>
+        <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
+        <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
+        <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:3px;min-width:0"
+        onmouseenter="showTaskNoteTip(this.querySelector('input').value,this)"
+        onmouseleave="hideTaskNoteTip()"
+        onfocusin="hideTaskNoteTip()">
+        ${userDot}
+        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..."
+          onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
+      <select class="tm-status-sel ${statusClass}" onchange="onTmStatus(${day},${i},this)">
+        <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
+        <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
+        <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
+      </select>`}
       <button class="tm-edit-btn" title="Edit task (full view)" onclick="openTaskEditModal(${day},${i})" style="background:none;border:1px solid var(--border2);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0" onmouseover="this.style.color='var(--text)';this.style.background='var(--surface3)'" onmouseout="this.style.color='var(--muted)';this.style.background='none'">
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>
       </button>
