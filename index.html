@@ -9177,7 +9177,7 @@ async function renderTasksView(){
     let donutRings = '';
     let tierLegend = '';
     TIERS.forEach((tier, i) => {
-      const r = baseR + i * (ringW + ringGap);
+      const r = baseR + (TIERS.length - 1 - i) * (ringW + ringGap);
       const circ = 2 * Math.PI * r;
       let pct = 0;
       if(totalPts >= tier.to) pct = 1;
