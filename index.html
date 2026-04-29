@@ -9296,6 +9296,7 @@ async function renderTasksView(){
 function describeRecurrence(rule){
   const DNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   if(rule.recurrenceType==='weekly_day') return 'Every '+DNAMES[rule.recurrenceValue||0];
+  if(rule.recurrenceType==='daily_no_sun') return 'Every day except Sundays';
   if(rule.recurrenceType==='month_start') return '1st of every month';
   if(rule.recurrenceType==='monthly_day') return ordinal(rule.recurrenceValue||1)+' of every month';
   return '—';
@@ -9312,7 +9313,11 @@ async function generateRecurringTasks(){
       const rule=doc.data();
       if(rule.lastGeneratedMonth===key) continue;
       const fireDays=[];
-      if(rule.recurrenceType==='month_start'){
+      if(rule.recurrenceType==='daily_no_sun'){
+        for(let d=1;d<=daysInMonth;d++){
+          if(new Date(tmYear,tmMonth,d).getDay()!==0) fireDays.push(d);
+        }
+      } else if(rule.recurrenceType==='month_start'){
         fireDays.push(1);
       } else if(rule.recurrenceType==='monthly_day'){
         const day=rule.recurrenceValue||1;
@@ -9367,6 +9372,7 @@ async function renderRecurringTab(baseHtml, el, tabs){
       <div class="fg"><label>Recurrence</label>
         <select id="recType" onchange="toggleRecFields()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
           <option value="weekly_day">Every week on…</option>
+          <option value="daily_no_sun">Every day except Sundays</option>
           <option value="monthly_day">Every month on day…</option>
           <option value="month_start">1st of every month</option>
         </select>
