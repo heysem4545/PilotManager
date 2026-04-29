@@ -7222,10 +7222,12 @@ async function renderTeamDailyLog(){
     const dayJobs=jobsByDay[d]||[];
     const hasJobs=dayJobs.length>0;
     const isToday=isCurrentMonth&&d===today.getDate();
-    const wJobs=dayJobs.filter(j=>j.jobType!=='excuse');
+    const wJobs=dayJobs.filter(j=>j.jobType!=='excuse'&&j.jobType!=='private');
     const eJobs=dayJobs.filter(j=>j.jobType==='excuse');
+    const pJobs=dayJobs.filter(j=>j.jobType==='private');
     const wMins=wJobs.reduce((s,j)=>s+(j.duration||0),0);
     const eMins=eJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const pMins=pJobs.reduce((s,j)=>s+(j.duration||0),0);
     const ds=dayStatuses[d]||'';
     const statusColors={'Sick':'var(--red)','Day Off':'var(--amber)','Excused':'var(--blue)','Holiday':'var(--purple)','Half Day':'var(--amber)'};
     const sBg=ds?statusColors[ds]||'var(--muted)':'';
@@ -7240,10 +7242,11 @@ async function renderTeamDailyLog(){
         :hasJobs?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${sundayWorked?'rgba(245,201,106,0.15)':'rgba(74,222,128,0.12)'};color:${sundayWorked?'#f5c96a':'#4ade80'}">${wJobs.length} task${wJobs.length>1?'s':''}</span>`:''}
       </div>
       ${ds&&!hasJobs?`<div style="display:flex;align-items:center;justify-content:center;height:40px;font-size:11px;color:${sBg};font-weight:500">${ds}</div>`
-      :hasJobs?wJobs.slice(0,3).map(j=>`<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${escapeHtml((j.task||'').substring(0,30))} · ${j.duration||0}m</div>`).join('')
-        +(wJobs.length>3?`<div style="font-size:8px;color:var(--muted2)">+${wJobs.length-3} more</div>`:'')
+      :hasJobs?wJobs.concat(pJobs).slice(0,3).map(j=>{const dur=j.duration||0;const durTxt=dur>=60?Math.floor(dur/60)+'h '+dur%60+'m':dur+'m';const clr=j.jobType==='private'?'var(--purple)':'var(--muted)';return `<div style="font-size:9px;color:${clr};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">${j.jobType==='private'?'🔒 ':''}${escapeHtml((j.task||'').substring(0,25))} · ${durTxt}</div>`;}).join('')
+        +((wJobs.length+pJobs.length)>3?`<div style="font-size:8px;color:var(--muted2)">+${wJobs.length+pJobs.length-3} more</div>`:'')
         +`<div style="font-size:8px;color:var(--blue);margin-top:2px">${Math.floor(wMins/60)}h ${wMins%60}m</div>`
         +(eMins>0?`<div style="font-size:8px;color:var(--red);margin-top:1px">⏸ ${Math.floor(eMins/60)}h ${eMins%60}m</div>`:'')
+        +(pMins>0?`<div style="font-size:8px;color:var(--purple);margin-top:1px">🔒 ${Math.floor(pMins/60)}h ${pMins%60}m</div>`:'')
       :`<div style="display:flex;align-items:center;justify-content:center;height:50px;color:var(--muted2);font-size:18px">+</div>`}
     </div>`;
   }
