@@ -9306,7 +9306,8 @@ async function renderTasksView(){
     const rows=assignTasks.map(t=>{
       const stColor=t.status==='done'?'#4ade80':t.status==='progressing'?'var(--amber)':'var(--muted)';
       const canEdit=isAdmin()||t.assignedUid===currentUser.uid;
-      return `<tr style="${t.status==='done'?'opacity:0.5':''}">
+      const isMyTask=t.assignedUid===currentUser.uid&&t.status!=='done';
+      return `<tr style="${t.status==='done'?'opacity:0.5':isMyTask?'background:rgba(245,112,106,0.08);border-left:3px solid var(--red)':''}">
         <td style="font-size:11px;color:var(--muted)">${escapeHtml(t.createdByName||'—')}</td>
         <td style="font-size:12px;font-weight:500">${escapeHtml(t.task||'—')}</td>
         <td style="font-size:11px">${escapeHtml(t.assignedName||'—')}</td>
