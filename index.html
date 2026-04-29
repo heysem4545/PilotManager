@@ -9367,7 +9367,7 @@ async function renderTasksView(){
         const hasTasks=dt.length>0;
         html+=`<div style="background:var(--surface);border:1px solid ${isToday?'var(--accent)':hasTasks?pendingCount>0?'rgba(245,112,106,0.3)':'rgba(74,222,128,0.3)':'var(--border)'};border-radius:6px;padding:4px;min-height:50px;font-size:9px">
           <div style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'};margin-bottom:2px">${d}</div>
-          ${dt.slice(0,3).map(t=>`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${t.status==='done'?'#4ade80':'var(--muted)'};${t.status==='done'?'text-decoration:line-through':''}">${escapeHtml((t.task||'').substring(0,15))}</div>`).join('')}
+          ${dt.slice(0,3).map(t=>`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${t.status==='done'?'#4ade80':'var(--muted)'};${t.status==='done'?'text-decoration:line-through':''}"><span style="font-size:7px;padding:0 3px;border-radius:3px;background:var(--blue-dim);color:var(--blue);margin-right:2px">${escapeHtml((t.assignedName||'').split(' ')[0])}</span>${escapeHtml((t.task||'').substring(0,12))}</div>`).join('')}
           ${dt.length>3?`<div style="color:var(--muted2)">+${dt.length-3} more</div>`:''}
           ${hasTasks?`<div style="margin-top:2px;font-size:8px"><span style="color:#4ade80">${doneCount}✓</span> <span style="color:var(--red)">${pendingCount}✗</span></div>`:''}
         </div>`;
