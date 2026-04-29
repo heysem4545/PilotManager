@@ -7020,13 +7020,18 @@ async function renderInnovationView(){
 }
 
 function startAssignedTaskBadge(){
-  const now=new Date();
-  const key=`tm-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  db.collection('tasks').where('monthKey','==',key).where('assignedUid','==',currentUser.uid).onSnapshot(snap=>{
-    const pending=snap.docs.filter(d=>{const t=d.data();return t.isGroup&&t.status!=='done'&&t.task;}).length;
+  db.collection('assignedTasks').where('assignedUid','==',currentUser.uid).where('status','in',['notstarted','progressing']).onSnapshot(snap=>{
+    const pending=snap.size;
     const badge=document.getElementById('assignedTaskBadge');
     if(badge){badge.textContent=pending;badge.style.display=pending>0?'':'none';}
-  },()=>{});
+  },()=>{
+    // Fallback if composite index not ready
+    db.collection('assignedTasks').where('assignedUid','==',currentUser.uid).onSnapshot(snap2=>{
+      const pending=snap2.docs.filter(d=>d.data().status!=='done').length;
+      const badge=document.getElementById('assignedTaskBadge');
+      if(badge){badge.textContent=pending;badge.style.display=pending>0?'':'none';}
+    },()=>{});
+  });
 }
 
 function startInnovationBadge(){
@@ -9264,6 +9269,71 @@ async function renderTasksView(){
     }).join('')}</div>`;
   }
 
+  if(tmTab==='group'){
+    // Simple table view for Assign Tasks
+    const assignSnap=await db.collection('assignedTasks').orderBy('createdAt','desc').get().catch(()=>({docs:[]}));
+    const assignTasks=assignSnap.docs?assignSnap.docs.map(d=>({id:d.id,...d.data()})):[];
+
+    const userOpts=teamUsersCache.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+    const pendingCount=assignTasks.filter(t=>t.status!=='done').length;
+    const doneCount=assignTasks.filter(t=>t.status==='done').length;
+
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--text)">${assignTasks.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Tasks</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${pendingCount}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Pending</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#4ade80">${doneCount}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Done</div>
+      </div>
+    </div>`;
+
+    // Add form
+    html+=`<div class="table-card" style="margin-bottom:16px">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="fg" style="margin:0;flex:1;min-width:200px"><label>Task</label><input type="text" id="atNewTask" placeholder="Type task…" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
+        <div class="fg" style="margin:0;min-width:140px"><label>Assign To</label><select id="atNewAssign" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"><option value="">Select…</option>${userOpts}</select></div>
+        <button class="btn btn-primary btn-sm" style="margin-bottom:1px" onclick="addAssignedTask()">+ Assign</button>
+      </div>
+    </div>`;
+
+    // Table
+    const rows=assignTasks.map(t=>{
+      const stColor=t.status==='done'?'#4ade80':t.status==='progressing'?'var(--amber)':'var(--muted)';
+      const canEdit=isAdmin()||t.assignedUid===currentUser.uid;
+      return `<tr style="${t.status==='done'?'opacity:0.5':''}">
+        <td style="font-size:11px;color:var(--muted)">${escapeHtml(t.createdByName||'—')}</td>
+        <td style="font-size:12px;font-weight:500">${escapeHtml(t.task||'—')}</td>
+        <td style="font-size:11px">${escapeHtml(t.assignedName||'—')}</td>
+        <td>${canEdit?`<select style="font-size:10px;padding:3px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:${stColor};font-weight:600;cursor:pointer;font-family:var(--font)" onchange="updateAssignedTaskStatus('${t.id}',this.value)">
+          <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
+          <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
+          <option value="done" ${t.status==='done'?'selected':''}>✓ Done</option>
+        </select>`:`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${stColor}20;color:${stColor};font-weight:600">${t.status==='done'?'Done':t.status==='progressing'?'Progressing':'Not Started'}</span>`}</td>
+        <td style="font-size:10px;font-family:var(--mono);color:var(--muted)">${t.createdDate||'—'}</td>
+        ${isAdmin()?`<td><button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:9px" onclick="deleteAssignedTask('${t.id}')">×</button></td>`:''}
+      </tr>`;
+    }).join('');
+
+    html+=`<div class="table-card">
+      <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${assignTasks.length} assigned task${assignTasks.length!==1?'s':''}</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr>
+          <th>Created By</th><th>Task</th><th>Assign To</th><th>Status</th><th>Date</th>${isAdmin()?'<th></th>':''}
+        </tr></thead>
+        <tbody>${rows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No assigned tasks yet</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+
+    el.innerHTML=html;
+    return;
+  }
+
   if(tmTab==='recurring'){
     await renderRecurringTab(html, el, tabs);
     return;
@@ -9542,6 +9612,46 @@ async function forceGenerateRule(id){
     await generateRecurringTasks();
     toast('Tasks generated for this month');
     await renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+// ─── ASSIGNED TASKS (simple table) ───
+async function addAssignedTask(){
+  const task=document.getElementById('atNewTask').value.trim();
+  const assignUid=document.getElementById('atNewAssign').value;
+  if(!task){toast('Type a task');return;}
+  if(!assignUid){toast('Select who to assign');return;}
+  const user=teamUsersCache.find(u=>u.uid===assignUid);
+  try{
+    await db.collection('assignedTasks').add({
+      task,
+      assignedUid:assignUid,
+      assignedName:user?(user.name||user.email):'',
+      createdBy:currentUser.uid,
+      createdByName:currentUser.name||currentUser.email,
+      createdDate:new Date().toISOString().slice(0,10),
+      status:'notstarted',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Task assigned to '+(user?user.name:'user'));
+    renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function updateAssignedTaskStatus(id, status){
+  try{
+    await db.collection('assignedTasks').doc(id).update({status, updatedAt:new Date()});
+    if(status==='done') toast('Task completed!');
+    renderTasksView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+async function deleteAssignedTask(id){
+  if(!confirm('Delete this task?')) return;
+  try{
+    await db.collection('assignedTasks').doc(id).delete();
+    toast('Task deleted');
+    renderTasksView();
   }catch(e){toast('Error: '+e.message);}
 }
 
