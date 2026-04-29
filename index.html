@@ -9127,18 +9127,18 @@ async function renderTasksView(){
     const myStats = calcStats(tasks);
     const totalPts = myStats.pts;
     const TIERS = [
-      {name:'Tier 1', color:'#4ade80', from:0, to:200},
-      {name:'Tier 2', color:'#6ab8f5', from:200, to:400},
-      {name:'Tier 3', color:'#f5c96a', from:400, to:600},
-      {name:'Tier 4', color:'#b56af5', from:600, to:800},
-      {name:'Tier 5', color:'#f5706a', from:800, to:1000}
+      {name:'Tier 1', color:'#4ade80', from:0, to:100},
+      {name:'Tier 2', color:'#6ab8f5', from:100, to:200},
+      {name:'Tier 3', color:'#f5c96a', from:200, to:300},
+      {name:'Tier 4', color:'#b56af5', from:300, to:400},
+      {name:'Tier 5', color:'#f5706a', from:400, to:500}
     ];
     const currentTier = TIERS.findIndex(t => totalPts < t.to);
     const activeTierIdx = currentTier >= 0 ? currentTier : TIERS.length - 1;
-    const chartCenter = 110;
-    const ringW = 10;
-    const ringGap = 3;
-    const baseR = 35;
+    const chartCenter = 150;
+    const ringW = 14;
+    const ringGap = 5;
+    const baseR = 65;
     let donutRings = '';
     let tierLegend = '';
     TIERS.forEach((tier, i) => {
