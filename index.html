@@ -7408,7 +7408,8 @@ async function addTeamLogEntry(day, jobType){
   const isPrivate=jobType==='private';
   const idPrefix=isPrivate?'tlNewPvt':isExcuse?'tlNewExc':'tlNew';
   const taskEl=document.getElementById(idPrefix+'Task');
-  const task=taskEl?taskEl.value.trim():'';
+  if(!taskEl){toast('Error: form field not found ('+idPrefix+'Task)');return;}
+  const task=taskEl.value.trim();
   if(!task){toast(isExcuse?'Enter a reason':isPrivate?'Enter a private task':'Enter a task');return;}
   const mKey=`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
   const prefix=idPrefix;
