@@ -15099,8 +15099,8 @@ function openSalaryEntryModal(editId){
         <div class="fg"><label>Bonus 3 Amount ($)</label><input type="number" id="sf_b3amt" placeholder="0" step="0.01"></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Bonus 4 Name</label><input id="sf_b4name" placeholder=""></div>
-        <div class="fg"><label>Bonus 4 Amount ($)</label><input type="number" id="sf_b4amt" placeholder="0" step="0.01"></div>
+        <div class="fg"><label>Bonus 4 — Collection Rate</label><input id="sf_b4name" value="Collection Rate" placeholder="Collection Rate"></div>
+        <div class="fg"><label>Amount ($)</label><div style="display:flex;gap:4px"><input type="number" id="sf_b4amt" placeholder="0" step="0.01" style="flex:1"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:9px;color:var(--amber);white-space:nowrap" onclick="calcCollectionBonus()">📊 Calc</button></div></div>
       </div>
       <div class="frow">
         <div class="fg"><label>Bonus 5 — Task Points</label><input id="sf_b5name" value="Task Points" placeholder="Task Points"></div>
@@ -15195,6 +15195,63 @@ function saveBonusRates(){
   localStorage.setItem('bonusRates',JSON.stringify({taskPointRate,meetingStarRate}));
   document.getElementById('bonusRatesModal').remove();
   toast('Bonus rates saved: Task $'+taskPointRate+'/pt · Meeting $'+meetingStarRate+'/star');
+}
+
+async function calcCollectionBonus(){
+  const dateFrom=document.getElementById('sf_dateFrom').value;
+  if(!dateFrom){toast('Set pay period dates first');return;}
+  // Calculate collection rates for the pay period month
+  const m=parseInt(dateFrom.slice(5,7),10)-1;
+  const y=parseInt(dateFrom.slice(0,4),10);
+  const savedYear=activeYear, savedMonth=activeMonth;
+  activeYear=y; activeMonth=m;
+  // Load month data if needed
+  const mKey=monthKey(y,m);
+  const alreadyLoaded=Object.values(monthData).some(pd=>pd[mKey]!==undefined);
+  if(!alreadyLoaded) await loadMonthData(mKey);
+
+  const rentedProps=properties.filter(p=>getMonthProp(p).status==='RENTED');
+  const expTenant=rentedProps.reduce((s,p)=>s+(getMonthProp(p).tenantPortion||0),0);
+  const collTenant=rentedProps.reduce((s,p)=>s+(getMonthProp(p).tenantPaid||0),0);
+  const expCmha=rentedProps.reduce((s,p)=>s+(getMonthProp(p).cmha||0),0);
+  const collCmha=rentedProps.reduce((s,p)=>s+(getMonthProp(p).cmhaPaid||0),0);
+  const expTotal=expCmha+expTenant;
+  const collTotal=collCmha+collTenant;
+  const totalRate=expTotal>0?Math.round(collTotal/expTotal*100):0;
+  const cmhaRate=expCmha>0?Math.round(collCmha/expCmha*100):0;
+  const tenantRate=expTenant>0?Math.round(collTenant/expTenant*100):0;
+
+  activeYear=savedYear; activeMonth=savedMonth;
+
+  // Check bonus eligibility
+  const MNAMES_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel=MNAMES_S[m]+' '+y;
+  let bonusAmt=0;
+  let bonusText='Collection Rate';
+
+  if(totalRate<90||cmhaRate<90){
+    document.getElementById('sf_b4name').value='Collection Rate (Not eligible — Total '+totalRate+'% / CMHA '+cmhaRate+'%)';
+    document.getElementById('sf_b4amt').value=0;
+    toast('❌ Not eligible: Total ('+totalRate+'%) or CMHA ('+cmhaRate+'%) below 90%');
+    return;
+  }
+
+  if(tenantRate>=95){
+    bonusText='Collection Rate — Bonus 2 HIT! (Tenant '+tenantRate+'%)';
+    bonusAmt=200; // You can adjust this
+    toast('🏆 Bonus 2 HIT! Tenant '+tenantRate+'% · Total '+totalRate+'% · CMHA '+cmhaRate+'%');
+  } else if(tenantRate>=90){
+    bonusText='Collection Rate — Bonus 1 HIT! (Tenant '+tenantRate+'%)';
+    bonusAmt=100; // You can adjust this
+    toast('🏆 Bonus 1 HIT! Tenant '+tenantRate+'% · Total '+totalRate+'% · CMHA '+cmhaRate+'%');
+  } else {
+    bonusText='Collection Rate (Tenant '+tenantRate+'% — not hit 90%)';
+    bonusAmt=0;
+    toast('Tenant at '+tenantRate+'% — need 90% for Bonus 1');
+  }
+
+  document.getElementById('sf_b4name').value=bonusText;
+  document.getElementById('sf_b4amt').value=bonusAmt;
 }
 
 async function calcTaskBonus(){
