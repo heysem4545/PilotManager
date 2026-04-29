@@ -14858,8 +14858,8 @@ async function renderSalaryPoolAdmin(el, users){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px">
         <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 Salary Summary ${thisYear}</div>
-        <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px">${fmtc(totalPaidYear)}</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Total paid this year</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px">${fmtc(records.length>0?(Number(records[0].baseSalary)||0)+sumBonuses(records[0]):0)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Last month earnings</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${[1,2,3,4,5,6].map(i=>{
             const total=records.reduce((s,r)=>s+(Number(r['bonus'+i+'Amount'])||0),0);
@@ -14935,8 +14935,7 @@ async function renderSalaryPoolUser(el){
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px">
         <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 My Salary</div>
         <div style="display:flex;gap:16px;margin-bottom:10px">
-          <div><div style="font-size:22px;font-weight:700;color:var(--accent)">${fmtc(lastSalary)}</div><div style="font-size:9px;color:var(--muted)">Last Pay</div></div>
-          <div><div style="font-size:22px;font-weight:700;color:var(--blue)">${fmtc(totalPaidYear)}</div><div style="font-size:9px;color:var(--muted)">Total ${thisYear}</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:var(--accent)">${fmtc(lastSalary)}</div><div style="font-size:9px;color:var(--muted)">Last Month Earnings</div></div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${[1,2,3,4,5,6].map(i=>{
