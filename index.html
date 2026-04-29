@@ -14885,8 +14885,11 @@ async function renderSalaryPoolAdmin(el, users){
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${releaseDate}</span>
         </div>`:`<div style="font-size:9px;color:var(--muted2);margin-top:8px">double-click to set release date</div>`}
-        <div style="margin-top:10px;padding:6px 10px;background:rgba(176,106,245,0.06);border-radius:6px">
-          <div style="font-size:8px;color:var(--muted);line-height:1.5">ℹ Reserve pool is only eligible for active employees by the release date. If employment ends before the release date, the reserve will not be paid out.</div>
+        <div style="margin-top:10px;cursor:pointer" onclick="const m=this.querySelector('.rp-tip');m.style.display=m.style.display==='none'?'':'none'">
+          <span style="font-size:9px;color:var(--muted2)">ℹ Terms & Conditions</span>
+          <div class="rp-tip" style="display:none;margin-top:6px;padding:8px 10px;background:rgba(176,106,245,0.06);border:1px solid rgba(176,106,245,0.15);border-radius:6px">
+            <div style="font-size:9px;color:var(--muted);line-height:1.6">Reserve pool is only eligible for active employees by the release date. If employment ends before the release date, the reserve will not be paid out.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -14970,8 +14973,11 @@ async function renderSalaryPoolUser(el){
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${releaseDate}</span>
         </div>`:''}
-        <div style="margin-top:10px;padding:6px 10px;background:rgba(176,106,245,0.06);border-radius:6px">
-          <div style="font-size:8px;color:var(--muted);line-height:1.5">ℹ Reserve pool is only eligible for active employees by the release date. If employment ends before the release date, the reserve will not be paid out.</div>
+        <div style="margin-top:10px;cursor:pointer" onclick="const m=this.querySelector('.rp-tip');m.style.display=m.style.display==='none'?'':'none'">
+          <span style="font-size:9px;color:var(--muted2)">ℹ Terms & Conditions</span>
+          <div class="rp-tip" style="display:none;margin-top:6px;padding:8px 10px;background:rgba(176,106,245,0.06);border:1px solid rgba(176,106,245,0.15);border-radius:6px">
+            <div style="font-size:9px;color:var(--muted);line-height:1.6">Reserve pool is only eligible for active employees by the release date. If employment ends before the release date, the reserve will not be paid out.</div>
+          </div>
         </div>
       </div>
     </div>
