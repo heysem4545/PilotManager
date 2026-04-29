@@ -3269,8 +3269,8 @@ function renderDonut(){
     const targetDash=targets&&targets.length?circ*targets[targets.length-1]/100:0;
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
       <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">${label}</div>
-      <div style="position:relative;width:140px;height:140px;margin:0 auto">
-        <svg viewBox="0 0 100 100" style="width:140px;height:140px;transform:rotate(-90deg)">
+      <div style="position:relative;width:110px;height:110px;margin:0 auto">
+        <svg viewBox="0 0 100 100" style="width:110px;height:110px;transform:rotate(-90deg)">
           <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface3)" stroke-width="8"/>
           ${targets&&targets.length?`<circle cx="50" cy="50" r="42" fill="none" stroke="rgba(245,201,106,0.15)" stroke-width="8" stroke-dasharray="${targetDash} ${circ}"/>`:''}
           <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
