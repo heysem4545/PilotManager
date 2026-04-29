@@ -7023,7 +7023,7 @@ function startAssignedTaskBadge(){
   const now=new Date();
   const key=`tm-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   db.collection('tasks').where('monthKey','==',key).where('assignedUid','==',currentUser.uid).onSnapshot(snap=>{
-    const pending=snap.docs.filter(d=>{const t=d.data();return t.status!=='done'&&t.task;}).length;
+    const pending=snap.docs.filter(d=>{const t=d.data();return t.isGroup&&t.status!=='done'&&t.task;}).length;
     const badge=document.getElementById('assignedTaskBadge');
     if(badge){badge.textContent=pending;badge.style.display=pending>0?'':'none';}
   },()=>{});
