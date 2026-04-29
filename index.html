@@ -8661,10 +8661,8 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
   const today=new Date();
   const isToday=today.getDate()===day&&today.getMonth()===tmMonth&&today.getFullYear()===tmYear;
   const rawTasks=tasks[day]||[];
-  // Final filter: group view only shows unassigned/team tasks (not personally assigned ones)
-  const filteredTasks=isGroup
-    ? rawTasks.filter(t=>!t.assignedUid || t.assignedUid==='' || t.assignedUid==='team')
-    : rawTasks;
+  // Final filter: group/assign view shows all group tasks, own view shows personal only
+  const filteredTasks=isGroup ? rawTasks : rawTasks;
   // Sort by rowIdx so tasks stay in their original position
   const dayTasks=[...filteredTasks].sort((a,b)=>(a.rowIdx||0)-(b.rowIdx||0));
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -9069,12 +9067,7 @@ async function renderTasksView(){
     });
   } else if(tmTab==='group'){
     Object.keys(tasks).forEach(dk=>{
-      tasks[dk]=tasks[dk].filter(t=>{
-        // Show in group if: isGroup is true, OR assignedUid is 'team'/empty and no specific user
-        if(t.isGroup) return true;
-        if(t.assignedUid && t.assignedUid!=='team' && t.assignedUid!=='') return false;
-        return true;
-      });
+      tasks[dk]=tasks[dk].filter(t=>!!t.isGroup);
     });
   }
 
