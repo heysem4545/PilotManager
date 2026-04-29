@@ -3241,29 +3241,37 @@ function renderDonut(){
   const cmhaRate=pct(t.cmha,expCmha);
   const tenantRate=pct(t.tp,expTenant);
 
-  function buildDonut(label,rate,collected,expected,color,subLabel,targets){
+  function buildDonut(label,rate,collected,expected,color,subLabel,targets,prereq){
     const circ=2*Math.PI*42;
     const dash=circ*rate/100;
     const rateColor=rate>=90?'#4ade80':rate>=70?'var(--amber)':'var(--red)';
     let targetHtml='';
+    const prereqMet=!prereq||prereq();
     if(targets&&targets.length){
-      targetHtml='<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">';
-      targets.forEach((tg,idx)=>{
-        const gap=tg-rate;
-        const remaining=Math.max(0,Math.round(expected*tg/100)-collected);
-        const bonusLabel='Bonus '+(idx+1);
-        if(rate>=tg){
-          targetHtml+=`<div style="padding:8px 10px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:6px">
-            <div style="font-size:12px;font-weight:700;color:#4ade80">🏆 ${bonusLabel} — ${tg}% HIT!</div>
-          </div>`;
-        } else {
-          targetHtml+=`<div style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
-            <div style="font-size:12px;font-weight:600;color:var(--amber)">💰 ${bonusLabel}: Collect ${fmt(remaining)} more!</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px">${gap}% to reach ${tg}%</div>
-          </div>`;
-        }
-      });
-      targetHtml+='</div>';
+      if(!prereqMet){
+        targetHtml=`<div style="margin-top:8px;padding:8px 10px;background:rgba(245,112,106,0.06);border:1px solid rgba(245,112,106,0.2);border-radius:6px">
+          <div style="font-size:12px;font-weight:600;color:var(--red)">⚠ Total & CMHA must be 90%+ first</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Bonus requires all collections above 90%</div>
+        </div>`;
+      } else {
+        targetHtml='<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">';
+        targets.forEach((tg,idx)=>{
+          const gap=tg-rate;
+          const remaining=Math.max(0,Math.round(expected*tg/100)-collected);
+          const bonusLabel='Bonus '+(idx+1);
+          if(rate>=tg){
+            targetHtml+=`<div style="padding:8px 10px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:6px">
+              <div style="font-size:12px;font-weight:700;color:#4ade80">🏆 ${bonusLabel} — ${tg}% HIT!</div>
+            </div>`;
+          } else {
+            targetHtml+=`<div style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
+              <div style="font-size:12px;font-weight:600;color:var(--amber)">💰 ${bonusLabel}: Collect ${fmt(remaining)} more!</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">${gap}% to reach ${tg}%</div>
+            </div>`;
+          }
+        });
+        targetHtml+='</div>';
+      }
     }
     // Target line on donut
     const targetDash=targets&&targets.length?circ*targets[targets.length-1]/100:0;
@@ -3290,7 +3298,7 @@ function renderDonut(){
   if(el) el.innerHTML=
     buildDonut('Total Collection',totalRate,t.coll,t.rent,'var(--accent)',t.rented+' rented properties')+
     buildDonut('CMHA Collection',cmhaRate,t.cmha,expCmha,'var(--blue)','CMHA payments')+
-    buildDonut('Tenant Collection',tenantRate,t.tp,expTenant,'var(--amber)','Tenant payments',[90,95]);
+    buildDonut('Tenant Collection',tenantRate,t.tp,expTenant,'var(--amber)','Tenant payments',[90,95],()=>totalRate>=90&&cmhaRate>=90);
 }
 
 function renderFilterTabs(){
