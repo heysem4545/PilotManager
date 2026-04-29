@@ -3256,8 +3256,8 @@ function renderDonut(){
         </div>`;
       } else {
         targetHtml=`<div style="margin-top:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
-          <div style="font-size:9px;color:var(--muted)">🎯 Target: <strong style="color:var(--text)">${target}%</strong></div>
-          <div style="font-size:9px;color:var(--red);margin-top:2px">${gap}% more needed · <strong>${fmt(remaining)}</strong> to collect</div>
+          <div style="font-size:10px;font-weight:600;color:var(--amber)">💰 Collect ${fmt(remaining)} more to hit bonus!</div>
+          <div style="font-size:8px;color:var(--muted);margin-top:2px">${gap}% to reach ${target}% target</div>
         </div>`;
       }
     }
