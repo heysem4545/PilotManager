@@ -15047,7 +15047,7 @@ async function buildSalaryTableRowsExpanded(records, showActions=true, uid=''){
       <td class="money">${fmtc(Number(r.baseSalary)||0)}</td>
       ${bonusCells}
       <td class="money" style="font-weight:600;color:var(--accent)">${fmtc(totalSalary)}</td>
-      <td class="money" style="color:var(--blue)">${fmtc(Number(r.reserveAmount)||0)}</td>
+      <td style="color:var(--blue)"><div style="font-family:var(--mono);text-align:right">${fmtc(Number(r.reserveAmount)||0)}</div>${r.reserveNote?`<div style="font-size:8px;color:var(--muted);text-align:right">${escapeHtml(r.reserveNote)}</div>`:''}</td>
       ${(()=>{
         const att=attendanceData[r.monthKey]||{excuseMins:0,privateMins:0,statuses:{}};
         const excH=Math.floor(att.excuseMins/60);
@@ -15112,7 +15112,7 @@ function buildSalaryTableRows(records, showActions){
       <td class="money">${fmtc(Number(r.baseSalary)||0)}</td>
       <td>${bonusDisplay}</td>
       <td class="money m-pos" style="font-weight:600">${fmtc(totalSalary)}</td>
-      <td class="money" style="color:var(--blue)">${fmtc(Number(r.reserveAmount)||0)}</td>
+      <td style="color:var(--blue)"><div style="font-family:var(--mono);text-align:right">${fmtc(Number(r.reserveAmount)||0)}</div>${r.reserveNote?`<div style="font-size:8px;color:var(--muted);text-align:right">${escapeHtml(r.reserveNote)}</div>`:''}</td>
       ${actions}
     </tr>`;
   }).join('');
@@ -15173,6 +15173,7 @@ function openSalaryEntryModal(editId){
       </div>
       <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px">Reserve Pool</div>
       <div class="frow">
+        <div class="fg"><label>Reserve Note</label><input id="sf_reserveNote" placeholder="e.g. Monthly savings, Performance pool"></div>
         <div class="fg"><label>Reserve Amount ($)</label><input type="number" id="sf_reserve" placeholder="0" step="0.01"></div>
       </div>
       <div id="sf_absenceSummary" style="margin-top:12px;padding:10px;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;font-size:11px;color:var(--muted);display:none"></div>
@@ -15404,6 +15405,7 @@ async function loadSalaryEntryForEdit(docId){
       document.getElementById('sf_b'+i+'name').value = r['bonus'+i+'Name'] || '';
       document.getElementById('sf_b'+i+'amt').value = r['bonus'+i+'Amount'] || '';
     }
+    document.getElementById('sf_reserveNote').value = r.reserveNote || '';
     document.getElementById('sf_reserve').value = r.reserveAmount || '';
   } catch(e){ toast('Error loading record'); }
 }
@@ -15427,6 +15429,7 @@ async function saveSalaryRecord(){
     monthKey,
     dateFrom, dateTo,
     baseSalary,
+    reserveNote: document.getElementById('sf_reserveNote').value.trim(),
     reserveAmount: Number(document.getElementById('sf_reserve').value)||0
   };
 
