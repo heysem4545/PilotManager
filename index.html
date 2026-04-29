@@ -9298,6 +9298,7 @@ async function renderTasksView(){
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
         <div class="fg" style="margin:0;flex:1;min-width:200px"><label>Task</label><input type="text" id="atNewTask" placeholder="Type task…" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></div>
         <div class="fg" style="margin:0;min-width:140px"><label>Assign To</label><select id="atNewAssign" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"><option value="">Select…</option>${userOpts}</select></div>
+        <div class="fg" style="margin:0;min-width:130px"><label>Date</label><input type="date" id="atNewDate" value="${new Date().toISOString().slice(0,10)}" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark"></div>
         <button class="btn btn-primary btn-sm" style="margin-bottom:1px" onclick="addAssignedTask()">+ Assign</button>
       </div>
     </div>`;
@@ -9673,7 +9674,7 @@ async function addAssignedTask(){
       assignedName:user?(user.name||user.email):'',
       createdBy:currentUser.uid,
       createdByName:currentUser.name||currentUser.email,
-      createdDate:new Date().toISOString().slice(0,10),
+      createdDate:document.getElementById('atNewDate').value||new Date().toISOString().slice(0,10),
       status:'notstarted',
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
