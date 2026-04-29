@@ -1087,29 +1087,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <div id="inspectionAlertSection"></div>
         <div class="month-bar" id="dashMonthBar"></div>
         <div class="metrics" id="metricsGrid"></div>
-        <div class="overview-row">
-          <div class="ov-card">
-            <div class="card-title">Portfolio status</div>
-            <div id="statusBars"></div>
-          </div>
-          <div class="ov-card">
-            <div class="card-title">Collection rate</div>
-            <div class="donut-wrap">
-              <svg viewBox="0 0 100 100" style="width:100px;height:100px;transform:rotate(-90deg)">
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#222228" stroke-width="9"/>
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#c9f563" stroke-width="9" stroke-linecap="round"
-                  id="donutArc" stroke-dasharray="0 239" style="transition:stroke-dasharray .8s ease"/>
-              </svg>
-              <div class="donut-inner">
-                <div class="donut-pct" id="donutPct">0%</div>
-                <div class="donut-sub">collected</div>
-              </div>
-            </div>
-            <div class="leg-row"><div style="display:flex;align-items:center;gap:6px"><span class="leg-dot" style="background:var(--accent)"></span>CMHA paid</div><span class="money m-pos" id="legCmha"></span></div>
-            <div class="leg-row"><div style="display:flex;align-items:center;gap:6px"><span class="leg-dot" style="background:var(--blue)"></span>Tenant paid</div><span class="money" style="color:var(--blue)" id="legTenant"></span></div>
-            <div class="leg-row"><div style="display:flex;align-items:center;gap:6px"><span class="leg-dot" style="background:var(--red)"></span>Balance due</div><span class="money m-neg" id="legBalance"></span></div>
-          </div>
-        </div>
+        <div id="collectionDonuts" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px"></div>
       </div>
 
 
@@ -3257,15 +3235,38 @@ function renderStatusBars(){
 
 function renderDonut(){
   const t=calcTotals();
-  const p=pct(t.coll,t.rent);
-  const circ=2*Math.PI*38;
-  setTimeout(()=>{
-    document.getElementById('donutArc').setAttribute('stroke-dasharray',`${circ*p/100} ${circ}`);
-    document.getElementById('donutPct').textContent=p+'%';
-    document.getElementById('legCmha').textContent=fmt(t.cmha);
-    document.getElementById('legTenant').textContent=fmt(t.tp);
-    document.getElementById('legBalance').textContent=fmt(t.realBal);
-  },120);
+  const expCmha=properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).cmha||0),0);
+  const expTenant=properties.filter(p=>getMonthProp(p).status==='RENTED').reduce((s,p)=>s+(getMonthProp(p).tenantPortion||0),0);
+  const totalRate=pct(t.coll,t.rent);
+  const cmhaRate=pct(t.cmha,expCmha);
+  const tenantRate=pct(t.tp,expTenant);
+
+  function buildDonut(label,rate,collected,expected,color,subLabel){
+    const circ=2*Math.PI*42;
+    const dash=circ*rate/100;
+    const rateColor=rate>=90?'#4ade80':rate>=70?'var(--amber)':'var(--red)';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">${label}</div>
+      <div style="position:relative;width:100px;height:100px;margin:0 auto">
+        <svg viewBox="0 0 100 100" style="width:100px;height:100px;transform:rotate(-90deg)">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="${dash} ${circ}" style="transition:stroke-dasharray .8s ease"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:22px;font-weight:700;color:${rateColor}">${rate}%</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text);font-weight:500">${fmt(collected)} <span style="color:var(--muted);font-weight:400">of ${fmt(expected)}</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">${subLabel}</div>
+    </div>`;
+  }
+
+  const el=document.getElementById('collectionDonuts');
+  if(el) el.innerHTML=
+    buildDonut('Total Collection',totalRate,t.coll,t.rent,'var(--accent)',t.rented+' rented properties')+
+    buildDonut('CMHA Collection',cmhaRate,t.cmha,expCmha,'var(--blue)','CMHA payments')+
+    buildDonut('Tenant Collection',tenantRate,t.tp,expTenant,'var(--amber)','Tenant payments');
 }
 
 function renderFilterTabs(){
@@ -6119,8 +6120,7 @@ async function switchMonth(y,m){
   startMonthDataListener(key);
   renderTable();
   renderMetrics();
-   renderStatusBars();
-  renderDonut();
+    renderDonut();
   // If on collection monthly view, re-render it too
   if(currentView==='collection' && collectionViewMode==='monthly') renderCollectionMonthlyView();
 }
@@ -10204,8 +10204,7 @@ function showView(v){
     renderInspectionAlerts();
     renderMonthBar();
     renderMetrics();
-       renderStatusBars();
-    renderDonut();
+          renderDonut();
   }
   if(v==='collection') renderCollectionPage();
   if(v==='properties'){
