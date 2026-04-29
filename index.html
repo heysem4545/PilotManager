@@ -7490,10 +7490,12 @@ function showTeamLogMonthList(){
 
   db.collection('teamDailyLog').where('monthKey','==',mKey).where('uid','==',teamLogUser).get().then(snap=>{
     const jobs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.day||0)-(b.day||0));
-    const wJobs=jobs.filter(j=>j.jobType!=='excuse');
+    const wJobs=jobs.filter(j=>j.jobType!=='excuse'&&j.jobType!=='private');
     const eJobs=jobs.filter(j=>j.jobType==='excuse');
+    const pJobs=isAdmin()?jobs.filter(j=>j.jobType==='private'):[];
     const wMins=wJobs.reduce((s,j)=>s+(j.duration||0),0);
     const eMins=eJobs.reduce((s,j)=>s+(j.duration||0),0);
+    const pMins=pJobs.reduce((s,j)=>s+(j.duration||0),0);
     const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const thStyle='text-align:left;padding:8px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)';
 
@@ -7529,6 +7531,7 @@ function showTeamLogMonthList(){
         <span><strong style="color:var(--accent)">${wJobs.length}</strong> tasks</span>
         <span><strong style="color:var(--blue)">${Math.floor(wMins/60)}h ${wMins%60}m</strong> work</span>
         ${eMins>0?`<span><strong style="color:var(--red)">${Math.floor(eMins/60)}h ${eMins%60}m</strong> excuse</span>`:''}
+        ${pMins>0?`<span><strong style="color:var(--purple)">${Math.floor(pMins/60)}h ${pMins%60}m</strong> private</span>`:''}
       </div>
       <div style="max-height:60vh;overflow-y:auto">
         <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;padding:8px 0">🔧 Work</div>
@@ -7538,6 +7541,10 @@ function showTeamLogMonthList(){
         ${eJobs.length?`<div style="font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 8px">⏸ Excuse</div>
         <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Reason</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>
           <tbody>${buildSection(eJobs,'Excuse','var(--red)')}</tbody>
+        </table>`:''}
+        ${pJobs.length?`<div style="font-size:11px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 8px">🔒 Private</div>
+        <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thStyle}">Day</th><th style="${thStyle}">Task</th><th style="${thStyle}">Start</th><th style="${thStyle}">End</th><th style="${thStyle}">Duration</th><th style="${thStyle}">Notes</th></tr></thead>
+          <tbody>${buildSection(pJobs,'Private','var(--purple)')}</tbody>
         </table>`:''}
       </div>
       <div class="modal-foot"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('teamLogMonthModal').remove()">Close</button></div>
