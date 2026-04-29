@@ -12889,7 +12889,7 @@ function startConstProjectsListener(){
   if(_constProjUnsub) _constProjUnsub();
   _constProjUnsub=db.collection('constructionProjects').onSnapshot(snap=>{
     constProjectsData = snap.docs.map(d=>({id:d.id,...d.data()}));
-    constProjectsData.sort((a,b)=>(a.totalProgress||0)-(b.totalProgress||0));
+    constProjectsData.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
     if(_constProjRendering) return;
     const el=document.getElementById('constProjectsView');
     if(el&&el.innerHTML!==''){
@@ -12906,7 +12906,7 @@ async function loadConstProjects(){
   try{
     const snap = await db.collection('constructionProjects').get();
     constProjectsData = snap.docs.map(d=>({id:d.id,...d.data()}));
-    constProjectsData.sort((a,b)=>(a.totalProgress||0)-(b.totalProgress||0));
+    constProjectsData.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   }catch(e){
     console.error('loadConstProjects error:',e);
     constProjectsData=[];
@@ -13848,7 +13848,7 @@ function renderTurnoverProjects(){
   const container = document.getElementById('turnoverTabContent');
   if(!container) return;
 
-  const sorted = [...turnoverData].filter(p=>!p.archived).sort((a,b)=>(a.progress||0)-(b.progress||0));
+  const sorted = [...turnoverData].filter(p=>!p.archived).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 
   if(!sorted.length){
     container.innerHTML=`<div class="to-empty">
