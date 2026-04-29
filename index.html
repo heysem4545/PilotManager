@@ -3334,6 +3334,7 @@ function renderDonut(){
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--text);font-weight:500">${fmt(collected)} <span style="color:var(--muted);font-weight:400">of ${fmt(expected)}</span></div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">${subLabel}</div>
+      ${rate<90?`<div style="margin-top:6px;padding:4px 8px;background:var(--amber-dim);border-radius:5px"><div style="font-size:10px;color:var(--amber);font-weight:600">Collect ${fmt(Math.max(0,Math.round(expected*0.9)-collected))} to hit 90%</div></div>`:''}
       ${targetHtml}
     </div>`;
   }
