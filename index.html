@@ -964,9 +964,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <span class="nav-badge" id="courtBadge" style="display:none">0</span>
       </button>
       <div class="nav-label">Management</div>
-      <button class="nav-item" id="nav-tasks" onclick="showView('tasks')">
+      <button class="nav-item" id="nav-tasks" onclick="showView('tasks')" style="position:relative">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8l2 2 4-4"/></svg>
         Task Management
+        <span class="nav-badge" id="assignedTaskBadge" style="display:none">0</span>
       </button>
       <button class="nav-item" id="nav-meetings" onclick="showView('meetings')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
@@ -2522,6 +2523,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startConstProjectsListener();
   startTurnoverListener();
   startInnovationBadge();
+  startAssignedTaskBadge();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -7017,6 +7019,16 @@ async function renderInnovationView(){
   el.innerHTML=html;
 }
 
+function startAssignedTaskBadge(){
+  const now=new Date();
+  const key=`tm-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  db.collection('tasks').where('monthKey','==',key).where('assignedUid','==',currentUser.uid).onSnapshot(snap=>{
+    const pending=snap.docs.filter(d=>{const t=d.data();return t.status!=='done'&&t.task;}).length;
+    const badge=document.getElementById('assignedTaskBadge');
+    if(badge){badge.textContent=pending;badge.style.display=pending>0?'':'none';}
+  },()=>{});
+}
+
 function startInnovationBadge(){
   if(!isAdmin()) return;
   db.collection('innovation').where('status','==','Open').onSnapshot(snap=>{
@@ -8687,24 +8699,24 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
     </div>`;
     return `<div class="tm-task-row">
       ${flagDot}
-      <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
+      ${isGroup?`<select class="tm-diff-sel" onchange="onTmAssignNew(${day},${i},this)" style="cursor:pointer;font-size:10px;padding:2px 3px;min-width:70px">
+        <option value="" ${!t.assignedUid?'selected':''}>👤 Assign</option>
+        ${assignOpts}
+      </select>`:`<select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
         <option value="" ${!t.diff?'selected':''}>Difficulty</option>
         <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
         <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
         <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
-      </select>
+      </select>`}
       <div style="display:flex;align-items:center;gap:3px;min-width:0"
         onmouseenter="showTaskNoteTip(this.querySelector('input').value,this)"
         onmouseleave="hideTaskNoteTip()"
         onfocusin="hideTaskNoteTip()">
         ${userDot}
-        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="Add task..."
+        <input class="tm-task-input" value="${(t.task||'').replace(/"/g,'&quot;')}" placeholder="${isGroup?'Assign a task...':'Add task...'}"
           onblur="onTmTask(${day},${i},this)" onkeydown="if(event.key==='Enter')this.blur()">
       </div>
-      ${isGroup?`<select class="tm-assign-sel" onchange="onTmAssign(${day},${i},this)" style="font-size:10px;padding:2px 3px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer;max-width:70px">
-        <option value="" ${!t.assignedUid?'selected':''}>Everyone</option>
-        ${assignOpts}
-      </select>`:''}
+      ${isGroup&&t.userName?`<span style="font-size:8px;color:var(--muted2);white-space:nowrap">by ${escapeHtml(t.userName)}</span>`:''}
       <select class="tm-status-sel ${statusClass}" onchange="onTmStatus(${day},${i},this)">
         <option value="notstarted" ${(t.status||'notstarted')==='notstarted'?'selected':''}>Not Started</option>
         <option value="progressing" ${t.status==='progressing'?'selected':''}>Progressing</option>
@@ -8744,6 +8756,15 @@ function onTmStatus(day,rowIdx,sel){
   saveTask(day,rowIdx,'status',sel.value,tmTargetUid());
   tmRefreshStats();
 }
+function onTmAssignNew(day,rowIdx,sel){
+  const uid=sel.value;
+  const user=teamUsersCache.find(u=>u.uid===uid);
+  // Auto-set medium difficulty when assigning
+  saveTask(day,rowIdx,'diff','medium');
+  saveTask(day,rowIdx,'assignedUid',uid||'');
+  if(user) saveTask(day,rowIdx,'assignedName',user.name||'');
+}
+
 function onTmAssign(day,rowIdx,sel){
   const uid=sel.value;
   const user=teamUsersCache.find(u=>u.uid===uid);
@@ -9009,7 +9030,7 @@ async function renderTasksView(){
   }
   const tabs=[
     {k:'own',l:'My Tasks'},
-    {k:'group',l:'Group Tasks'},
+    {k:'group',l:'📋 Assign Tasks'},
     ...(isAdminUser?[{k:'admin',l:'👑 Team Overview'}]:[]),
     ...(isAdminUser?[{k:'recurring',l:'🔁 Recurring'}]:[]),
     ...(isAdminUser?[{k:'flagged',l:`🚩 Flagged${flaggedCount>0?' ('+flaggedCount+')':''}`}]:[])
