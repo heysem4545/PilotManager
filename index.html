@@ -15007,10 +15007,11 @@ async function buildSalaryTableRowsExpanded(records, showActions=true, uid=''){
       const statusSnap=await db.collection('teamLogDayStatus').where('monthKey','==',mk).where('uid','==',targetUid).get();
       const logs=logSnap.docs.map(d=>d.data());
       const excuseMins=logs.filter(l=>l.jobType==='excuse').reduce((s,l)=>s+(l.duration||0),0);
+      const privateMins=logs.filter(l=>l.jobType==='private').reduce((s,l)=>s+(l.duration||0),0);
       const statuses={};
       statusSnap.docs.forEach(d=>{const dat=d.data();statuses[dat.status]=(statuses[dat.status]||0)+1;});
-      attendanceData[mk]={excuseMins,statuses};
-    }catch(e){attendanceData[mk]={excuseMins:0,statuses:{}};}
+      attendanceData[mk]={excuseMins,privateMins,statuses};
+    }catch(e){attendanceData[mk]={excuseMins:0,privateMins:0,statuses:{}};}
   }
 
   const sorted=[...records].sort((a,b)=>(a.monthKey||'').localeCompare(b.monthKey||''));
@@ -15038,20 +15039,23 @@ async function buildSalaryTableRowsExpanded(records, showActions=true, uid=''){
       <td class="money" style="font-weight:600;color:var(--accent)">${fmtc(totalSalary)}</td>
       <td class="money" style="color:var(--blue)">${fmtc(Number(r.reserveAmount)||0)}</td>
       ${(()=>{
-        const att=attendanceData[r.monthKey]||{excuseMins:0,statuses:{}};
+        const att=attendanceData[r.monthKey]||{excuseMins:0,privateMins:0,statuses:{}};
         const excH=Math.floor(att.excuseMins/60);
         const excM=att.excuseMins%60;
+        const pvtH=Math.floor((att.privateMins||0)/60);
+        const pvtM=(att.privateMins||0)%60;
         const sick=att.statuses['Sick']||0;
         const dayOff=att.statuses['Day Off']||0;
         const excused=att.statuses['Excused']||0;
         const halfDay=att.statuses['Half Day']||0;
-        const hasIssues=att.excuseMins>0||sick||dayOff||excused||halfDay;
+        const hasIssues=att.excuseMins>0||(att.privateMins||0)>0||sick||dayOff||excused||halfDay;
         const pills=[];
         if(sick) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--red-dim);color:var(--red);font-size:8px">Sick ${sick}d</span>`);
         if(dayOff) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--amber-dim);color:var(--amber);font-size:8px">Off ${dayOff}d</span>`);
         if(excused) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--blue-dim);color:var(--blue);font-size:8px">Excused ${excused}d</span>`);
         if(halfDay) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--amber-dim);color:var(--amber);font-size:8px">Half ${halfDay}d</span>`);
         if(att.excuseMins>0) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--red-dim);color:var(--red);font-size:8px">Excuse ${excH}h${excM}m</span>`);
+        if(att.privateMins>0) pills.push(`<span style="padding:1px 5px;border-radius:3px;background:var(--purple-dim);color:var(--purple);font-size:8px">Private ${pvtH}h${pvtM}m</span>`);
         return `<td style="font-size:9px">${hasIssues?`<div style="display:flex;flex-wrap:wrap;gap:2px">${pills.join('')}</div>`:`<span style="color:var(--accent);font-size:9px">✓ Full</span>`}</td>`;
       })()}
       <td>${showActions?`<input type="date" value="${r.paidDate||''}" style="font-size:10px;padding:2px 4px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:${r.paidDate?'var(--accent)':'var(--muted2)'};font-family:var(--mono);outline:none;color-scheme:dark" onchange="db.collection('salaryRecords').doc('${r.id}').update({paidDate:this.value});toast('Paid date saved')">`:`<span style="font-size:10px;font-family:var(--mono);color:${r.paidDate?'var(--accent)':'var(--muted2)'}">${r.paidDate||'—'}</span>`}</td>
