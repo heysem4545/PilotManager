@@ -9306,8 +9306,8 @@ async function renderTasksView(){
     const rows=assignTasks.map(t=>{
       const stColor=t.status==='done'?'#4ade80':t.status==='progressing'?'var(--amber)':'var(--muted)';
       const canEdit=isAdmin()||t.assignedUid===currentUser.uid;
-      const isMyTask=t.assignedUid===currentUser.uid&&t.status!=='done';
-      return `<tr style="${t.status==='done'?'opacity:0.5':isMyTask?'background:rgba(245,112,106,0.08);border-left:3px solid var(--red)':''}">
+      const isMyTask=t.assignedUid===currentUser.uid;
+      return `<tr style="${t.status==='done'?'background:rgba(74,222,128,0.06);border-left:3px solid #4ade80':isMyTask?'background:rgba(245,112,106,0.08);border-left:3px solid var(--red)':''}">
         <td style="font-size:11px;color:var(--muted)">${escapeHtml(t.createdByName||'—')}</td>
         <td style="font-size:12px;font-weight:500">${escapeHtml(t.task||'—')}</td>
         <td style="font-size:11px">${escapeHtml(t.assignedName||'—')}</td>
@@ -9330,6 +9330,49 @@ async function renderTasksView(){
         <tbody>${rows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No assigned tasks yet</td></tr>'}</tbody>
       </table></div>
     </div>`;
+
+    // Calendar view
+    if(assignTasks.length>0){
+      const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const now=new Date();
+      const calMonth=now.getMonth(), calYear=now.getFullYear();
+      const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+      const firstDow=new Date(calYear,calMonth,1).getDay();
+      const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+      // Group tasks by created date
+      const tasksByDate={};
+      assignTasks.forEach(t=>{
+        const d=t.createdDate||'';
+        if(d){
+          const dayNum=parseInt(d.split('-')[2],10);
+          const mCheck=d.slice(0,7);
+          if(mCheck===`${calYear}-${String(calMonth+1).padStart(2,'0')}`){
+            if(!tasksByDate[dayNum]) tasksByDate[dayNum]=[];
+            tasksByDate[dayNum].push(t);
+          }
+        }
+      });
+
+      html+=`<div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">📅 ${MNAMES_FULL[calMonth]} ${calYear}</div>`;
+      html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
+      DNAMES.forEach(d=>{html+=`<div style="text-align:center;font-size:9px;font-weight:600;color:var(--muted);padding:4px">${d}</div>`;});
+      for(let i=0;i<firstDow;i++) html+=`<div></div>`;
+      for(let d=1;d<=daysInMonth;d++){
+        const dt=tasksByDate[d]||[];
+        const isToday=d===now.getDate();
+        const doneCount=dt.filter(t=>t.status==='done').length;
+        const pendingCount=dt.length-doneCount;
+        const hasTasks=dt.length>0;
+        html+=`<div style="background:var(--surface);border:1px solid ${isToday?'var(--accent)':hasTasks?pendingCount>0?'rgba(245,112,106,0.3)':'rgba(74,222,128,0.3)':'var(--border)'};border-radius:6px;padding:4px;min-height:50px;font-size:9px">
+          <div style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'};margin-bottom:2px">${d}</div>
+          ${dt.slice(0,3).map(t=>`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${t.status==='done'?'#4ade80':'var(--muted)'};${t.status==='done'?'text-decoration:line-through':''}">${escapeHtml((t.task||'').substring(0,15))}</div>`).join('')}
+          ${dt.length>3?`<div style="color:var(--muted2)">+${dt.length-3} more</div>`:''}
+          ${hasTasks?`<div style="margin-top:2px;font-size:8px"><span style="color:#4ade80">${doneCount}✓</span> <span style="color:var(--red)">${pendingCount}✗</span></div>`:''}
+        </div>`;
+      }
+      html+=`</div>`;
+    }
 
     el.innerHTML=html;
     return;
