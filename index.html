@@ -8764,13 +8764,43 @@ function onTmStatus(day,rowIdx,sel){
   saveTask(day,rowIdx,'status',sel.value,tmTargetUid());
   tmRefreshStats();
 }
-function onTmAssignNew(day,rowIdx,sel){
+async function onTmAssignNew(day,rowIdx,sel){
   const uid=sel.value;
+  if(!uid) return;
   const user=teamUsersCache.find(u=>u.uid===uid);
-  // Auto-set medium difficulty when assigning
-  saveTask(day,rowIdx,'diff','medium');
-  saveTask(day,rowIdx,'assignedUid',uid||'');
-  if(user) saveTask(day,rowIdx,'assignedName',user.name||'');
+  const key=tmActiveKey();
+  // Find existing task doc or create new one with all fields at once
+  try{
+    let q=db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('rowIdx','==',rowIdx);
+    const snap=await q.get();
+    if(!snap.empty){
+      await snap.docs[0].ref.update({
+        diff:'medium',
+        assignedUid:uid,
+        assignedName:user?user.name:'',
+        updatedAt:new Date()
+      });
+    } else {
+      // Get task text from the input in the same row
+      const row=sel.closest('.tm-task-row');
+      const taskInput=row?row.querySelector('.tm-task-input'):'';
+      const taskText=taskInput?taskInput.value.trim():'';
+      await db.collection('tasks').add({
+        monthKey:key, day, rowIdx,
+        uid:currentUser.uid,
+        userName:currentUser.name||currentUser.email,
+        userColor:userColor(currentUser.uid),
+        isGroup:true,
+        diff:'medium',
+        task:taskText,
+        status:'notstarted',
+        assignedUid:uid,
+        assignedName:user?user.name:'',
+        suspiciousFlag:false,
+        createdAt:new Date(), updatedAt:new Date()
+      });
+    }
+  }catch(e){console.error('onTmAssignNew',e);}
 }
 
 function onTmAssign(day,rowIdx,sel){
