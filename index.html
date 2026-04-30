@@ -14887,12 +14887,12 @@ async function renderSalaryPoolAdmin(el, users){
   const thisYear = now.getFullYear();
   if(!availableYears.includes(String(thisYear))) availableYears.unshift(String(thisYear));
   const yearTabs=availableYears.map(y=>`<button class="ftab ${Number(y)===salaryPoolYear?'active':''}" onclick="salaryPoolYear=${y};renderSalaryPoolView()">${y}</button>`).join('');
-  let totalPaidYear=0, totalReservesYear=0, totalReservesAll=0;
+  let totalPaidYear=0, totalReservesYear=0;
+  const totalReservesAll=allRecords.reduce((s,r)=>s+(Number(r.reserveAmount)||0),0);
   const bonusTotals={};
   records.forEach(r=>{
     const base=Number(r.baseSalary)||0;
     const res=Number(r.reserveAmount)||0;
-    totalReservesAll+=res;
     for(let i=1;i<=6;i++){
       const nm=r['bonus'+i+'Name']||'';
       const amt=Number(r['bonus'+i+'Amount'])||0;
