@@ -7231,7 +7231,16 @@ async function renderDailyLogView(){
 
     el.innerHTML=tabs+'<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
   } else {
-    el.innerHTML='<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+    const userTabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
+      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='scorecard'?' active':''}" onclick="dailyLogTab='scorecard';renderDailyLogView()">🏆 My Scorecard</button>
+    </div>`;
+    if(dailyLogTab==='scorecard'){
+      el.innerHTML=userTabs+'<div id="scorecardContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+      await renderDailyLogScorecard();
+      return;
+    }
+    el.innerHTML=userTabs+'<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
   }
   await renderTeamDailyLog();
 }
@@ -7265,7 +7274,8 @@ async function renderDailyLogScorecard(){
   </div>`;
 
   // Per-user scores
-  const scores=users.map(u=>{
+  const visibleUsers=isAdmin()?users:users.filter(u=>u.uid===currentUser.uid);
+  const scores=visibleUsers.map(u=>{
     const userEntries=allEntries.filter(e=>e.uid===u.uid);
     const total=userEntries.length;
     const late=userEntries.filter(e=>e.lateEntry).length;
@@ -7302,7 +7312,6 @@ async function renderDailyLogScorecard(){
       <td style="text-align:center;font-family:var(--mono);color:#4ade80">${s.onTime}</td>
       <td style="text-align:center;font-family:var(--mono);color:${s.late>0?'var(--red)':'var(--muted2)'}">${s.late>0?s.late:'—'}</td>
       <td style="text-align:center"><span style="font-size:13px;font-weight:700;color:${rateColor}">${s.onTimeRate}%</span></td>
-      <td style="text-align:center">${eligible?`<span style="font-size:11px;padding:3px 10px;border-radius:5px;background:rgba(74,222,128,0.1);color:#4ade80;font-weight:600">✓ Eligible</span>`:`<span style="font-size:11px;padding:3px 10px;border-radius:5px;background:var(--red-dim);color:var(--red);font-weight:600">✗ Not Eligible</span>`}</td>
     </tr>`;
   }).join('');
 
@@ -7312,9 +7321,9 @@ async function renderDailyLogScorecard(){
     </div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>User</th><th style="text-align:center">Total Entries</th><th style="text-align:center">On Time</th><th style="text-align:center">Late</th><th style="text-align:center">On-Time Rate</th><th style="text-align:center">Bonus</th>
+        <th>User</th><th style="text-align:center">Total Entries</th><th style="text-align:center">On Time</th><th style="text-align:center">Late</th><th style="text-align:center">On-Time Rate</th>
       </tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No data for this month</td></tr>'}</tbody>
+      <tbody>${rows||'<tr><td colspan="5" style="padding:30px;text-align:center;color:var(--muted)">No data for this month</td></tr>'}</tbody>
     </table></div>
   </div>`;
 
