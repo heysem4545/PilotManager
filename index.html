@@ -15065,20 +15065,28 @@ async function buildSalaryTableRowsExpanded(records, showActions=true, uid=''){
   // Load attendance data for all months
   const attendanceData={};
   const targetUid=uid||salaryPoolSelectedUser||currentUser.uid;
-  for(const r of records){
-    const mk=r.monthKey;
-    if(!mk||attendanceData[mk]) continue;
-    try{
-      const logSnap=await db.collection('teamDailyLog').where('monthKey','==',mk).where('uid','==',targetUid).get();
-      const statusSnap=await db.collection('teamLogDayStatus').where('monthKey','==',mk).where('uid','==',targetUid).get();
-      const logs=logSnap.docs.map(d=>d.data());
-      const excuseMins=logs.filter(l=>l.jobType==='excuse').reduce((s,l)=>s+(l.duration||0),0);
-      const privateMins=logs.filter(l=>l.jobType==='private').reduce((s,l)=>s+(l.duration||0),0);
-      const statuses={};
-      statusSnap.docs.forEach(d=>{const dat=d.data();statuses[dat.status]=(statuses[dat.status]||0)+1;});
-      attendanceData[mk]={excuseMins,privateMins,statuses};
-    }catch(e){attendanceData[mk]={excuseMins:0,privateMins:0,statuses:{}};}
-  }
+  // Load all attendance data in 2 queries instead of per-month
+  try{
+    const [logSnap,statusSnap]=await Promise.all([
+      db.collection('teamDailyLog').where('uid','==',targetUid).get(),
+      db.collection('teamLogDayStatus').where('uid','==',targetUid).get()
+    ]);
+    logSnap.docs.forEach(d=>{
+      const l=d.data();
+      const mk=l.monthKey;
+      if(!mk) return;
+      if(!attendanceData[mk]) attendanceData[mk]={excuseMins:0,privateMins:0,statuses:{}};
+      if(l.jobType==='excuse') attendanceData[mk].excuseMins+=(l.duration||0);
+      if(l.jobType==='private') attendanceData[mk].privateMins+=(l.duration||0);
+    });
+    statusSnap.docs.forEach(d=>{
+      const s=d.data();
+      const mk=s.monthKey;
+      if(!mk) return;
+      if(!attendanceData[mk]) attendanceData[mk]={excuseMins:0,privateMins:0,statuses:{}};
+      attendanceData[mk].statuses[s.status]=(attendanceData[mk].statuses[s.status]||0)+1;
+    });
+  }catch(e){}
 
   const sorted=[...records].sort((a,b)=>(a.monthKey||'').localeCompare(b.monthKey||''));
   let runningReserve=0;
