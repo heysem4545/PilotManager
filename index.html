@@ -14830,6 +14830,7 @@ async function deleteTurnoverProject(docId){
 // ─────────────────────────────────────────────
 let salaryPoolSelectedUser = '';
 let salaryPoolEditId = null;
+let salaryPoolYear = new Date().getFullYear();
 
 let _salaryUnsub=null;
 let _salaryListenerUid='';
@@ -14870,16 +14871,22 @@ async function renderSalaryPoolAdmin(el, users){
     return `<button class="ftab ${active?'active':''}" onclick="salaryPoolSelectedUser='${u.uid}';renderSalaryPoolView()">${escapeHtml(u.name||u.email)}</button>`;
   }).join('');
 
-  // Load records for selected user
+  // Load records for selected user — only selected year
+  let allRecords = [];
   let records = [];
   try {
     const snap = await db.collection('salaryRecords').where('uid','==',salaryPoolSelectedUser).get();
-    snap.forEach(d => records.push({id:d.id,...d.data()}));
-    records.sort((a,b)=>(b.monthKey||'').localeCompare(a.monthKey||''));
+    snap.forEach(d => allRecords.push({id:d.id,...d.data()}));
+    allRecords.sort((a,b)=>(b.monthKey||'').localeCompare(a.monthKey||''));
+    records = allRecords.filter(r=>(r.monthKey||'').startsWith(String(salaryPoolYear)));
   } catch(e){ console.error('salary load error:',e); }
 
+  // Get available years
+  const availableYears=[...new Set(allRecords.map(r=>(r.monthKey||'').slice(0,4)).filter(Boolean))].sort().reverse();
   const now = new Date();
   const thisYear = now.getFullYear();
+  if(!availableYears.includes(String(thisYear))) availableYears.unshift(String(thisYear));
+  const yearTabs=availableYears.map(y=>`<button class="ftab ${Number(y)===salaryPoolYear?'active':''}" onclick="salaryPoolYear=${y};renderSalaryPoolView()">${y}</button>`).join('');
   let totalPaidYear=0, totalReservesYear=0, totalReservesAll=0;
   const bonusTotals={};
   records.forEach(r=>{
@@ -14902,14 +14909,15 @@ async function renderSalaryPoolAdmin(el, users){
   const releaseDate = latestWithRelease ? latestWithRelease.reserveReleaseDate : '';
 
   el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div class="ftabs" style="flex-wrap:wrap">${userTabs}</div>
       <button class="btn btn-primary btn-sm" onclick="openSalaryEntryModal()">+ Add Salary Entry</button>
     </div>
+    <div style="display:flex;gap:4px;margin-bottom:16px">${yearTabs}</div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:16px">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 Salary Summary ${thisYear}</div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💰 Salary Summary ${salaryPoolYear}</div>
         <div style="font-size:28px;font-weight:700;color:var(--accent);margin-bottom:4px">${fmtc(records.length>0?(Number(records[0].baseSalary)||0)+sumBonuses(records[0]):0)}</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Last month earnings</div>
         ${records.length>0?`<div style="display:flex;flex-wrap:wrap;gap:6px">
