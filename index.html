@@ -7239,6 +7239,9 @@ async function renderDailyLogView(){
 let scorecardMonth=new Date().getMonth();
 let scorecardYear=new Date().getFullYear();
 
+let scorecardMonth=new Date().getMonth();
+let scorecardYear=new Date().getFullYear();
+
 async function renderDailyLogScorecard(){
   const el=document.getElementById('scorecardContent');
   if(!el) return;
@@ -7248,28 +7251,11 @@ async function renderDailyLogScorecard(){
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const mKey=`${scorecardYear}-${String(scorecardMonth+1).padStart(2,'0')}`;
 
-  // Load all daily log entries for this month
   let allEntries=[];
   try{
     const snap=await db.collection('teamDailyLog').where('monthKey','==',mKey).get();
     allEntries=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){}
-
-  // Load day statuses
-  let allStatuses=[];
-  try{
-    const snap=await db.collection('teamLogDayStatus').where('monthKey','==',mKey).get();
-    allStatuses=snap.docs.map(d=>d.data());
-  }catch(e){}
-
-  // Calculate workdays (Mon-Sat, exclude Sun)
-  const daysInMonth=new Date(scorecardYear,scorecardMonth+1,0).getDate();
-  const today=new Date();
-  const maxDay=(scorecardYear===today.getFullYear()&&scorecardMonth===today.getMonth())?today.getDate():daysInMonth;
-  let workdays=0;
-  for(let d=1;d<=maxDay;d++){
-    if(new Date(scorecardYear,scorecardMonth,d).getDay()!==0) workdays++;
-  }
 
   // Month nav
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -7280,58 +7266,17 @@ async function renderDailyLogScorecard(){
 
   // Per-user scores
   const scores=users.map(u=>{
-    const userEntries=allEntries.filter(e=>e.uid===u.uid&&e.jobType!=='private');
-    const userStatuses=allStatuses.filter(s=>s.uid===u.uid);
-
-    // Days with entries
-    const daysWithEntries=new Set(userEntries.map(e=>e.day)).size;
-    // Late entries
-    const lateEntries=userEntries.filter(e=>e.lateEntry).length;
-    // On-time entries
-    const onTimeEntries=userEntries.filter(e=>!e.lateEntry).length;
-    // Days off/sick
-    const daysOff=userStatuses.filter(s=>['Sick','Day Off','Holiday','Excused'].includes(s.status)).length;
-    // Expected days = workdays minus days off
-    const expectedDays=Math.max(0,workdays-daysOff);
-    // Missed days = expected minus days with entries
-    const missedDays=Math.max(0,expectedDays-daysWithEntries);
-    // On-time rate
-    const totalEntryDays=daysWithEntries;
-    const onTimeDays=totalEntryDays-new Set(userEntries.filter(e=>e.lateEntry).map(e=>e.day)).size;
-    const onTimeRate=expectedDays>0?Math.round(onTimeDays/expectedDays*100):100;
-    // Work hours
-    const workMins=userEntries.filter(e=>e.jobType==='work'||!e.jobType).reduce((s,e)=>s+(e.duration||0),0);
-    const excuseMins=userEntries.filter(e=>e.jobType==='excuse').reduce((s,e)=>s+(e.duration||0),0);
-
-    return {
-      uid:u.uid, name:u.name||u.email,
-      expectedDays, daysWithEntries, onTimeDays, lateEntries,
-      missedDays, onTimeRate, daysOff, workMins, excuseMins
-    };
-  }).filter(s=>s.expectedDays>0);
+    const userEntries=allEntries.filter(e=>e.uid===u.uid);
+    const total=userEntries.length;
+    const late=userEntries.filter(e=>e.lateEntry).length;
+    const onTime=total-late;
+    const onTimeRate=total>0?Math.round(onTime/total*100):0;
+    return {name:u.name||u.email, total, onTime, late, onTimeRate};
+  }).filter(s=>s.total>0);
 
   scores.sort((a,b)=>b.onTimeRate-a.onTimeRate);
 
-  // Table
-  const rows=scores.map(s=>{
-    const rateColor=s.onTimeRate>=95?'#4ade80':s.onTimeRate>=80?'var(--amber)':'var(--red)';
-    const eligible=s.onTimeRate>=90&&s.missedDays<=2;
-    return `<tr>
-      <td style="font-weight:500">${escapeHtml(s.name)}</td>
-      <td style="text-align:center;font-family:var(--mono)">${s.expectedDays}</td>
-      <td style="text-align:center;font-family:var(--mono);color:var(--accent)">${s.daysWithEntries}</td>
-      <td style="text-align:center;font-family:var(--mono);color:#4ade80">${s.onTimeDays}</td>
-      <td style="text-align:center;font-family:var(--mono);color:var(--red)">${s.lateEntries>0?s.lateEntries:'—'}</td>
-      <td style="text-align:center;font-family:var(--mono);color:${s.missedDays>0?'var(--red)':'var(--muted2)'}">${s.missedDays>0?s.missedDays:'—'}</td>
-      <td style="text-align:center;font-family:var(--mono);color:var(--amber)">${s.daysOff>0?s.daysOff:'—'}</td>
-      <td style="text-align:center;font-family:var(--mono);color:var(--blue)">${Math.floor(s.workMins/60)}h ${s.workMins%60}m</td>
-      <td style="text-align:center;font-family:var(--mono);color:var(--red)">${s.excuseMins>0?Math.floor(s.excuseMins/60)+'h '+s.excuseMins%60+'m':'—'}</td>
-      <td style="text-align:center"><span style="font-size:12px;font-weight:700;color:${rateColor}">${s.onTimeRate}%</span></td>
-      <td style="text-align:center">${eligible?`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:rgba(74,222,128,0.1);color:#4ade80;font-weight:600">✓ Eligible</span>`:`<span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--red-dim);color:var(--red);font-weight:600">✗ Not Eligible</span>`}</td>
-    </tr>`;
-  }).join('');
-
-  const eligibleCount=scores.filter(s=>s.onTimeRate>=90&&s.missedDays<=2).length;
+  const eligibleCount=scores.filter(s=>s.onTimeRate>=90).length;
 
   html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
@@ -7339,33 +7284,38 @@ async function renderDailyLogScorecard(){
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Team Members</div>
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:var(--accent)">${workdays}</div>
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Work Days</div>
-    </div>
-    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
       <div style="font-size:22px;font-weight:700;color:#4ade80">${eligibleCount}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Bonus Eligible</div>
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:var(--red)">${scores.reduce((s,u)=>s+u.lateEntries,0)}</div>
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${scores.reduce((s,u)=>s+u.late,0)}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Late Entries</div>
     </div>
   </div>`;
 
+  const rows=scores.map(s=>{
+    const rateColor=s.onTimeRate>=90?'#4ade80':s.onTimeRate>=70?'var(--amber)':'var(--red)';
+    const eligible=s.onTimeRate>=90;
+    return `<tr>
+      <td style="font-weight:500">${escapeHtml(s.name)}</td>
+      <td style="text-align:center;font-family:var(--mono)">${s.total}</td>
+      <td style="text-align:center;font-family:var(--mono);color:#4ade80">${s.onTime}</td>
+      <td style="text-align:center;font-family:var(--mono);color:${s.late>0?'var(--red)':'var(--muted2)'}">${s.late>0?s.late:'—'}</td>
+      <td style="text-align:center"><span style="font-size:13px;font-weight:700;color:${rateColor}">${s.onTimeRate}%</span></td>
+      <td style="text-align:center">${eligible?`<span style="font-size:11px;padding:3px 10px;border-radius:5px;background:rgba(74,222,128,0.1);color:#4ade80;font-weight:600">✓ Eligible</span>`:`<span style="font-size:11px;padding:3px 10px;border-radius:5px;background:var(--red-dim);color:var(--red);font-weight:600">✗ Not Eligible</span>`}</td>
+    </tr>`;
+  }).join('');
+
   html+=`<div class="table-card">
-    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
-      🏆 Scorecard — ${MNAMES_FULL[scorecardMonth]} ${scorecardYear} · Bonus requires 90%+ on-time rate & max 2 missed days
+    <div style="padding:10px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">
+      🏆 Daily Log Scorecard — ${MNAMES_FULL[scorecardMonth]} ${scorecardYear} · Bonus requires 90%+ on-time rate
     </div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>User</th><th style="text-align:center">Expected</th><th style="text-align:center">Entered</th><th style="text-align:center">On Time</th><th style="text-align:center">Late</th><th style="text-align:center">Missed</th><th style="text-align:center">Days Off</th><th style="text-align:center">Work Hrs</th><th style="text-align:center">Excuse Hrs</th><th style="text-align:center">Rate</th><th style="text-align:center">Bonus</th>
+        <th>User</th><th style="text-align:center">Total Entries</th><th style="text-align:center">On Time</th><th style="text-align:center">Late</th><th style="text-align:center">On-Time Rate</th><th style="text-align:center">Bonus</th>
       </tr></thead>
-      <tbody>${rows||'<tr><td colspan="11" style="padding:30px;text-align:center;color:var(--muted)">No data for this month</td></tr>'}</tbody>
+      <tbody>${rows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No data for this month</td></tr>'}</tbody>
     </table></div>
-  </div>`;
-
-  html+=`<div style="margin-top:10px;font-size:10px;color:var(--muted)">
-    ℹ On-time rate = days entered on time ÷ expected work days. Bonus eligible: 90%+ rate & max 2 missed days.
   </div>`;
 
   el.innerHTML=html;
