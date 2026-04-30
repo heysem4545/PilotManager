@@ -9215,7 +9215,7 @@ async function deleteTaskFromModal(){
 }
 
 function tmAddRow(day){
-  const cols=tmTab==='group'?3:4;
+  const cols=3;
   const weekStart=Math.floor((day-1)/cols)*cols+1;
   const daysInMonth=getDaysInMonth(tmYear,tmMonth);
   const weekEnd=Math.min(weekStart+cols-1,daysInMonth);
@@ -9336,7 +9336,7 @@ async function renderTasksView(){
 
   const days=getDaysInMonth(tmYear,tmMonth);
   const weeks=[];
-  const cols=tmTab==='group'?3:4;
+  const cols=3;
   for(let d=1;d<=days;d+=cols) weeks.push([d,Math.min(d+cols-1,days)]);
 
   let html=`
