@@ -7273,7 +7273,7 @@ async function renderDailyLogScorecard(){
   // Per-user scores
   const visibleUsers=isAdmin()?users:users.filter(u=>u.uid===currentUser.uid);
   const scores=visibleUsers.map(u=>{
-    const userEntries=allEntries.filter(e=>e.uid===u.uid);
+    const userEntries=allEntries.filter(e=>e.uid===u.uid&&e.createdBy===u.uid&&e.source!=='task-done');
     const total=userEntries.length;
     const late=userEntries.filter(e=>e.lateEntry).length;
     const onTime=total-late;
@@ -7702,6 +7702,7 @@ async function addTeamLogEntry(day, jobType){
   try{
     await db.collection('teamDailyLog').add({
       monthKey:mKey, day, uid:teamLogUser,
+      createdBy:currentUser.uid,
       jobType:jobType||'work',
       task, timeStart, timeEnd,
       duration:calcDurFromTimes(timeStart,timeEnd),
