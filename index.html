@@ -7162,11 +7162,101 @@ async function deleteInnovation(id){
 }
 
 // ─── DAILY LOG (standalone section) ───
+let dailyLogTab='calendar';
+
 async function renderDailyLogView(){
   const el=document.getElementById('dailyLogView');
   if(!el) return;
-  el.innerHTML='<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+
+  if(isAdmin()){
+    let lateCount=0;
+    try{const s=await db.collection('teamDailyLog').where('lateEntry','==',true).get();lateCount=s.size;}catch(e){}
+
+    const tabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
+      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='late'?' active':''}" onclick="dailyLogTab='late';renderDailyLogView()" style="position:relative">⚠ Late Entry Log${lateCount>0?' <span style="background:var(--red);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:4px">'+lateCount+'</span>':''}</button>
+    </div>`;
+
+    if(dailyLogTab==='late'){
+      el.innerHTML=tabs+'<div id="lateEntryContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+      await renderLateEntryLog();
+      return;
+    }
+
+    el.innerHTML=tabs+'<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+  } else {
+    el.innerHTML='<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+  }
   await renderTeamDailyLog();
+}
+
+async function renderLateEntryLog(){
+  const el=document.getElementById('lateEntryContent');
+  if(!el) return;
+
+  let entries=[];
+  try{
+    const snap=await db.collection('teamDailyLog').where('lateEntry','==',true).get();
+    entries=snap.docs.map(d=>({id:d.id,...d.data()}));
+    entries.sort((a,b)=>(b.entryDate||'').localeCompare(a.entryDate||''));
+  }catch(e){console.error('lateEntryLog',e);}
+
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+
+  let html=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${entries.length}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Late Entries</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--amber)">${new Set(entries.map(e=>e.uid)).size}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users with Late</div>
+    </div>
+  </div>`;
+
+  // Per-user breakdown
+  const byUser={};
+  entries.forEach(e=>{
+    if(!byUser[e.uid]) byUser[e.uid]={name:'',count:0};
+    const u=users.find(x=>x.uid===e.uid);
+    byUser[e.uid].name=u?(u.name||u.email):'Unknown';
+    byUser[e.uid].count++;
+  });
+  if(Object.keys(byUser).length>0){
+    html+=`<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">`;
+    Object.entries(byUser).sort((a,b)=>b[1].count-a[1].count).forEach(([uid,d])=>{
+      html+=`<span style="font-size:10px;padding:4px 10px;border-radius:5px;background:var(--red-dim);color:var(--red);font-weight:600">${escapeHtml(d.name)}: ${d.count} late</span>`;
+    });
+    html+=`</div>`;
+  }
+
+  const rows=entries.map(e=>{
+    const u=users.find(x=>x.uid===e.uid);
+    const userName=u?(u.name||u.email):'Unknown';
+    const daysBehind=e.entryDate&&e.targetDate?Math.max(0,Math.ceil((new Date(e.entryDate)-new Date(e.targetDate))/86400000)):0;
+    return `<tr>
+      <td style="font-size:11px;font-weight:500">${escapeHtml(userName)}</td>
+      <td style="font-size:11px">${escapeHtml(e.task||'—')}</td>
+      <td style="font-size:10px;font-family:var(--mono)">${e.targetDate||'—'}</td>
+      <td style="font-size:10px;font-family:var(--mono)">${e.entryDate||'—'}</td>
+      <td style="text-align:center"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${daysBehind>3?'var(--red)':daysBehind>1?'var(--amber-dim)':'var(--amber-dim)'};color:${daysBehind>3?'#fff':'var(--amber)'};font-weight:600">${daysBehind}d late</span></td>
+      <td style="font-size:10px;color:var(--muted)">${escapeHtml(e.jobType||'work')}</td>
+      <td style="font-size:10px;color:var(--muted)">${escapeHtml(e.notes||'—')}</td>
+    </tr>`;
+  }).join('');
+
+  html+=`<div class="table-card">
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${entries.length} late entries</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>User</th><th>Task</th><th>Should Have Been</th><th>Entered On</th><th>Delay</th><th>Type</th><th>Notes</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="padding:30px;text-align:center;color:var(--muted)">No late entries — your team is on time!</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+
+  el.innerHTML=html;
 }
 
 // ─── TEAM DAILY LOG ───
@@ -7463,6 +7553,15 @@ async function addTeamLogEntry(day, jobType){
   const timeStart=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';
   const timeEnd=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';
   const notesEl=document.getElementById(prefix+'Notes');
+
+  // Check if this is a late entry (not today's date)
+  const today=new Date();
+  const isToday=today.getFullYear()===teamLogYear&&today.getMonth()===teamLogMonth&&today.getDate()===day;
+  const isLateEntry=!isToday&&!isAdmin();
+  if(isLateEntry){
+    if(!confirm('⚠ This is not today\'s date. Are you sure you want to enter data for a previous date?\n\nNote: Late entries will be flagged and reported to admin.')){return;}
+  }
+
   try{
     await db.collection('teamDailyLog').add({
       monthKey:mKey, day, uid:teamLogUser,
@@ -7470,6 +7569,9 @@ async function addTeamLogEntry(day, jobType){
       task, timeStart, timeEnd,
       duration:calcDurFromTimes(timeStart,timeEnd),
       notes:notesEl?notesEl.value.trim():'',
+      lateEntry:isLateEntry,
+      entryDate:today.toISOString().slice(0,10),
+      targetDate:`${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
       createdAt:new Date()
     });
     document.getElementById('teamLogDayModal').remove();
