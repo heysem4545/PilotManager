@@ -11233,6 +11233,13 @@ async function openQuickMeetingModal(date){
     <div class="fg"><label>Date</label>
       <input type="date" id="qmDate" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
     </div>
+    <div class="fg"><label>Difficulty</label>
+      <select id="qmDifficulty" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="1">⭐ 1 Star (Easy)</option>
+        <option value="3" selected>⭐⭐⭐ 3 Stars (Medium)</option>
+        <option value="5">⭐⭐⭐⭐⭐ 5 Stars (Hard)</option>
+      </select>
+    </div>
     <div class="fg"><label>Attendees</label>
       <div id="qmAttendees" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">
         ${users.map(u=>{
@@ -11270,6 +11277,7 @@ function prefillQuickMeeting(){
   document.querySelectorAll('#qmAttendees input[type=checkbox]').forEach(cb=>{
     cb.checked=atts.includes(cb.value);
   });
+  document.getElementById('qmDifficulty').value=tpl.difficulty||'3';
   // Show agenda
   const agendaEl=document.getElementById('qmAgendaSection');
   if(tpl.agenda&&tpl.agenda.length){
@@ -11310,7 +11318,7 @@ async function saveQuickMeeting(){
       templateId:tplId||'',
       attendees,
       agenda:tpl&&tpl.agenda?tpl.agenda.map(a=>({text:a,checked:false})):[],
-      difficulty:tpl?tpl.difficulty||3:3,
+      difficulty:parseInt(document.getElementById('qmDifficulty').value)||3,
       duration:0,
       efficiency:0,
       completed:false,
