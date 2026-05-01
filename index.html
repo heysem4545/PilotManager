@@ -11400,7 +11400,7 @@ function addQmAgendaItem(){
   input.focus();
 }
 
-function renderMeetingCalendar(){
+async function renderMeetingCalendar(){
   const container = document.getElementById('mtgTabContent');
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -11411,7 +11411,8 @@ function renderMeetingCalendar(){
   const todayDate=today.getDate();
 
   // User filter
-  const users=teamUsersCache.length?teamUsersCache:[];
+  if(!teamUsersCache.length) teamUsersCache=await getUsers();
+  const users=teamUsersCache;
   const userFilterTabs=`<button class="ftab ${mtgCalUser==='all'?'active':''}" onclick="mtgCalUser='all';renderMeetingsView()">All</button>`+
     users.map(u=>`<button class="ftab ${mtgCalUser===u.uid?'active':''}" onclick="mtgCalUser='${u.uid}';renderMeetingsView()">${escapeHtml(u.name||u.email)}</button>`).join('');
 
@@ -11480,15 +11481,15 @@ function renderMeetingCalendar(){
   userStatsHtml=`<div style="margin-bottom:14px">
     <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">${escapeHtml(statsName)} — Meeting Summary</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
-      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailOnTime').classList.toggle('open')">
+      <div style="${cardStyle}" onclick="document.getElementById('mtgDetailOnTime').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:#4ade80">${onTime}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">On Time</div>
       </div>
-      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailLate').classList.toggle('open')">
+      <div style="${cardStyle}" onclick="document.getElementById('mtgDetailLate').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--amber)">${lateCnt}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Late</div>
       </div>
-      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailAbsent').classList.toggle('open')">
+      <div style="${cardStyle}" onclick="document.getElementById('mtgDetailAbsent').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--red)">${absentCnt}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Absent</div>
       </div>
@@ -11496,11 +11497,11 @@ function renderMeetingCalendar(){
         <div style="font-size:18px;font-weight:700;color:${attRate>=90?'#4ade80':attRate>=70?'var(--amber)':'var(--red)'}">${attRate}%</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attendance</div>
       </div>
-      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailDur').classList.toggle('open')">
+      <div style="${cardStyle}" onclick="document.getElementById('mtgDetailDur').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--accent)">${durH}h ${durM}m</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Duration</div>
       </div>
-      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailStars').classList.toggle('open')">
+      <div style="${cardStyle}" onclick="document.getElementById('mtgDetailStars').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--amber)">${totalStars} ⭐</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Stars Earned</div>
       </div>
