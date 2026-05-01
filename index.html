@@ -9844,13 +9844,15 @@ function describeRecurrence(rule){
 function ordinal(n){const s=['th','st','nd','rd'];const v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
 
 async function generateRecurringTasks(){
-  if(!isAdmin()) return;
   const key=tmActiveKey();
   const daysInMonth=getDaysInMonth(tmYear,tmMonth);
   try{
-    const rulesSnap=await db.collection('recurringTasks').where('active','==',true).get();
+    let rulesQuery=db.collection('recurringTasks').where('active','==',true);
+    const rulesSnap=await rulesQuery.get();
     for(const doc of rulesSnap.docs){
       const rule=doc.data();
+      // Non-admin: only generate own rules
+      if(!isAdmin()&&rule.createdBy!==currentUser.uid) continue;
       if(rule.lastGeneratedMonth===key) continue;
       // Check if rule applies to this month
       if(rule.applyMonth&&rule.applyMonth!=='all'&&parseInt(rule.applyMonth,10)!==tmMonth) continue;
