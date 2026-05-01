@@ -11672,7 +11672,7 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
   }
 
   document.getElementById('mtgLogId').value = meetingId||'';
-  document.getElementById('mtgLogModalTitle').textContent = mtg ? 'Edit Meeting' : 'Log Meeting';
+  document.getElementById('mtgLogModalTitle').textContent = mtg ? 'Log Meeting' : 'Log Meeting';
 
   if(mtg){
     tplSelect.value = mtg.templateId||'';
@@ -11749,12 +11749,18 @@ function renderMtgLogAttendees(){
 
 function renderMtgLogAgenda(){
   const container = document.getElementById('mtgLogAgenda');
+  // Filter out empty items
+  meetingAgendaDraft=meetingAgendaDraft.filter(a=>a.text||a.checked);
   let html = '';
+  if(!meetingAgendaDraft.length){
+    html='<div style="font-size:11px;color:var(--muted);padding:8px 0">No agenda items. Click "+ Add" to add.</div>';
+  }
   meetingAgendaDraft.forEach((item,i)=>{
-    html += `<div class="mtg-agenda-row">
-      <input type="checkbox" ${item.checked?'checked':''} onchange="meetingAgendaDraft[${i}].checked=this.checked">
-      <input type="text" value="${escapeAttr(item.text||'')}" onchange="meetingAgendaDraft[${i}].text=this.value" placeholder="Agenda item...">
-      <button class="btn btn-danger btn-sm" style="padding:4px 8px;width:auto" onclick="removeAgendaItem(${i})">×</button>
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:3px;background:${item.checked?'rgba(74,222,128,0.06)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'};border-radius:6px">
+      <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="meetingAgendaDraft[${i}].checked=this.checked;renderMtgLogAgenda()">
+      <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <input type="text" value="${escapeAttr(item.text||'')}" onchange="meetingAgendaDraft[${i}].text=this.value" placeholder="Agenda item..." style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:${item.checked?'var(--muted)':'var(--text)'};font-family:var(--font);outline:none;${item.checked?'text-decoration:line-through':''}">
+      <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="removeAgendaItem(${i})">×</button>
     </div>`;
   });
   container.innerHTML = html;
