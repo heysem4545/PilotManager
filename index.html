@@ -11732,15 +11732,27 @@ function onMtgTemplateSelect(tplId){
 function renderMtgLogAttendees(){
   const container = document.getElementById('mtgLogAttendees');
   let html = '';
+  // Sort: required attendees first (from meeting creation), then others
   meetingAttendeesDraft.forEach((a,i)=>{
-    html += `<div class="mtg-attendee-row">
-      <label>${escapeHtml(a.name)}</label>
-      <label style="min-width:auto;font-weight:400;font-size:11px"><input type="checkbox" ${a.attended?'checked':''} onchange="meetingAttendeesDraft[${i}].attended=this.checked;renderMtgLogAttendees()"> Attended</label>
+    const col=userColor(a.uid);
+    const initials=(a.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const isRequired=true; // all listed attendees are required
+    const bgColor=a.attended?'rgba(74,222,128,0.08)':isRequired?'rgba(245,112,106,0.05)':'var(--surface2)';
+    const borderColor=a.attended?'rgba(74,222,128,0.25)':isRequired?'rgba(245,112,106,0.2)':'var(--border2)';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:4px;background:${bgColor};border:1px solid ${borderColor};border-left:3px solid ${a.attended?'#4ade80':'var(--red)'};border-radius:6px">
+      <span style="width:28px;height:28px;border-radius:50%;background:${col}22;color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escapeHtml(a.name)}</span>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:${a.attended?'#4ade80':'var(--muted)'}">
+        <input type="checkbox" ${a.attended?'checked':''} style="accent-color:#4ade80;width:14px;height:14px" onchange="meetingAttendeesDraft[${i}].attended=this.checked;renderMtgLogAttendees()"> ${a.attended?'✓ Attended':'Attended'}
+      </label>
       ${a.attended?`
-        <label style="min-width:auto;font-weight:400;font-size:11px"><input type="checkbox" ${a.late?'checked':''} onchange="meetingAttendeesDraft[${i}].late=this.checked;renderMtgLogAttendees()"> Late</label>
-        ${a.late?`<input type="number" min="0" placeholder="min" value="${a.lateMinutes||''}" onchange="meetingAttendeesDraft[${i}].lateMinutes=parseInt(this.value)||0">`:''}
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:${a.late?'var(--amber)':'var(--muted)'}">
+          <input type="checkbox" ${a.late?'checked':''} style="accent-color:var(--amber);width:14px;height:14px" onchange="meetingAttendeesDraft[${i}].late=this.checked;renderMtgLogAttendees()"> Late
+        </label>
+        ${a.late?`<input type="number" min="0" placeholder="min" value="${a.lateMinutes||''}" style="width:50px;font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--mono);outline:none" onchange="meetingAttendeesDraft[${i}].lateMinutes=parseInt(this.value)||0">`:''}
       `:`
-        <input type="text" placeholder="Reason" value="${escapeAttr(a.absenceReason||'')}" onchange="meetingAttendeesDraft[${i}].absenceReason=this.value">
+        <input type="text" placeholder="Absence reason" value="${escapeAttr(a.absenceReason||'')}" style="width:120px;font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onchange="meetingAttendeesDraft[${i}].absenceReason=this.value">
+        <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:var(--red-dim);color:var(--red);font-weight:600">Absent</span>
       `}
     </div>`;
   });
