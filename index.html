@@ -9665,12 +9665,18 @@ async function renderTasksView(){
       </div>
     </div>`;
 
-    html += `<div class="tm-user-tabs">${teamUsers.map(u=>{
-      const col=userColor(u.uid);
-      return `<button class="tm-user-tab ${u.uid===tmAdminUser?'active':''}"
-        style="${u.uid===tmAdminUser?`background:${col};`:''}"
-        onclick="switchTmAdminUser('${u.uid}')">${u.name}</button>`;
-    }).join('')}</div>`;
+    const selUserName=teamUsers.find(u=>u.uid===tmAdminUser);
+    html += `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">📅 ${selUserName?escapeHtml(selUserName.name)+'\'s':'User'} Task Calendar</div>
+      </div>
+      <div class="tm-user-tabs">${teamUsers.map(u=>{
+        const col=userColor(u.uid);
+        return `<button class="tm-user-tab ${u.uid===tmAdminUser?'active':''}"
+          style="${u.uid===tmAdminUser?`background:${col};`:''}"
+          onclick="switchTmAdminUser('${u.uid}')">${u.name}</button>`;
+      }).join('')}</div>
+    </div>`;
   }
 
   if(tmTab==='group'){
