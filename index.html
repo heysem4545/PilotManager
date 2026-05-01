@@ -794,8 +794,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .mtg-efficiency.eff-high{background:var(--accent-dim);color:var(--accent)}
 .mtg-efficiency.eff-mid{background:var(--amber-dim);color:var(--amber)}
 .mtg-efficiency.eff-low{background:var(--red-dim);color:var(--red)}
-.mtg-history-tbl thead th{cursor:default}
-.mtg-history-tbl tbody td{font-size:12px}
 .mtg-stat{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;text-align:center}
 .mtg-stat .stat-val{font-size:20px;font-weight:600;font-family:var(--mono);line-height:1}
 .mtg-stat .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:6px}
@@ -11164,9 +11162,6 @@ let mtgCalYear = new Date().getFullYear();
 let meetingLogDraft = null;
 let meetingAgendaDraft = [];
 let meetingAttendeesDraft = [];
-let mtgHistoryFilter = '';
-let mtgHistoryDateFrom = '';
-let mtgHistoryDateTo = '';
 
 async function loadMeetingTemplates(){
   try {
@@ -11198,14 +11193,12 @@ async function renderMeetingsView(){
     <div class="mtg-tabs">
       <button class="${meetingsTab==='calendar'?'active':''}" onclick="switchMeetingsTab('calendar')">📅 Calendar</button>
       <button class="${meetingsTab==='templates'?'active':''}" onclick="switchMeetingsTab('templates')">Templates</button>
-      <button class="${meetingsTab==='history'?'active':''}" onclick="switchMeetingsTab('history')">History</button>
     </div>
     <div style="padding:16px 18px" id="mtgTabContent"></div>
   </div>`;
   el.innerHTML = html;
-  if(meetingsTab==='calendar') renderMeetingCalendar();
-  else if(meetingsTab==='templates') renderTemplatesTab();
-  else renderHistoryTab();
+  if(meetingsTab==='templates') renderTemplatesTab();
+  else renderMeetingCalendar();
 }
 
 function switchMeetingsTab(tab){
@@ -11326,7 +11319,7 @@ async function saveQuickMeeting(){
   if(!date){toast('Select a date');return;}
   const attendees=[];
   document.querySelectorAll('#qmAttendees input[type=checkbox]:checked').forEach(cb=>{
-    attendees.push({uid:cb.value, name:cb.dataset.name||'', attended:false, late:false, lateMinutes:0, absenceReason:''});
+    attendees.push({uid:cb.value, name:cb.dataset.name||'', attended:false, late:false, lateMinutes:0, absenceReason:'', required:true});
   });
   if(!attendees.length){toast('Select at least one attendee');return;}
   const tplId=document.getElementById('qmTemplate').value;
@@ -11594,74 +11587,6 @@ function renderTemplatesTab(){
   container.innerHTML = html;
 }
 
-function renderHistoryTab(){
-  const container = document.getElementById('mtgTabContent');
-  // Filter
-  let filtered = meetingsData.slice();
-  if(mtgHistoryFilter) filtered = filtered.filter(m=>(m.templateId||'')===mtgHistoryFilter || (m.name||'').toLowerCase().includes(mtgHistoryFilter.toLowerCase()));
-  if(mtgHistoryDateFrom) filtered = filtered.filter(m=>(m.targetDate||'')>=mtgHistoryDateFrom);
-  if(mtgHistoryDateTo) filtered = filtered.filter(m=>(m.targetDate||'')<=mtgHistoryDateTo);
-  filtered.sort((a,b)=>(b.targetDate||'').localeCompare(a.targetDate||''));
-
-  // Stats
-  const totalMtgs = filtered.length;
-  const avgEff = totalMtgs ? (filtered.reduce((s,m)=>s+(m.efficiency||0),0)/totalMtgs).toFixed(1) : '—';
-  // Most absent
-  const absentMap = {};
-  filtered.forEach(m=>{
-    (m.attendees||[]).forEach(a=>{
-      if(!a.attended){ absentMap[a.name] = (absentMap[a.name]||0)+1; }
-    });
-  });
-  let mostAbsent = '—';
-  let maxAbs = 0;
-  Object.entries(absentMap).forEach(([name,cnt])=>{
-    if(cnt>maxAbs){ maxAbs=cnt; mostAbsent=name+' ('+cnt+')'; }
-  });
-
-  // Template options for filter
-  let tplOpts = '<option value="">All meetings</option>';
-  meetingTemplates.forEach(t=>{ tplOpts += `<option value="${escapeAttr(t.id)}" ${mtgHistoryFilter===t.id?'selected':''}>${escapeHtml(t.name)}</option>`; });
-
-  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-    <div class="mtg-stat"><div class="stat-val">${totalMtgs}</div><div class="stat-lbl">Total Meetings</div></div>
-    <div class="mtg-stat"><div class="stat-val">${avgEff}</div><div class="stat-lbl">Avg Efficiency</div></div>
-    <div class="mtg-stat"><div class="stat-val" style="font-size:13px">${escapeHtml(mostAbsent)}</div><div class="stat-lbl">Most Absent</div></div>
-  </div>
-  <div class="mtg-filter">
-    <select onchange="mtgHistoryFilter=this.value;renderHistoryTab()">${tplOpts}</select>
-    <input type="date" value="${mtgHistoryDateFrom}" onchange="mtgHistoryDateFrom=this.value;renderHistoryTab()" title="From date">
-    <input type="date" value="${mtgHistoryDateTo}" onchange="mtgHistoryDateTo=this.value;renderHistoryTab()" title="To date">
-  </div>`;
-
-  if(!filtered.length){
-    html += '<div style="text-align:center;color:var(--muted);padding:30px 0">No meetings match filters.</div>';
-  } else {
-    html += `<div class="tbl-wrap"><table class="mtg-history-tbl"><thead><tr>
-      <th>Date</th><th>Meeting Name</th><th>Duration</th><th>Attendees</th><th>Absent</th><th>Efficiency</th><th></th>
-    </tr></thead><tbody>`;
-    filtered.forEach(m=>{
-      const attCount = (m.attendees||[]).length;
-      const absentCount = (m.attendees||[]).filter(a=>!a.attended).length;
-      const durH = Math.floor((m.duration||0)/60);
-      const durM = (m.duration||0)%60;
-      const durStr = durH ? `${durH}h ${durM}m` : `${durM}m`;
-      const eff = m.efficiency ? `<span class="mtg-efficiency ${mtgEffClass(m.efficiency)}">${m.efficiency}/5 ${mtgEffLabel(m.efficiency)}</span>` : '—';
-      html += `<tr>
-        <td style="font-family:var(--mono);white-space:nowrap">${escapeHtml(m.targetDate||'—')}</td>
-        <td style="font-weight:500;cursor:pointer" onclick="openMeetingLogModal('${m.id}')">${escapeHtml(m.name||'Untitled')}</td>
-        <td>${durStr}</td>
-        <td>${attCount}</td>
-        <td>${absentCount?'<span style="color:var(--red)">'+absentCount+'</span>':'0'}</td>
-        <td>${eff}</td>
-        <td>${canEdit()?'<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMeeting(\''+m.id+'\')">Delete</button>':''}</td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-  }
-  container.innerHTML = html;
-}
-
 let mtgAgendaDraft=[];
 
 async function openTemplateModal(id){
@@ -11798,7 +11723,7 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     // Ensure all users are in attendees list
     users.forEach(u=>{
       if(!meetingAttendeesDraft.find(a=>a.uid===u.uid)){
-        meetingAttendeesDraft.push({uid:u.uid, name:u.name||u.email||u.uid, attended:false, late:false, lateMinutes:0, absenceReason:''});
+        meetingAttendeesDraft.push({uid:u.uid, name:u.name||u.email||u.uid, attended:false, late:false, lateMinutes:0, absenceReason:'', required:false});
       }
     });
   } else {
@@ -11811,7 +11736,7 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     document.getElementById('mtgLogEfficiency').value = '';
     document.getElementById('mtgLogNotes').value = '';
     meetingAgendaDraft = [];
-    meetingAttendeesDraft = users.map(u=>({uid:u.uid, name:u.name||u.email||u.uid, attended:true, late:false, lateMinutes:0, absenceReason:''}));
+    meetingAttendeesDraft = users.map(u=>({uid:u.uid, name:u.name||u.email||u.uid, attended:true, late:false, lateMinutes:0, absenceReason:'', required:true}));
     if(templateId){
       onMtgTemplateSelect(templateId);
     }
@@ -11839,15 +11764,16 @@ function renderMtgLogAttendees(){
   const container = document.getElementById('mtgLogAttendees');
   let html = '';
   // Sort: required attendees first (from meeting creation), then others
+  meetingAttendeesDraft.sort((x,y)=>(y.required!==false?1:0)-(x.required!==false?1:0));
   meetingAttendeesDraft.forEach((a,i)=>{
     const col=userColor(a.uid);
     const initials=(a.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const isRequired=true; // all listed attendees are required
+    const isRequired=a.required!==false;
     const bgColor=a.attended?'rgba(74,222,128,0.08)':isRequired?'rgba(245,112,106,0.05)':'var(--surface2)';
     const borderColor=a.attended?'rgba(74,222,128,0.25)':isRequired?'rgba(245,112,106,0.2)':'var(--border2)';
-    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:4px;background:${bgColor};border:1px solid ${borderColor};border-left:3px solid ${a.attended?'#4ade80':'var(--red)'};border-radius:6px">
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:4px;background:${bgColor};border:1px solid ${borderColor};border-left:3px solid ${a.attended?'#4ade80':isRequired?'var(--red)':'var(--border2)'};border-radius:6px">
       <span style="width:28px;height:28px;border-radius:50%;background:${col}22;color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
-      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escapeHtml(a.name)}</span>
+      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escapeHtml(a.name)}${isRequired?' <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(245,158,11,0.12);color:var(--amber);font-weight:700;margin-left:4px">Required</span>':''}</span>
       <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;color:${a.attended?'#4ade80':'var(--muted)'}">
         <input type="checkbox" ${a.attended?'checked':''} style="accent-color:#4ade80;width:14px;height:14px" onchange="meetingAttendeesDraft[${i}].attended=this.checked;renderMtgLogAttendees()"> ${a.attended?'✓ Attended':'Attended'}
       </label>
@@ -11927,10 +11853,10 @@ async function saveMeetingLog(){
   const agendaInputs = document.querySelectorAll('#mtgLogAgenda .mtg-agenda-row input[type="text"]');
   agendaInputs.forEach((inp,i)=>{ if(meetingAgendaDraft[i]) meetingAgendaDraft[i].text = inp.value; });
 
-  const attendees = meetingAttendeesDraft.map(a=>({uid:a.uid, name:a.name, attended:!!a.attended, late:!!a.late, lateMinutes:a.lateMinutes||0, absenceReason:a.absenceReason||''}));
+  const attendees = meetingAttendeesDraft.map(a=>({uid:a.uid, name:a.name, attended:!!a.attended, late:!!a.late, lateMinutes:a.lateMinutes||0, absenceReason:a.absenceReason||'', required:a.required!==false}));
   const agenda = meetingAgendaDraft.filter(a=>a.text.trim()).map(a=>({text:a.text.trim(), checked:!!a.checked}));
 
-  const data = { templateId, name, targetDate, actualDate, timeStart:mtgStart, timeEnd:mtgEnd, duration, attendees, agenda, notes, efficiency };
+  const data = { templateId, name, targetDate, actualDate, timeStart:mtgStart, timeEnd:mtgEnd, duration, attendees, agenda, notes, efficiency, completed:true };
 
   try {
     if(id){
