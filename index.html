@@ -11210,6 +11210,96 @@ function switchMeetingsTab(tab){
   renderMeetingsView();
 }
 
+async function openQuickMeetingModal(date){
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+  const tplOpts=meetingTemplates.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  const existing=document.getElementById('quickMtgModal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='quickMtgModal';
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:480px">
+    <div class="modal-title"><span>📅 Create Meeting — ${date}</span><button class="modal-close" onclick="document.getElementById('quickMtgModal').remove()">×</button></div>
+    <div class="fg"><label>From Template (optional)</label>
+      <select id="qmTemplate" onchange="prefillQuickMeeting()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="">Custom meeting</option>${tplOpts}
+      </select>
+    </div>
+    <div class="fg"><label>Meeting Name</label>
+      <input type="text" id="qmName" placeholder="e.g. Weekly Standup" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+    </div>
+    <div class="fg"><label>Date</label>
+      <input type="date" id="qmDate" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
+    </div>
+    <div class="fg"><label>Attendees</label>
+      <div id="qmAttendees" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">
+        ${users.map(u=>{
+          const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+          const col=userColor(u.uid);
+          return `<label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer">
+            <input type="checkbox" value="${u.uid}" data-name="${escapeAttr(u.name||u.email)}" style="accent-color:var(--accent);width:15px;height:15px">
+            <span style="width:24px;height:24px;border-radius:50%;background:${col}22;color:${col};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+            <span style="font-size:12px;font-weight:500">${escapeHtml(u.name||u.email)}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('quickMtgModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveQuickMeeting()">Create Meeting</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function prefillQuickMeeting(){
+  const tplId=document.getElementById('qmTemplate').value;
+  if(!tplId) return;
+  const tpl=meetingTemplates.find(t=>t.id===tplId);
+  if(!tpl) return;
+  document.getElementById('qmName').value=tpl.name||'';
+  const atts=tpl.defaultAttendees||[];
+  document.querySelectorAll('#qmAttendees input[type=checkbox]').forEach(cb=>{
+    cb.checked=atts.includes(cb.value);
+  });
+}
+
+async function saveQuickMeeting(){
+  const name=document.getElementById('qmName').value.trim();
+  if(!name){toast('Enter a meeting name');return;}
+  const date=document.getElementById('qmDate').value;
+  if(!date){toast('Select a date');return;}
+  const attendees=[];
+  document.querySelectorAll('#qmAttendees input[type=checkbox]:checked').forEach(cb=>{
+    attendees.push({uid:cb.value, name:cb.dataset.name||'', attended:false, late:false, lateMinutes:0, absenceReason:''});
+  });
+  if(!attendees.length){toast('Select at least one attendee');return;}
+  const tplId=document.getElementById('qmTemplate').value;
+  const tpl=tplId?meetingTemplates.find(t=>t.id===tplId):null;
+  try{
+    await db.collection('meetings').add({
+      name,
+      targetDate:date,
+      actualDate:'',
+      templateId:tplId||'',
+      attendees,
+      agenda:tpl&&tpl.agenda?tpl.agenda.map(a=>({text:a,checked:false})):[],
+      duration:0,
+      efficiency:0,
+      completed:false,
+      notes:'',
+      createdBy:currentUser.uid,
+      createdByName:currentUser.name||currentUser.email,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('quickMtgModal').remove();
+    toast('Meeting created');
+    await renderMeetingsView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
 function renderMeetingCalendar(){
   const container = document.getElementById('mtgTabContent');
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -11264,7 +11354,7 @@ function renderMeetingCalendar(){
     html+=`<div style="background:var(--surface);border:1px solid ${border};border-radius:8px;padding:6px;min-height:75px;position:relative">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</span>
-        ${canEdit()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 2px" onclick="openMeetingLogModal(null,null,'${mtgCalYear}-${String(mtgCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}')" title="Add meeting">+</button>`:''}
+        ${canEdit()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 2px" onclick="openQuickMeetingModal('${mtgCalYear}-${String(mtgCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}')" title="Create meeting">+</button>`:''}
       </div>
       ${dayMtgs.map(m=>{
         const isDone=m.completed;
