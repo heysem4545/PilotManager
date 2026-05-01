@@ -9221,6 +9221,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       <span class="tm-day-num ${isToday?'today-num':''}">${day}</span>
     </div>
     <div class="tm-day-body" id="tmbody-${day}">${rowsHtml}</div>
+    ${readonly?'':'<div class="tm-add-row" onclick="tmAddRow('+day+')">+ Add row</div>'}
   </div>`;
 }
 
