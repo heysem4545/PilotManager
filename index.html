@@ -6270,6 +6270,7 @@ async function switchMonth(y,m){
   if(!alreadyLoaded) await loadMonthData(key);
   // Re-subscribe the real-time listener to the new month
   startMonthDataListener(key);
+  renderFilterTabs();
   renderTable();
   renderMetrics();
     renderDonut();
