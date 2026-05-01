@@ -11325,6 +11325,8 @@ async function saveQuickMeeting(){
   }catch(e){toast('Error: '+e.message);}
 }
 
+let mtgCalUser='all';
+
 function renderMeetingCalendar(){
   const container = document.getElementById('mtgTabContent');
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -11335,36 +11337,68 @@ function renderMeetingCalendar(){
   const isCurrentMonth=today.getFullYear()===mtgCalYear&&today.getMonth()===mtgCalMonth;
   const todayDate=today.getDate();
 
-  // Group meetings by day
-  const mtgByDay={};
-  meetingsData.forEach(m=>{
-    if(!m.targetDate) return;
-    const [y,mo,d]=m.targetDate.split('-').map(Number);
-    if(y===mtgCalYear&&(mo-1)===mtgCalMonth){
-      if(!mtgByDay[d]) mtgByDay[d]=[];
-      mtgByDay[d].push(m);
-    }
-  });
+  // User filter
+  const users=teamUsersCache.length?teamUsersCache:[];
+  const userFilterTabs=`<button class="ftab ${mtgCalUser==='all'?'active':''}" onclick="mtgCalUser='all';renderMeetingsView()">All</button>`+
+    users.map(u=>`<button class="ftab ${mtgCalUser===u.uid?'active':''}" onclick="mtgCalUser='${u.uid}';renderMeetingsView()">${escapeHtml(u.name||u.email)}</button>`).join('');
 
-  // Stats
-  const monthMeetings=meetingsData.filter(m=>{
+  // Filter meetings by month AND user
+  const monthMeetingsAll=meetingsData.filter(m=>{
     if(!m.targetDate) return false;
     const [y,mo]=m.targetDate.split('-').map(Number);
     return y===mtgCalYear&&(mo-1)===mtgCalMonth;
   });
+  const monthMeetings=mtgCalUser==='all'?monthMeetingsAll:monthMeetingsAll.filter(m=>(m.attendees||[]).some(a=>a.uid===mtgCalUser));
+
+  // Group meetings by day
+  const mtgByDay={};
+  monthMeetings.forEach(m=>{
+    const d=parseInt(m.targetDate.split('-')[2],10);
+    if(!mtgByDay[d]) mtgByDay[d]=[];
+    mtgByDay[d].push(m);
+  });
+
   const totalMtg=monthMeetings.length;
   const doneMtg=monthMeetings.filter(m=>m.completed).length;
 
-  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+  // Per-user attendance stats when a user is selected
+  let userStatsHtml='';
+  if(mtgCalUser!=='all'){
+    const attended=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&a.attended)).length;
+    const absent=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&!a.attended)).length;
+    const late=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&a.attended&&a.late)).length;
+    const attRate=doneMtg>0?Math.round(attended/doneMtg*100):0;
+    const selName=users.find(u=>u.uid===mtgCalUser);
+    userStatsHtml=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#4ade80">${attended}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attended</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--red)">${absent}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Absent</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--amber)">${late}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Late</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:${attRate>=90?'#4ade80':attRate>=70?'var(--amber)':'var(--red)'}">${attRate}%</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attendance</div>
+      </div>
+    </div>`;
+  }
+
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:12px">
       <button class="btn btn-ghost btn-sm" onclick="mtgCalMonth--;if(mtgCalMonth<0){mtgCalMonth=11;mtgCalYear--;}renderMeetingsView()">‹</button>
       <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[mtgCalMonth]} ${mtgCalYear}</span>
       <button class="btn btn-ghost btn-sm" onclick="mtgCalMonth++;if(mtgCalMonth>11){mtgCalMonth=0;mtgCalYear++;}renderMeetingsView()">›</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span style="font-size:11px;color:var(--muted)">${totalMtg} meetings · <span style="color:#4ade80">${doneMtg} done</span> · <span style="color:var(--red)">${totalMtg-doneMtg} pending</span></span>
-    </div>
-  </div>`;
+    <div style="font-size:11px;color:var(--muted)">${totalMtg} meetings · <span style="color:#4ade80">${doneMtg} done</span> · <span style="color:var(--red)">${totalMtg-doneMtg} pending</span></div>
+  </div>
+  ${isAdmin()?`<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">${userFilterTabs}</div>`:''}
+  ${userStatsHtml}`;
 
   html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">`;
   DNAMES.forEach(d=>{html+=`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px">${d}</div>`;});
@@ -11383,8 +11417,14 @@ function renderMeetingCalendar(){
       </div>
       ${dayMtgs.map(m=>{
         const isDone=m.completed;
+        let userStatus='';
+        if(mtgCalUser!=='all'&&isDone){
+          const att=(m.attendees||[]).find(a=>a.uid===mtgCalUser);
+          if(att&&att.attended) userStatus=att.late?' ⏰':'';
+          else userStatus=' ✗';
+        }
         return `<div onclick="openMeetingLogModal('${m.id}')" style="font-size:9px;padding:3px 6px;margin-bottom:2px;border-radius:4px;cursor:pointer;background:${isDone?'rgba(74,222,128,0.1)':'rgba(245,112,106,0.08)'};border-left:2px solid ${isDone?'#4ade80':'var(--red)'};color:${isDone?'#4ade80':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isDone?'text-decoration:line-through':''}">
-          ${isDone?'✓ ':''}${escapeHtml(m.name||'Meeting')}
+          ${isDone?'✓ ':''}${escapeHtml(m.name||'Meeting')}${userStatus}
         </div>`;
       }).join('')}
     </div>`;
