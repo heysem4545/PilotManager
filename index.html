@@ -774,6 +774,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .mtg-tabs button{padding:10px 18px;font-size:12px;font-weight:500;cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font);transition:all .12s}
 .mtg-tabs button:hover{color:var(--text)}
 .mtg-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.mtg-detail-panel{display:none;margin-top:8px;padding:10px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:8px}
+.mtg-detail-panel.open{display:block}
 .mtg-card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .12s}
 .mtg-card:hover{border-color:var(--muted2)}
 .mtg-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -1804,15 +1806,18 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div class="fg"><label>Duration</label>
         <div id="mtgLogDurDisplay" style="font-size:14px;font-weight:700;color:var(--blue);font-family:var(--mono)">—</div>
       </div>
-      <div class="fg"><label>Efficiency</label>
-        <select id="mtgLogEfficiency">
-          <option value="">— Select —</option>
-          <option value="1">1 — Poor</option>
-          <option value="2">2 — Fair</option>
-          <option value="3">3 — Average</option>
-          <option value="4">4 — Good</option>
-          <option value="5">5 — Excellent</option>
-        </select>
+      <div class="fg"><label>Stars</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div id="mtgLogStars" style="display:flex;gap:2px">
+            <span onclick="setMtgStars(1)" style="font-size:22px;cursor:pointer;opacity:0.25;transition:opacity .15s">⭐</span>
+            <span onclick="setMtgStars(2)" style="font-size:22px;cursor:pointer;opacity:0.25;transition:opacity .15s">⭐</span>
+            <span onclick="setMtgStars(3)" style="font-size:22px;cursor:pointer;opacity:0.25;transition:opacity .15s">⭐</span>
+            <span onclick="setMtgStars(4)" style="font-size:22px;cursor:pointer;opacity:0.25;transition:opacity .15s">⭐</span>
+            <span onclick="setMtgStars(5)" style="font-size:22px;cursor:pointer;opacity:0.25;transition:opacity .15s">⭐</span>
+          </div>
+          <span id="mtgLogStarLabel" style="font-size:12px;font-weight:600;color:var(--muted);min-width:60px"></span>
+          <input type="hidden" id="mtgLogEfficiency" value="">
+        </div>
       </div>
     </div>
     <div class="fg"><label>Attendees</label>
@@ -11356,6 +11361,13 @@ function getMtgTime(prefix){
   return h.value.padStart(2,'0')+':'+m.value.padStart(2,'0');
 }
 
+function setMtgStars(n){
+  document.getElementById('mtgLogEfficiency').value=n;
+  const labels=['','Poor','Fair','Average','Good','Excellent'];
+  document.getElementById('mtgLogStarLabel').textContent=n+'/5 — '+labels[n];
+  document.querySelectorAll('#mtgLogStars span').forEach((s,i)=>{s.style.opacity=i<n?1:0.25;});
+}
+
 function calcMtgDur(){
   const s=getMtgTime('mtgLog-start');
   const e=getMtgTime('mtgLog-end');
@@ -11444,34 +11456,60 @@ function renderMeetingCalendar(){
   });
   const durH=Math.floor(totalDur/60);
   const durM=totalDur%60;
+
+  // Build detail rows for clickable cards
+  let onTimeRows='',lateRows='',absentRows='',starRows='',durRows='';
+  myMtgs.forEach(m=>{
+    const att=(m.attendees||[]).find(a=>a.uid===statsUid);
+    if(!att) return;
+    const dt=m.targetDate||'—';
+    const nm=escapeHtml(m.name||'Meeting');
+    if(att.attended&&!att.late) onTimeRows+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span>${dt}</span><span>${nm}</span><span style="color:#4ade80">✓ On Time</span></div>`;
+    if(att.attended&&att.late) lateRows+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span>${dt}</span><span>${nm}</span><span style="color:var(--amber)">${att.lateMinutes||0} min late</span></div>`;
+    if(!att.attended) absentRows+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span>${dt}</span><span>${nm}</span><span style="color:var(--red)">${escapeHtml(att.absenceReason||'No reason')}</span></div>`;
+    if(att.attended){
+      const s=m.efficiency||0;
+      starRows+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span>${dt}</span><span>${nm}</span><span style="color:var(--amber)">${'⭐'.repeat(s)} (${s})</span></div>`;
+      const mDur=m.duration||0;
+      const mH=Math.floor(mDur/60),mM=mDur%60;
+      durRows+=`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span>${dt}</span><span>${nm}</span><span style="color:var(--accent)">${mH}h ${mM}m</span></div>`;
+    }
+  });
+
+  const cardStyle='background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .12s';
   userStatsHtml=`<div style="margin-bottom:14px">
     <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">${escapeHtml(statsName)} — Meeting Summary</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailOnTime').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:#4ade80">${onTime}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">On Time</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailLate').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--amber)">${lateCnt}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Late</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailAbsent').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--red)">${absentCnt}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Absent</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}">
         <div style="font-size:18px;font-weight:700;color:${attRate>=90?'#4ade80':attRate>=70?'var(--amber)':'var(--red)'}">${attRate}%</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attendance</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailDur').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--accent)">${durH}h ${durM}m</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Duration</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+      <div style="${cardStyle}" onclick="this.parentNode.querySelector('#mtgDetailStars').classList.toggle('open')">
         <div style="font-size:18px;font-weight:700;color:var(--amber)">${totalStars} ⭐</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Stars Earned</div>
       </div>
     </div>
+    <div id="mtgDetailOnTime" class="mtg-detail-panel">${onTimeRows||'<div style="font-size:11px;color:var(--muted);padding:8px 0">None</div>'}</div>
+    <div id="mtgDetailLate" class="mtg-detail-panel">${lateRows||'<div style="font-size:11px;color:var(--muted);padding:8px 0">None</div>'}</div>
+    <div id="mtgDetailAbsent" class="mtg-detail-panel">${absentRows||'<div style="font-size:11px;color:var(--muted);padding:8px 0">None</div>'}</div>
+    <div id="mtgDetailDur" class="mtg-detail-panel">${durRows||'<div style="font-size:11px;color:var(--muted);padding:8px 0">None</div>'}</div>
+    <div id="mtgDetailStars" class="mtg-detail-panel">${starRows||'<div style="font-size:11px;color:var(--muted);padding:8px 0">None</div>'}</div>
   </div>`;
 
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
@@ -11740,7 +11778,7 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     document.getElementById('mtgLogStartWrap').innerHTML=pilotTimeSelect(mtg.timeStart||'','mtgLog-start','calcMtgDur()',true);
     document.getElementById('mtgLogEndWrap').innerHTML=pilotTimeSelect(mtg.timeEnd||'','mtgLog-end','calcMtgDur()',true);
     calcMtgDur();
-    document.getElementById('mtgLogEfficiency').value = mtg.efficiency||'';
+    if(mtg.efficiency) setMtgStars(mtg.efficiency); else { document.getElementById('mtgLogEfficiency').value=''; document.querySelectorAll('#mtgLogStars span').forEach(s=>s.style.opacity=0.25); document.getElementById('mtgLogStarLabel').textContent=''; }
     document.getElementById('mtgLogNotes').value = mtg.notes||'';
     meetingAgendaDraft = (mtg.agenda||[]).map(a=>({...a}));
     meetingAttendeesDraft = (mtg.attendees||[]).map(a=>({...a}));
@@ -11758,6 +11796,8 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     document.getElementById('mtgLogStartWrap').innerHTML=pilotTimeSelect('','mtgLog-start','calcMtgDur()',true);
     document.getElementById('mtgLogEndWrap').innerHTML=pilotTimeSelect('','mtgLog-end','calcMtgDur()',true);
     document.getElementById('mtgLogEfficiency').value = '';
+    document.querySelectorAll('#mtgLogStars span').forEach(s=>s.style.opacity=0.25);
+    document.getElementById('mtgLogStarLabel').textContent='';
     document.getElementById('mtgLogNotes').value = '';
     meetingAgendaDraft = [];
     meetingAttendeesDraft = users.map(u=>({uid:u.uid, name:u.name||u.email||u.uid, attended:true, late:false, lateMinutes:0, absenceReason:'', required:true}));
