@@ -3445,8 +3445,8 @@ function renderCollectionPage(){
   if(tabsEl){
     tabsEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
-      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')" style="${collectionViewMode==='monthly'?'background:var(--accent);color:#0d0d10;border-color:var(--accent)':'background:var(--accent-dim);color:var(--accent);border-color:var(--accent)'};font-weight:700">⭐ Monthly Balance</button>
+      <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
   }
