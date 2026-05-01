@@ -11389,9 +11389,13 @@ async function openTemplateModal(id){
   let attHtml = '';
   users.forEach(u=>{
     const checked = defaultAtt.includes(u.uid) ? 'checked' : '';
-    attHtml += `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
-      <input type="checkbox" value="${escapeAttr(u.uid)}" ${checked} style="accent-color:var(--accent)">
-      ${escapeHtml(u.name||u.email||u.uid)}
+    const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const col=userColor(u.uid);
+    attHtml += `<label style="display:flex;align-items:center;gap:10px;padding:6px 10px;margin-bottom:4px;border-radius:6px;background:${checked?'var(--accent-dim)':'var(--surface2)'};border:1px solid ${checked?'var(--accent-dim)':'var(--border2)'};cursor:pointer;transition:all .12s">
+      <input type="checkbox" value="${escapeAttr(u.uid)}" ${checked} style="accent-color:var(--accent);width:15px;height:15px" onchange="this.closest('label').style.background=this.checked?'var(--accent-dim)':'var(--surface2)';this.closest('label').style.borderColor=this.checked?'var(--accent-dim)':'var(--border2)'">
+      <span style="width:26px;height:26px;border-radius:50%;background:${col}22;color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+      <span style="font-size:12px;font-weight:500;color:var(--text)">${escapeHtml(u.name||u.email)}</span>
+      <span style="font-size:10px;color:var(--muted);margin-left:auto">${escapeHtml(u.role||'')}</span>
     </label>`;
   });
   attContainer.innerHTML = attHtml;
