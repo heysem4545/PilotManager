@@ -11389,9 +11389,6 @@ async function openTemplateModal(id){
   });
   document.getElementById('mtgTemplateDifficulty').value = tpl ? tpl.difficulty||'3' : '3';
   document.getElementById('mtgTemplateLocation').value = tpl ? tpl.location||'' : '';
-  const durTotal = tpl ? (tpl.defaultDuration||0) : 60;
-  document.getElementById('mtgTemplateDurH').value = Math.floor(durTotal/60);
-  document.getElementById('mtgTemplateDurM').value = durTotal%60;
   mtgAgendaDraft = tpl&&tpl.agenda ? [...tpl.agenda] : [];
   renderMtgTemplateAgenda();
   const defaultAtt = tpl ? (tpl.defaultAttendees||[]) : [];
@@ -11437,8 +11434,8 @@ async function saveTemplate(){
   const name = document.getElementById('mtgTemplateName').value.trim();
   if(!name){ toast('Template name is required'); return; }
   const recurrence = document.getElementById('mtgTemplateRecurrence').value;
-  const durH = parseInt(document.getElementById('mtgTemplateDurH').value)||0;
-  const durM = parseInt(document.getElementById('mtgTemplateDurM').value)||0;
+  const durH = 0;
+  const durM = 0;
   const defaultDuration = durH*60+durM;
   const checkboxes = document.querySelectorAll('#mtgTemplateAttendees input[type="checkbox"]');
   const defaultAttendees = [];
