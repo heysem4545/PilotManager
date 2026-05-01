@@ -3170,10 +3170,11 @@ async function renderMyDailyCard(){
     });
   }catch(e){}
 
-  // Incomplete tasks — user's own tasks not done
+  // Incomplete tasks — user's own tasks not done (current month only)
   let incompleteTasks=0;
+  const curKey=monthKey(new Date().getFullYear(),new Date().getMonth());
   try{
-    const snap=await db.collection('tasks').where('assignedUid','==',uid).get();
+    const snap=await db.collection('tasks').where('monthKey','==',curKey).where('uid','==',uid).get();
     snap.forEach(d=>{
       const t=d.data();
       if(t.status!=='done') incompleteTasks++;
