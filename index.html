@@ -1091,6 +1091,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
       <!-- DASHBOARD VIEW -->
       <div id="dashView">
+        <div id="myDailyCard"></div>
         <div id="courtAlertSection"></div>
         <div id="inspectionAlertSection"></div>
         <div class="month-bar" id="dashMonthBar"></div>
@@ -3153,6 +3154,68 @@ function calcTotals(){
 // ─────────────────────────────────────────────
 // RENDER
 // ─────────────────────────────────────────────
+async function renderMyDailyCard(){
+  const el=document.getElementById('myDailyCard');
+  if(!el) return;
+  const uid=currentUser.uid;
+  const today=new Date().toISOString().slice(0,10);
+
+  // Pending meetings — not completed, targetDate >= today, user is attendee
+  let pendingMtgs=0;
+  try{
+    const snap=await db.collection('meetings').where('completed','==',false).get();
+    snap.forEach(d=>{
+      const m=d.data();
+      if((m.targetDate||'')>=today && (m.attendees||[]).some(a=>a.uid===uid)) pendingMtgs++;
+    });
+  }catch(e){}
+
+  // Incomplete tasks — user's own tasks not done
+  let incompleteTasks=0;
+  try{
+    const snap=await db.collection('tasks').where('assignedUid','==',uid).get();
+    snap.forEach(d=>{
+      const t=d.data();
+      if(t.status!=='done') incompleteTasks++;
+    });
+  }catch(e){}
+
+  // Assigned tasks from others
+  let assignedFromOthers=0;
+  try{
+    const snap=await db.collection('assignedTasks').where('assignedTo','==',uid).get();
+    snap.forEach(d=>{
+      const t=d.data();
+      if(t.status!=='done') assignedFromOthers++;
+    });
+  }catch(e){}
+
+  const total=pendingMtgs+incompleteTasks+assignedFromOthers;
+  const allClear=total===0;
+
+  el.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;color:var(--text)">📋 My Daily</div>
+      <div style="font-size:10px;color:var(--muted)">${today}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div onclick="showView('meetings')" style="background:${pendingMtgs?'rgba(245,158,11,0.08)':'rgba(74,222,128,0.06)'};border:1px solid ${pendingMtgs?'rgba(245,158,11,0.2)':'rgba(74,222,128,0.2)'};border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .12s">
+        <div style="font-size:24px;font-weight:700;color:${pendingMtgs?'var(--amber)':'#4ade80'}">${pendingMtgs}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Pending Meetings</div>
+      </div>
+      <div onclick="showView('tasks')" style="background:${incompleteTasks?'rgba(245,112,106,0.08)':'rgba(74,222,128,0.06)'};border:1px solid ${incompleteTasks?'rgba(245,112,106,0.2)':'rgba(74,222,128,0.2)'};border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .12s">
+        <div style="font-size:24px;font-weight:700;color:${incompleteTasks?'var(--red)':'#4ade80'}">${incompleteTasks}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Incomplete Tasks</div>
+      </div>
+      <div onclick="showView('tasks')" style="background:${assignedFromOthers?'rgba(99,102,241,0.08)':'rgba(74,222,128,0.06)'};border:1px solid ${assignedFromOthers?'rgba(99,102,241,0.2)':'rgba(74,222,128,0.2)'};border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .12s">
+        <div style="font-size:24px;font-weight:700;color:${assignedFromOthers?'var(--accent)':'#4ade80'}">${assignedFromOthers}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Assigned to Me</div>
+      </div>
+    </div>
+    ${allClear?'<div style="text-align:center;margin-top:10px;font-size:11px;color:#4ade80;font-weight:600">✓ All clear — nothing pending!</div>':''}
+  </div>`;
+}
+
 async function renderMetrics(){
   const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mLabel=MNAMES[activeMonth]+' '+activeYear;
@@ -10601,6 +10664,7 @@ function showView(v){
 
   // Render
   if(v==='dashboard'){
+    renderMyDailyCard();
     renderCourtAlerts();
     renderInspectionAlerts();
     renderMonthBar();
