@@ -9007,19 +9007,19 @@ function renderTmStats(tasks, label='This Month'){
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:var(--text)">${total}</div>
+      <div id="tmCardTotal" style="font-size:18px;font-weight:700;color:var(--text)">${total}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:var(--accent)">${done}</div>
+      <div id="tmCardDone" style="font-size:18px;font-weight:700;color:var(--accent)">${done}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Done</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:var(--amber)">${progressing}</div>
+      <div id="tmCardProgress" style="font-size:18px;font-weight:700;color:var(--amber)">${progressing}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">In Progress</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:var(--red)">${notstarted}</div>
+      <div id="tmCardNotStarted" style="font-size:18px;font-weight:700;color:var(--red)">${notstarted}</div>
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Not Started</div>
     </div>
   </div>`;
@@ -9386,25 +9386,25 @@ function tmAddRow(day){
 
 function tmRefreshStats(){
   // Recalculate stats from current DOM state
-  const key=tmActiveKey();
-  const cacheKey=key+(tmTab==='own'?'-own':tmTab==='group'?'':'-'+tmAdminUser);
-  const tasks=taskCache[cacheKey]||{};
-  // Also read from current DOM for real-time accuracy
   const allRows=document.querySelectorAll('.tm-task-row');
-  let total=0,done=0,pts=0;
+  let total=0,done=0,progressing=0,notstarted=0,pts=0;
   allRows.forEach(row=>{
     const inp=row.querySelector('.tm-task-input');
     const diff=row.querySelector('.tm-diff-sel');
     const status=row.querySelector('.tm-status-sel');
-    if(!inp||!inp.value.trim())return;
+    if(!inp||(typeof inp.value==='string'?!inp.value.trim():!inp.textContent.trim()))return;
     total++;
-    const p=DIFF_PTS[diff?.value]||1;
-    if(status?.value==='done'){done++;pts+=p;}
+    const diffVal=diff?diff.value:'medium';
+    const p=DIFF_PTS[diffVal]||1;
+    const st=status?status.value:'notstarted';
+    if(st==='done'){done++;pts+=p;}
+    else if(st==='progressing') progressing++;
+    else notstarted++;
   });
   const pct=total>0?Math.round(done/total*100):0;
   const circ=2*Math.PI*18;
   const dash=circ*pct/100;
-  // Update circle
+  // Update donut circle
   const circles=document.querySelectorAll('.tm-stat-circle circle:last-child');
   circles.forEach(c=>c.setAttribute('stroke-dasharray',`${dash} ${circ}`));
   const pctEls=document.querySelectorAll('.tm-stat-circle-inner');
@@ -9413,6 +9413,11 @@ function tmRefreshStats(){
   valEls.forEach(e=>e.textContent=`${done}/${total} tasks`);
   const ptsEls=document.querySelectorAll('.tm-stat-pts');
   ptsEls.forEach(e=>e.textContent=`⚡ ${pts} pts earned`);
+  // Update stat cards
+  const ct=document.getElementById('tmCardTotal');if(ct)ct.textContent=total;
+  const cd=document.getElementById('tmCardDone');if(cd)cd.textContent=done;
+  const cp=document.getElementById('tmCardProgress');if(cp)cp.textContent=progressing;
+  const cn=document.getElementById('tmCardNotStarted');if(cn)cn.textContent=notstarted;
 }
 
 async function renderTasksView(){
