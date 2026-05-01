@@ -9948,11 +9948,13 @@ async function generateRecurringTasks(){
         }
       }
       for(const day of fireDays){
-        const existing=await db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('recurringRuleId','==',doc.id).get();
-        if(!existing.empty) continue;
+        // Use deterministic doc ID to prevent race-condition duplicates
+        const detId=`rec_${doc.id}_${key}_${day}`;
+        const existingDoc=await db.collection('tasks').doc(detId).get();
+        if(existingDoc.exists) continue;
         const daySnap=await db.collection('tasks').where('monthKey','==',key).where('day','==',day).where('uid','==',rule.assignedUid||'team').get();
         const maxRow=daySnap.docs.reduce((mx,d)=>Math.max(mx,d.data().rowIdx||0),-1);
-        await db.collection('tasks').add({
+        await db.collection('tasks').doc(detId).set({
           monthKey:key, day, rowIdx:maxRow+1,
           uid:rule.isGroup?'team':rule.assignedUid,
           userName:rule.assignedName||'',
