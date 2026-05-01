@@ -4362,10 +4362,12 @@ async function renderMaintenanceView(){
     .flatMap(months => Object.values(months))
     .reduce((s,arr) => s + arr.length, 0);
 
+  const curMo=new Date().getMonth();
+  const isCurYear=maintenanceYear===curYear;
   const headerRow = `<thead><tr>
     <th style="text-align:center;width:16px;padding:4px 2px;font-size:10px">🌿</th>
     <th>Property</th>
-    ${MNAMES_S.map(m=>`<th>${m}</th>`).join('')}
+    ${MNAMES_S.map((m,i)=>`<th style="${isCurYear&&i===curMo?'background:var(--accent-dim);color:var(--accent);font-weight:700':''}">${m}</th>`).join('')}
     <th>Total</th>
     <th>Cost</th>
   </tr></thead>`;
@@ -4384,7 +4386,8 @@ async function renderMaintenanceView(){
       const cls = `maint-cell${warn?' warn':has?' has-visits':' empty'}${editable?'':' disabled'}`;
       const onclick = editable ? `onclick="openMaintenanceCell('${p.id}',${m})"` : '';
       const title = maintCellTitle(visits).replace(/"/g,'&quot;');
-      return `<td><div class="${cls}" ${onclick} title="${title}">${has?visits.length:'—'}</div></td>`;
+      const curCol=isCurYear&&m===curMo;
+      return `<td style="${curCol?'background:var(--accent-dim)':''}"><div class="${cls}" ${onclick} title="${title}">${has?visits.length:'—'}</div></td>`;
     }).join('');
     const addrLabel = p.addr && p.addr.trim()
       ? escapeHtml(p.addr)
