@@ -6854,7 +6854,7 @@ function openPilotDay(day){
       <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeStart||j.time||'','pj-start','calcPilotDur(this)')}</div>
       <div style="display:flex;gap:2px">${pilotTimeSelect(j.timeEnd||'','pj-end','calcPilotDur(this)')}</div>
       <div class="pj-dur-display" style="font-size:10px;font-family:var(--mono);color:${durColor};text-align:center;font-weight:600">${durDisplay}</div>
-      <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="pj-notes"><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deletePilotJob('${j.id}')">×</button></div>
+      <div style="display:flex;gap:4px;align-items:center"><input type="text" value="${escapeAttr(j.notes||'')}" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" class="pj-notes">${j.createdByName?`<span style="font-size:8px;color:var(--muted);white-space:nowrap" title="Added by ${escapeAttr(j.createdByName)}">👤 ${escapeHtml(j.createdByName.split(' ')[0])}</span>`:''}<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="deletePilotJob('${j.id}')">×</button></div>
     </div>`;
     }
     let jobRows=workJobs.map(j=>buildJobRow(j,false)).join('');
@@ -6934,7 +6934,9 @@ async function addPilotJob(day, jobType){
       timeEnd:(()=>{const h=document.getElementById(endPfx+'-h'),m=document.getElementById(endPfx+'-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})(),
       duration:(()=>{const hS=document.getElementById(startPfx+'-h'),mS=document.getElementById(startPfx+'-m'),hE=document.getElementById(endPfx+'-h'),mE=document.getElementById(endPfx+'-m');const s=hS&&hS.value!==''&&mS&&mS.value!==''?hS.value.padStart(2,'0')+':'+mS.value.padStart(2,'0'):'';const e=hE&&hE.value!==''&&mE&&mE.value!==''?hE.value.padStart(2,'0')+':'+mE.value.padStart(2,'0'):'';return calcDurFromTimes(s,e);})(),
       notes:(document.getElementById(isExcuse?'pjNewExcNotes':'pjNewNotes')||{}).value?.trim()||'',
-      createdAt:new Date()
+      createdAt:new Date(),
+      createdBy:currentUser.uid,
+      createdByName:currentUser.name||currentUser.email
     });
     document.getElementById('pilotDayModal').remove();
     toast('Job added');
