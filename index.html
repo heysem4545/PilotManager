@@ -9443,7 +9443,7 @@ async function renderTasksView(){
     {k:'own',l:'My Tasks'},
     {k:'group',l:'📋 Assign Tasks'},
     ...(isAdminUser?[{k:'admin',l:'👑 Team Overview'}]:[]),
-    ...(isAdminUser?[{k:'recurring',l:'🔁 Recurring'}]:[]),
+    {k:'recurring',l:'🔁 Recurring'},
     ...(isAdminUser?[{k:'flagged',l:`🚩 Flagged${flaggedCount>0?' ('+flaggedCount+')':''}`}]:[])
   ];
 
@@ -9899,7 +9899,10 @@ async function renderRecurringTab(baseHtml, el, tabs){
   const users=teamUsersCache.length?teamUsersCache:await getUsers();
   teamUsersCache=users;
   let rulesSnap;
-  try{rulesSnap=await db.collection('recurringTasks').get();}catch(e){rulesSnap={docs:[]};}
+  try{
+    if(isAdmin()) rulesSnap=await db.collection('recurringTasks').get();
+    else rulesSnap=await db.collection('recurringTasks').where('createdBy','==',currentUser.uid).get();
+  }catch(e){rulesSnap={docs:[]};}
   const rules=rulesSnap.docs?rulesSnap.docs.map(d=>({id:d.id,...d.data()})):[];
 
   let html=baseHtml;
@@ -9939,8 +9942,9 @@ async function renderRecurringTab(baseHtml, el, tabs){
       </div>
       <div class="fg"><label>Assign To</label>
         <select id="recAssign" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-          <option value="team">👥 Group Task</option>
-          ${users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('')}
+          ${isAdmin()?`<option value="team">👥 Group Task</option>
+          ${users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('')}`
+          :`<option value="${currentUser.uid}" selected>${escapeHtml(currentUser.name||currentUser.email)} (Me)</option>`}
         </select>
       </div>
       <div class="fg"><label>Difficulty</label>
