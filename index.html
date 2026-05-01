@@ -11246,6 +11246,8 @@ async function openQuickMeetingModal(date){
         }).join('')}
       </div>
     </div>
+    <div id="qmAgendaSection" class="fg" style="display:none"></div>
+    <div id="qmDiffSection" class="fg" style="display:none"></div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('quickMtgModal').remove()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveQuickMeeting()">Create Meeting</button>
@@ -11256,7 +11258,11 @@ async function openQuickMeetingModal(date){
 
 function prefillQuickMeeting(){
   const tplId=document.getElementById('qmTemplate').value;
-  if(!tplId) return;
+  if(!tplId){
+    document.getElementById('qmAgendaSection').style.display='none';
+    document.getElementById('qmDiffSection').style.display='none';
+    return;
+  }
   const tpl=meetingTemplates.find(t=>t.id===tplId);
   if(!tpl) return;
   document.getElementById('qmName').value=tpl.name||'';
@@ -11264,6 +11270,24 @@ function prefillQuickMeeting(){
   document.querySelectorAll('#qmAttendees input[type=checkbox]').forEach(cb=>{
     cb.checked=atts.includes(cb.value);
   });
+  // Show agenda
+  const agendaEl=document.getElementById('qmAgendaSection');
+  if(tpl.agenda&&tpl.agenda.length){
+    agendaEl.style.display='';
+    agendaEl.innerHTML=`<label style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Agenda</label>
+      ${tpl.agenda.map((a,i)=>`<div style="font-size:11px;padding:4px 8px;margin-bottom:2px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--text)">${i+1}. ${escapeHtml(a)}</div>`).join('')}`;
+  } else {
+    agendaEl.style.display='none';
+  }
+  // Show difficulty
+  const diffEl=document.getElementById('qmDiffSection');
+  if(tpl.difficulty){
+    diffEl.style.display='';
+    diffEl.innerHTML=`<label style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Difficulty</label>
+      <div style="font-size:14px">${'⭐'.repeat(tpl.difficulty)} (${tpl.difficulty} star${tpl.difficulty>1?'s':''})</div>`;
+  } else {
+    diffEl.style.display='none';
+  }
 }
 
 async function saveQuickMeeting(){
@@ -11286,6 +11310,7 @@ async function saveQuickMeeting(){
       templateId:tplId||'',
       attendees,
       agenda:tpl&&tpl.agenda?tpl.agenda.map(a=>({text:a,checked:false})):[],
+      difficulty:tpl?tpl.difficulty||3:3,
       duration:0,
       efficiency:0,
       completed:false,
