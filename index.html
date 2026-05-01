@@ -1714,11 +1714,12 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="fg"><label>Recurrence</label>
         <select id="mtgTemplateRecurrence">
-          <option value="Weekly" selected>Weekly</option>
-          <option value="Daily">Daily</option>
-          <option value="Biweekly">Biweekly</option>
-          <option value="Monthly">Monthly</option>
-          <option value="Custom">Custom</option>
+          <option value="weekly_day">Every week on…</option>
+          <option value="daily_no_sun">Every day except Sundays</option>
+          <option value="monthly_day">Every month on day…</option>
+          <option value="month_start">1st of every month</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="custom">Custom</option>
         </select>
       </div>
       <div class="fg"><label>Day of Week</label>
