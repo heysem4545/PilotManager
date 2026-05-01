@@ -11422,33 +11422,57 @@ function renderMeetingCalendar(){
   const totalMtg=monthMeetings.length;
   const doneMtg=monthMeetings.filter(m=>m.completed).length;
 
-  // Per-user attendance stats when a user is selected
+  // Per-user attendance stats — show for selected user, or current user if 'all'
   let userStatsHtml='';
-  if(mtgCalUser!=='all'){
-    const attended=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&a.attended)).length;
-    const absent=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&!a.attended)).length;
-    const late=monthMeetings.filter(m=>m.completed&&(m.attendees||[]).some(a=>a.uid===mtgCalUser&&a.attended&&a.late)).length;
-    const attRate=doneMtg>0?Math.round(attended/doneMtg*100):0;
-    const selName=users.find(u=>u.uid===mtgCalUser);
-    userStatsHtml=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px">
+  const statsUid=mtgCalUser!=='all'?mtgCalUser:currentUser.uid;
+  const statsName=mtgCalUser!=='all'?(users.find(u=>u.uid===statsUid)||{}).name||'User':currentUser.name||'You';
+  const completedMtgs=monthMeetingsAll.filter(m=>m.completed);
+  const myMtgs=completedMtgs.filter(m=>(m.attendees||[]).some(a=>a.uid===statsUid));
+  const onTime=myMtgs.filter(m=>(m.attendees||[]).some(a=>a.uid===statsUid&&a.attended&&!a.late)).length;
+  const lateCnt=myMtgs.filter(m=>(m.attendees||[]).some(a=>a.uid===statsUid&&a.attended&&a.late)).length;
+  const absentCnt=myMtgs.filter(m=>(m.attendees||[]).some(a=>a.uid===statsUid&&!a.attended)).length;
+  const attendedCnt=onTime+lateCnt;
+  const attRate=myMtgs.length>0?Math.round(attendedCnt/myMtgs.length*100):0;
+  let totalDur=0;
+  let totalStars=0;
+  myMtgs.forEach(m=>{
+    const att=(m.attendees||[]).find(a=>a.uid===statsUid);
+    if(att&&att.attended){
+      totalDur+=(m.duration||0);
+      totalStars+=(m.efficiency||0);
+    }
+  });
+  const durH=Math.floor(totalDur/60);
+  const durM=totalDur%60;
+  userStatsHtml=`<div style="margin-bottom:14px">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">${escapeHtml(statsName)} — Meeting Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:#4ade80">${attended}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attended</div>
+        <div style="font-size:18px;font-weight:700;color:#4ade80">${onTime}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">On Time</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:var(--red)">${absent}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Absent</div>
-      </div>
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:18px;font-weight:700;color:var(--amber)">${late}</div>
+        <div style="font-size:18px;font-weight:700;color:var(--amber)">${lateCnt}</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Late</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--red)">${absentCnt}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Absent</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:18px;font-weight:700;color:${attRate>=90?'#4ade80':attRate>=70?'var(--amber)':'var(--red)'}">${attRate}%</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Attendance</div>
       </div>
-    </div>`;
-  }
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--accent)">${durH}h ${durM}m</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Duration</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--amber)">${totalStars} ⭐</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Stars Earned</div>
+      </div>
+    </div>
+  </div>`;
 
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:12px">
