@@ -1704,20 +1704,44 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
 <!-- MEETING TEMPLATE MODAL -->
 <div class="overlay" id="meetingTemplateModal" onclick="if(event.target===this)closeModal('meetingTemplateModal')">
-  <div class="modal">
+  <div class="modal" style="width:600px">
     <div class="modal-title">
       <span id="mtgTemplateModalTitle">Create Template</span>
       <button class="modal-close" onclick="closeModal('meetingTemplateModal')">&times;</button>
     </div>
     <input type="hidden" id="mtgTemplateId">
-    <div class="fg"><label>Template Name</label><input id="mtgTemplateName" placeholder="e.g. Weekly Standup"></div>
-    <div class="frow">
+    <div class="fg"><label>Meeting Name</label><input id="mtgTemplateName" placeholder="e.g. Weekly Standup, Monthly Review"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="fg"><label>Recurrence</label>
         <select id="mtgTemplateRecurrence">
-          <option value="Daily">Daily</option>
           <option value="Weekly" selected>Weekly</option>
+          <option value="Daily">Daily</option>
+          <option value="Biweekly">Biweekly</option>
           <option value="Monthly">Monthly</option>
           <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div class="fg"><label>Day of Week</label>
+        <select id="mtgTemplateDay">
+          <option value="">Any</option>
+          <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+          <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+        </select>
+      </div>
+      <div class="fg"><label>Apply To Month</label>
+        <select id="mtgTemplateMonth">
+          <option value="all">All Months</option>
+          <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+          <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+          <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+          <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+        </select>
+      </div>
+      <div class="fg"><label>Difficulty (Stars)</label>
+        <select id="mtgTemplateDifficulty">
+          <option value="1">⭐ 1 Star (Easy)</option>
+          <option value="3" selected>⭐⭐⭐ 3 Stars (Medium)</option>
+          <option value="5">⭐⭐⭐⭐⭐ 5 Stars (Hard)</option>
         </select>
       </div>
       <div class="fg"><label>Default Duration</label>
@@ -1726,13 +1750,23 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <input type="number" id="mtgTemplateDurM" min="0" max="59" placeholder="Min" style="width:50%">
         </div>
       </div>
+      <div class="fg"><label>Location</label>
+        <input id="mtgTemplateLocation" placeholder="e.g. Office, Zoom, Conference Room">
+      </div>
     </div>
-    <div class="fg"><label>Default Attendees</label>
-      <div id="mtgTemplateAttendees" style="max-height:180px;overflow-y:auto;padding:6px 0"></div>
+    <div class="fg"><label>Who Needs to Attend</label>
+      <div id="mtgTemplateAttendees" style="max-height:150px;overflow-y:auto;padding:6px 0"></div>
+    </div>
+    <div class="fg"><label>Agenda Items</label>
+      <div id="mtgTemplateAgendaList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="mtgTemplateAgendaNew" placeholder="Add agenda item…" style="flex:1;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addMtgAgendaItem()">
+        <button class="btn btn-ghost btn-sm" onclick="addMtgAgendaItem()">+ Add</button>
+      </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('meetingTemplateModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveTemplate()">Save</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTemplate()">Save Template</button>
     </div>
   </div>
 </div>
@@ -11262,15 +11296,31 @@ function renderTemplatesTab(){
       const durM = (t.defaultDuration||0)%60;
       const durStr = durH ? `${durH}h ${durM}m` : `${durM}m`;
       const attNames = (t.defaultAttendees||[]).length + ' attendee' + ((t.defaultAttendees||[]).length!==1?'s':'');
+      const DNAMES_F=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const MNAMES_S2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const stars='⭐'.repeat(t.difficulty||3);
+      const dayLabel=t.dayOfWeek?DNAMES_F[parseInt(t.dayOfWeek)]:'Any day';
+      const monthLabel=t.applyMonth&&t.applyMonth!=='all'?MNAMES_S2[parseInt(t.applyMonth)]:'All months';
+      const agendaCount=(t.agenda||[]).length;
       html += `<div class="mtg-card" style="cursor:default">
         <div class="mtg-card-head">
           <h4>${escapeHtml(t.name||'Untitled')}</h4>
-          <span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--blue-dim);color:var(--blue)">${escapeHtml(t.recurrence||'')}</span>
+          <span style="font-size:10px">${stars}</span>
         </div>
         <div class="mtg-card-meta">
+          <span style="padding:2px 6px;border-radius:4px;background:var(--blue-dim);color:var(--blue);font-size:10px">${escapeHtml(t.recurrence||'')}</span>
+          <span>📅 ${dayLabel}</span>
           <span>⏱ ${durStr}</span>
-          <span>👥 ${attNames}</span>
         </div>
+        <div class="mtg-card-meta" style="margin-top:4px">
+          <span>👥 ${attNames}</span>
+          <span>📋 ${agendaCount} agenda item${agendaCount!==1?'s':''}</span>
+          <span>📆 ${monthLabel}</span>
+          ${t.location?`<span>📍 ${escapeHtml(t.location)}</span>`:''}
+        </div>
+        ${agendaCount>0?`<div style="margin-top:8px;padding:6px 8px;background:var(--surface2);border-radius:5px;font-size:10px;color:var(--muted)">
+          ${(t.agenda||[]).map((a,i)=>`<div>${i+1}. ${escapeHtml(a)}</div>`).join('')}
+        </div>`:''}
         <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end">
           ${canEdit()?`<button class="btn btn-ghost btn-sm" onclick="openTemplateModal('${t.id}')">Edit</button>`:''}
           ${canEdit()?`<button class="btn btn-danger btn-sm" onclick="deleteTemplate('${t.id}')">Delete</button>`:''}
@@ -11350,20 +11400,26 @@ function renderHistoryTab(){
   container.innerHTML = html;
 }
 
+let mtgAgendaDraft=[];
+
 async function openTemplateModal(id){
   const users = await getUsers();
   const attContainer = document.getElementById('mtgTemplateAttendees');
   let tpl = null;
-  if(id){
-    tpl = meetingTemplates.find(t=>t.id===id);
-  }
+  if(id) tpl = meetingTemplates.find(t=>t.id===id);
   document.getElementById('mtgTemplateId').value = id||'';
   document.getElementById('mtgTemplateModalTitle').textContent = tpl ? 'Edit Template' : 'Create Template';
   document.getElementById('mtgTemplateName').value = tpl ? tpl.name||'' : '';
   document.getElementById('mtgTemplateRecurrence').value = tpl ? tpl.recurrence||'Weekly' : 'Weekly';
+  document.getElementById('mtgTemplateDay').value = tpl ? tpl.dayOfWeek||'' : '';
+  document.getElementById('mtgTemplateMonth').value = tpl ? tpl.applyMonth||'all' : 'all';
+  document.getElementById('mtgTemplateDifficulty').value = tpl ? tpl.difficulty||'3' : '3';
+  document.getElementById('mtgTemplateLocation').value = tpl ? tpl.location||'' : '';
   const durTotal = tpl ? (tpl.defaultDuration||0) : 60;
   document.getElementById('mtgTemplateDurH').value = Math.floor(durTotal/60);
   document.getElementById('mtgTemplateDurM').value = durTotal%60;
+  mtgAgendaDraft = tpl&&tpl.agenda ? [...tpl.agenda] : [];
+  renderMtgTemplateAgenda();
   const defaultAtt = tpl ? (tpl.defaultAttendees||[]) : [];
   let attHtml = '';
   users.forEach(u=>{
@@ -11375,6 +11431,27 @@ async function openTemplateModal(id){
   });
   attContainer.innerHTML = attHtml;
   document.getElementById('meetingTemplateModal').classList.add('open');
+}
+
+function renderMtgTemplateAgenda(){
+  const list=document.getElementById('mtgTemplateAgendaList');
+  list.innerHTML=mtgAgendaDraft.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px">
+      <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);width:18px">${i+1}.</span>
+      <span style="flex:1;font-size:12px;color:var(--text)">${escapeHtml(item)}</span>
+      <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="mtgAgendaDraft.splice(${i},1);renderMtgTemplateAgenda()">×</button>
+    </div>
+  `).join('');
+}
+
+function addMtgAgendaItem(){
+  const input=document.getElementById('mtgTemplateAgendaNew');
+  const text=(input.value||'').trim();
+  if(!text){toast('Type an agenda item');return;}
+  mtgAgendaDraft.push(text);
+  input.value='';
+  renderMtgTemplateAgenda();
+  input.focus();
 }
 
 async function saveTemplate(){
@@ -11389,10 +11466,16 @@ async function saveTemplate(){
   const defaultAttendees = [];
   checkboxes.forEach(cb=>{ if(cb.checked) defaultAttendees.push(cb.value); });
 
-  const data = { name, recurrence, defaultDuration, defaultAttendees, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid };
+  const dayOfWeek=document.getElementById('mtgTemplateDay').value;
+  const applyMonth=document.getElementById('mtgTemplateMonth').value;
+  const difficulty=document.getElementById('mtgTemplateDifficulty').value;
+  const location=document.getElementById('mtgTemplateLocation').value.trim();
+  const agenda=[...mtgAgendaDraft];
+
+  const data = { name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, difficulty:parseInt(difficulty)||3, location, agenda, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid };
   try {
     if(id){
-      await db.collection('meetingTemplates').doc(id).update({name, recurrence, defaultDuration, defaultAttendees});
+      await db.collection('meetingTemplates').doc(id).update({name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, difficulty:parseInt(difficulty)||3, location, agenda});
     } else {
       await db.collection('meetingTemplates').add(data);
     }
