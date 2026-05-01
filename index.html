@@ -4244,7 +4244,7 @@ function addMaintCategory(){
   input.focus();
 }
 
-function saveMaintCategories(){
+async function saveMaintCategories(){
   const rows=document.querySelectorAll('#maintCatList > div');
   const cats=[];
   rows.forEach(r=>{
@@ -4252,6 +4252,9 @@ function saveMaintCategories(){
     if(name) cats.push(name);
   });
   if(!cats.length){toast('Add at least one category');return;}
+  try{
+    await db.collection('settings').doc('maintCategories').set({categories:cats});
+  }catch(e){console.warn('save maint cats to firestore',e);}
   localStorage.setItem('maintCategories',JSON.stringify(cats));
   MAINT_TYPES.length=0;
   cats.forEach(c=>MAINT_TYPES.push(c));
@@ -4260,12 +4263,20 @@ function saveMaintCategories(){
   renderMaintenanceView();
 }
 
-function getMaintTypes(){
+async function getMaintTypes(){
+  try{
+    const doc=await db.collection('settings').doc('maintCategories').get();
+    if(doc.exists&&doc.data().categories&&doc.data().categories.length){
+      const cats=doc.data().categories;
+      localStorage.setItem('maintCategories',JSON.stringify(cats));
+      return cats;
+    }
+  }catch(e){console.warn('load maint cats from firestore',e);}
   const saved=localStorage.getItem('maintCategories');
   if(saved){try{return JSON.parse(saved);}catch(e){}}
   return ['Plumbing','Electrical','Roofing','HVAC','Pest Control','General','Other'];
 }
-const MAINT_TYPES = getMaintTypes();
+let MAINT_TYPES = (()=>{const saved=localStorage.getItem('maintCategories');if(saved){try{return JSON.parse(saved);}catch(e){}}return ['Plumbing','Electrical','Roofing','HVAC','Pest Control','General','Other'];})();
 let maintenanceData = {}; // { propertyId: { 'YYYY-MM': [visit, ...] } }
 let maintenanceYear = new Date().getFullYear();
 let maintViewMode = 'tracking'; // 'tracking' or 'pest'
@@ -4341,6 +4352,9 @@ async function renderMaintenanceView(){
   el.innerHTML = tabBar + `<div id="maintTrackingContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
 
   try{
+    const freshCats=await getMaintTypes();
+    MAINT_TYPES.length=0;
+    freshCats.forEach(c=>MAINT_TYPES.push(c));
     await loadMaintenanceForYear(maintenanceYear);
   }catch(e){
     console.error('loadMaintenanceForYear', e);
