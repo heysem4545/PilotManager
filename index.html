@@ -1797,11 +1797,14 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div class="fg"><label>Actual Date</label><input type="date" id="mtgLogActualDate"></div>
     </div>
     <div class="frow">
+      <div class="fg"><label>Start Time</label>
+        <div style="display:flex;gap:2px" id="mtgLogStartWrap"></div>
+      </div>
+      <div class="fg"><label>End Time</label>
+        <div style="display:flex;gap:2px" id="mtgLogEndWrap"></div>
+      </div>
       <div class="fg"><label>Duration</label>
-        <div style="display:flex;gap:6px">
-          <input type="number" id="mtgLogDurH" min="0" max="23" placeholder="Hrs" style="width:50%">
-          <input type="number" id="mtgLogDurM" min="0" max="59" placeholder="Min" style="width:50%">
-        </div>
+        <div id="mtgLogDurDisplay" style="font-size:14px;font-weight:700;color:var(--blue);font-family:var(--mono)">—</div>
       </div>
       <div class="fg"><label>Efficiency</label>
         <select id="mtgLogEfficiency">
@@ -11353,6 +11356,21 @@ async function saveQuickMeeting(){
 
 let mtgCalUser='all';
 
+function getMtgTime(prefix){
+  const h=document.getElementById(prefix+'-h');
+  const m=document.getElementById(prefix+'-m');
+  if(!h||!m||h.value===''||m.value==='') return '';
+  return h.value.padStart(2,'0')+':'+m.value.padStart(2,'0');
+}
+
+function calcMtgDur(){
+  const s=getMtgTime('mtgLog-start');
+  const e=getMtgTime('mtgLog-end');
+  const dur=calcDurFromTimes(s,e);
+  const el=document.getElementById('mtgLogDurDisplay');
+  if(el) el.textContent=dur>0?Math.floor(dur/60)+'h '+dur%60+'m':'—';
+}
+
 let qmAgendaDraft=[];
 
 function renderQmAgendaList(){
@@ -11770,8 +11788,9 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     document.getElementById('mtgLogTargetDate').value = mtg.targetDate||'';
     document.getElementById('mtgLogActualDate').value = mtg.actualDate||'';
     const dur = mtg.duration||0;
-    document.getElementById('mtgLogDurH').value = Math.floor(dur/60);
-    document.getElementById('mtgLogDurM').value = dur%60;
+    document.getElementById('mtgLogStartWrap').innerHTML=pilotTimeSelect(mtg.timeStart||'','mtgLog-start','calcMtgDur()',true);
+    document.getElementById('mtgLogEndWrap').innerHTML=pilotTimeSelect(mtg.timeEnd||'','mtgLog-end','calcMtgDur()',true);
+    calcMtgDur();
     document.getElementById('mtgLogEfficiency').value = mtg.efficiency||'';
     document.getElementById('mtgLogNotes').value = mtg.notes||'';
     meetingAgendaDraft = (mtg.agenda||[]).map(a=>({...a}));
@@ -11787,8 +11806,8 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
     document.getElementById('mtgLogName').value = '';
     document.getElementById('mtgLogTargetDate').value = preDate||new Date().toISOString().slice(0,10);
     document.getElementById('mtgLogActualDate').value = preDate||new Date().toISOString().slice(0,10);
-    document.getElementById('mtgLogDurH').value = '1';
-    document.getElementById('mtgLogDurM').value = '0';
+    document.getElementById('mtgLogStartWrap').innerHTML=pilotTimeSelect('','mtgLog-start','calcMtgDur()',true);
+    document.getElementById('mtgLogEndWrap').innerHTML=pilotTimeSelect('','mtgLog-end','calcMtgDur()',true);
     document.getElementById('mtgLogEfficiency').value = '';
     document.getElementById('mtgLogNotes').value = '';
     meetingAgendaDraft = [];
@@ -11808,9 +11827,6 @@ function onMtgTemplateSelect(tplId){
   const tpl = meetingTemplates.find(t=>t.id===tplId);
   if(!tpl) return;
   document.getElementById('mtgLogName').value = tpl.name||'';
-  const dur = tpl.defaultDuration||60;
-  document.getElementById('mtgLogDurH').value = Math.floor(dur/60);
-  document.getElementById('mtgLogDurM').value = dur%60;
   // Check default attendees
   const defaults = tpl.defaultAttendees||[];
   meetingAttendeesDraft.forEach(a=>{
@@ -11890,8 +11906,11 @@ async function saveMeetingLog(){
   const templateId = document.getElementById('mtgLogTemplate').value||'';
   const targetDate = document.getElementById('mtgLogTargetDate').value;
   const actualDate = document.getElementById('mtgLogActualDate').value;
-  const durH = parseInt(document.getElementById('mtgLogDurH').value)||0;
-  const durM = parseInt(document.getElementById('mtgLogDurM').value)||0;
+  const mtgStart=getMtgTime('mtgLog-start');
+  const mtgEnd=getMtgTime('mtgLog-end');
+  const durTotal=calcDurFromTimes(mtgStart,mtgEnd);
+  const durH=Math.floor(durTotal/60);
+  const durM=durTotal%60;
   const duration = durH*60+durM;
   const efficiency = parseInt(document.getElementById('mtgLogEfficiency').value)||0;
   const notes = document.getElementById('mtgLogNotes').value.trim();
@@ -11911,7 +11930,7 @@ async function saveMeetingLog(){
   const attendees = meetingAttendeesDraft.map(a=>({uid:a.uid, name:a.name, attended:!!a.attended, late:!!a.late, lateMinutes:a.lateMinutes||0, absenceReason:a.absenceReason||''}));
   const agenda = meetingAgendaDraft.filter(a=>a.text.trim()).map(a=>({text:a.text.trim(), checked:!!a.checked}));
 
-  const data = { templateId, name, targetDate, actualDate, duration, attendees, agenda, notes, efficiency };
+  const data = { templateId, name, targetDate, actualDate, timeStart:mtgStart, timeEnd:mtgEnd, duration, attendees, agenda, notes, efficiency };
 
   try {
     if(id){
