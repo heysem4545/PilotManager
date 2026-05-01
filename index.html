@@ -9851,8 +9851,8 @@ async function generateRecurringTasks(){
     const rulesSnap=await rulesQuery.get();
     for(const doc of rulesSnap.docs){
       const rule=doc.data();
-      // Non-admin: only generate own rules
-      if(!isAdmin()&&rule.createdBy!==currentUser.uid) continue;
+      // Non-admin: only generate rules they created or are assigned to
+      if(!isAdmin()&&rule.createdBy!==currentUser.uid&&rule.assignedUid!==currentUser.uid) continue;
       if(rule.lastGeneratedMonth===key) continue;
       // Check if rule applies to this month
       if(rule.applyMonth&&rule.applyMonth!=='all'&&parseInt(rule.applyMonth,10)!==tmMonth) continue;
