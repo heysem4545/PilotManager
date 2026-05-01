@@ -9703,6 +9703,7 @@ async function renderTasksView(){
     html += `<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border2)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:14px;font-weight:600;color:var(--text)">📅 ${selUserName?escapeHtml(selUserName.name)+'\'s':'User'} Task Calendar</div>
+        <button class="btn btn-danger btn-sm" onclick="cleanupDuplicateTasks()" title="Remove duplicate tasks">🧹 Cleanup Duplicates</button>
       </div>
       <div class="tm-user-tabs">${teamUsers.map(u=>{
         const col=userColor(u.uid);
@@ -9970,6 +9971,38 @@ async function generateRecurringTasks(){
       await doc.ref.update({lastGeneratedMonth:key});
     }
   }catch(e){console.warn('generateRecurringTasks',e);}
+}
+
+async function cleanupDuplicateTasks(){
+  if(!confirm('This will scan and remove duplicate tasks for the current month. Continue?')) return;
+  const key=tmActiveKey();
+  toast('Scanning for duplicates...');
+  try{
+    const snap=await db.collection('tasks').where('monthKey','==',key).get();
+    const seen=new Map();
+    let deleted=0;
+    const batch=[];
+    snap.docs.forEach(d=>{
+      const t=d.data();
+      if(!t.task) return; // skip empty
+      // Key: uid + day + task text + difficulty
+      const k=`${t.uid||''}|${t.day||''}|${(t.task||'').trim().toLowerCase()}|${t.diff||''}`;
+      if(seen.has(k)){
+        batch.push(d.ref);
+      } else {
+        seen.set(k,d.id);
+      }
+    });
+    // Delete in batches of 500
+    for(let i=0;i<batch.length;i+=500){
+      const b=db.batch();
+      batch.slice(i,i+500).forEach(ref=>b.delete(ref));
+      await b.commit();
+      deleted+=Math.min(500,batch.length-i);
+    }
+    toast(`Cleanup done — removed ${deleted} duplicate tasks`);
+    if(deleted>0) await renderTasksView();
+  }catch(e){toast('Error: '+e.message);console.error('cleanupDuplicateTasks',e);}
 }
 
 async function renderRecurringTab(baseHtml, el, tabs){
