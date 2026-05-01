@@ -11585,9 +11585,26 @@ async function renderMeetingCalendar(){
       <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[mtgCalMonth]} ${mtgCalYear}</span>
       <button class="btn btn-ghost btn-sm" onclick="mtgCalMonth++;if(mtgCalMonth>11){mtgCalMonth=0;mtgCalYear++;}renderMeetingsView()">›</button>
     </div>
-    <div style="font-size:11px;color:var(--muted)">${totalMtg} meetings · <span style="color:#4ade80">${doneMtg} done</span> · <span style="color:var(--red)">${totalMtg-doneMtg} pending</span></div>
+    ${canEdit()?'<button class="btn btn-primary btn-sm" onclick="openMeetingLogModal()">+ Log Meeting</button>':''}
   </div>
   ${isAdmin()?`<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">${userFilterTabs}</div>`:''}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById('mtgDetailAll').classList.toggle('open')">
+      <div style="font-size:22px;font-weight:700;color:var(--text)">${totalMtg}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Meetings</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById('mtgDetailCompleted').classList.toggle('open')">
+      <div style="font-size:22px;font-weight:700;color:#4ade80">${doneMtg}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Completed</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById('mtgDetailIncomplete').classList.toggle('open')">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${totalMtg-doneMtg}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Incomplete</div>
+    </div>
+  </div>
+  <div id="mtgDetailAll" class="mtg-detail-panel">${monthMeetings.length?monthMeetings.map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer" onclick="openMeetingLogModal('${m.id}')"><span style="font-family:var(--mono)">${m.targetDate||'—'}</span><span>${escapeHtml(m.name||'Meeting')}</span><span style="color:${m.completed?'#4ade80':'var(--red)'}">${m.completed?'✓ Completed':'⏳ Pending'}</span></div>`).join(''):'<div style="font-size:11px;color:var(--muted);padding:8px 0">No meetings</div>'}</div>
+  <div id="mtgDetailCompleted" class="mtg-detail-panel">${monthMeetings.filter(m=>m.completed).length?monthMeetings.filter(m=>m.completed).map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer" onclick="openMeetingLogModal('${m.id}')"><span style="font-family:var(--mono)">${m.targetDate||'—'}</span><span>${escapeHtml(m.name||'Meeting')}</span><span style="color:#4ade80">${m.efficiency?'⭐'.repeat(m.efficiency)+' ('+m.efficiency+')':'—'}</span></div>`).join(''):'<div style="font-size:11px;color:var(--muted);padding:8px 0">None completed</div>'}</div>
+  <div id="mtgDetailIncomplete" class="mtg-detail-panel">${monthMeetings.filter(m=>!m.completed).length?monthMeetings.filter(m=>!m.completed).map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer" onclick="openMeetingLogModal('${m.id}')"><span style="font-family:var(--mono)">${m.targetDate||'—'}</span><span>${escapeHtml(m.name||'Meeting')}</span><span style="color:var(--red)">⏳ Pending</span></div>`).join(''):'<div style="font-size:11px;color:var(--muted);padding:8px 0">All complete!</div>'}</div>
   ${userStatsHtml}`;
 
   html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">`;
