@@ -1828,7 +1828,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <button class="btn btn-ghost btn-sm" style="margin-top:6px;width:auto" onclick="addAgendaItem()">+ Add agenda item</button>
     </div>
     <div class="fg"><label>Notes</label><textarea id="mtgLogNotes" rows="3" placeholder="Meeting notes..."></textarea></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;align-items:center">
+      <button id="mtgLogDeleteBtn" class="btn btn-danger btn-sm" style="margin-right:auto;display:none" onclick="deleteMeetingFromLog()">Delete</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('meetingLogModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveMeetingLog()">Save</button>
     </div>
@@ -11768,6 +11769,7 @@ async function openMeetingLogModal(meetingId, templateId, preDate){
   }
 
   document.getElementById('mtgLogId').value = meetingId||'';
+  document.getElementById('mtgLogDeleteBtn').style.display = meetingId?'inline-flex':'none';
   document.getElementById('mtgLogModalTitle').textContent = mtg ? 'Log Meeting' : 'Log Meeting';
 
   if(mtg){
@@ -11944,6 +11946,18 @@ async function deleteMeeting(id){
     toast('Meeting deleted');
     await renderMeetingsView();
   } catch(e){ console.error('deleteMeeting',e); toast('Error deleting meeting'); }
+}
+
+async function deleteMeetingFromLog(){
+  const id=document.getElementById('mtgLogId').value;
+  if(!id){toast('No meeting to delete');return;}
+  if(!confirm('Delete this meeting?')) return;
+  try{
+    await db.collection('meetings').doc(id).delete();
+    closeModal('meetingLogModal');
+    toast('Meeting deleted');
+    await renderMeetingsView();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 // ─────────────────────────────────────────────
