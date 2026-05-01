@@ -9833,10 +9833,12 @@ async function renderTasksView(){
 // ─── RECURRING TASKS SYSTEM ───
 function describeRecurrence(rule){
   const DNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  if(rule.recurrenceType==='weekly_day') return 'Every '+DNAMES[rule.recurrenceValue||0];
-  if(rule.recurrenceType==='daily_no_sun') return 'Every day except Sundays';
-  if(rule.recurrenceType==='month_start') return '1st of every month';
-  if(rule.recurrenceType==='monthly_day') return ordinal(rule.recurrenceValue||1)+' of every month';
+  const MNAMES_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel=rule.applyMonth&&rule.applyMonth!=='all'?' · '+MNAMES_S[parseInt(rule.applyMonth,10)]+' only':'';
+  if(rule.recurrenceType==='weekly_day') return 'Every '+DNAMES[rule.recurrenceValue||0]+monthLabel;
+  if(rule.recurrenceType==='daily_no_sun') return 'Every day except Sundays'+monthLabel;
+  if(rule.recurrenceType==='month_start') return '1st of every month'+monthLabel;
+  if(rule.recurrenceType==='monthly_day') return ordinal(rule.recurrenceValue||1)+' of every month'+monthLabel;
   return '—';
 }
 function ordinal(n){const s=['th','st','nd','rd'];const v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
@@ -9850,6 +9852,8 @@ async function generateRecurringTasks(){
     for(const doc of rulesSnap.docs){
       const rule=doc.data();
       if(rule.lastGeneratedMonth===key) continue;
+      // Check if rule applies to this month
+      if(rule.applyMonth&&rule.applyMonth!=='all'&&parseInt(rule.applyMonth,10)!==tmMonth) continue;
       const fireDays=[];
       if(rule.recurrenceType==='daily_no_sun'){
         for(let d=1;d<=daysInMonth;d++){
@@ -9924,6 +9928,15 @@ async function renderRecurringTab(baseHtml, el, tabs){
       <div class="fg" id="recMonthlyField" style="display:none"><label>Day of Month</label>
         <input type="number" id="recMonthDay" min="1" max="31" value="1" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
       </div>
+      <div class="fg"><label>Apply To Month</label>
+        <select id="recMonth" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="all">All Months</option>
+          <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+          <option value="3">April</option><option value="4" ${new Date().getMonth()===4?'selected':''}>May</option><option value="5">June</option>
+          <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+          <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+        </select>
+      </div>
       <div class="fg"><label>Assign To</label>
         <select id="recAssign" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
           <option value="team">👥 Group Task</option>
@@ -9991,8 +10004,10 @@ async function saveRecurringRule(){
   const assignedUser=isGroup?null:teamUsersCache.find(u=>u.uid===assignUid);
   const assignedName=isGroup?'Group Task':(assignedUser?(assignedUser.name||assignedUser.email):'');
   try{
+    const applyMonth=document.getElementById('recMonth').value;
     await db.collection('recurringTasks').add({
       task, diff, recurrenceType:type, recurrenceValue:value,
+      applyMonth:applyMonth,
       assignedUid:isGroup?'':(assignUid||''),
       assignedName, isGroup,
       active:true, lastGeneratedMonth:'',
