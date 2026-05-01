@@ -6271,12 +6271,12 @@ function renderPopupCell(id, value, field, label, editable){
   const has = !!(value && String(value).trim());
   const safeLabel = label.toLowerCase();
   const preview = has ? escapeHtml(String(value).trim().split(/\s+/).slice(0,3).join(' ')) : `Add ${safeLabel}…`;
-  const cls = `ab-notes-cell${has?' has-note':''}${has?'':' empty'}${editable?'':' disabled'}`;
-  const onclick = editable ? `onclick="openPopupEdit('${id}','${field}','${escapeAttr(label)}')"` : '';
+  const cls = `ab-notes-cell${has?' has-note':''}${has?'':' empty'}`;
+  const onclick = `onclick="openPopupEdit('${id}','${field}','${escapeAttr(label)}')"`;
   const icon = has
     ? `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3h7l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M5 8h6M5 11h4"/></svg>`
     : `<svg class="ab-notes-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>`;
-  const tip = has ? escapeAttr(String(value)) : `Click to add ${safeLabel}`;
+  const tip = has ? escapeAttr(String(value)) : `Click to ${editable?'add':'view'} ${safeLabel}`;
   return `<div class="${cls}" ${onclick} title="${tip}">
     <span class="ab-notes-preview">${preview}</span>${icon}
   </div>`;
@@ -6290,18 +6290,20 @@ let activePopupId = null;
 let activePopupField = null;
 
 function openPopupEdit(id, field, label){
-  if(!canEdit()) return;
   const p = properties.find(x=>x.id===id);
   if(!p) return;
-  activePopupId = id;
-  activePopupField = field;
-  document.getElementById('notesModalTitle').textContent = label;
+  const editable = canEdit();
+  activePopupId = editable ? id : null;
+  activePopupField = editable ? field : null;
+  document.getElementById('notesModalTitle').textContent = editable ? label : label + ' (View Only)';
   document.getElementById('notesModalLabel').textContent = label;
   document.getElementById('notesModalAddr').textContent = p.addr || '';
   document.getElementById('notesModalText').value = p[field] || '';
   document.getElementById('notesModalText').placeholder = `Type ${label.toLowerCase()} here\u2026`;
+  document.getElementById('notesModalText').readOnly = !editable;
+  document.getElementById('notesModalText').style.opacity = editable ? '1' : '0.7';
   document.getElementById('notesModal').classList.add('open');
-  setTimeout(()=>document.getElementById('notesModalText').focus(),50);
+  if(editable) setTimeout(()=>document.getElementById('notesModalText').focus(),50);
 }
 
 async function savePopupField(){
