@@ -9149,7 +9149,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
 
   // Place tasks at their rowIdx positions, fill gaps with empty rows
   const maxIdx = dayTasks.length>0 ? Math.max(...dayTasks.map(t=>t.rowIdx||0)) : -1;
-  const minRows = Math.max(8, maxIdx+3);
+  const minRows = Math.max(18, maxIdx+1);
   const rows=[];
   const tasksByIdx={};
   dayTasks.forEach(t=>{tasksByIdx[t.rowIdx||0]=t;});
@@ -9221,7 +9221,6 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       <span class="tm-day-num ${isToday?'today-num':''}">${day}</span>
     </div>
     <div class="tm-day-body" id="tmbody-${day}">${rowsHtml}</div>
-    ${readonly?'':'<div class="tm-add-row" onclick="tmAddRow('+day+')">+ Add row</div>'}
   </div>`;
 }
 
