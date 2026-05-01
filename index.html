@@ -9648,19 +9648,18 @@ async function renderTasksView(){
       </div>`;
     });
     const totalViewBox = center + startRadius + lbData.length * (ringWidth + ringGap) + 10;
-    html += `<div style="display:flex;align-items:center;gap:30px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;flex-wrap:wrap;justify-content:center">
+    html += `<div style="display:flex;align-items:center;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;flex-wrap:wrap;justify-content:center">
       <div style="position:relative">
-        <svg viewBox="0 0 ${totalViewBox*2} ${totalViewBox*2}" style="width:${Math.min(280, totalViewBox*2)}px;height:${Math.min(280, totalViewBox*2)}px;transform:rotate(-90deg)">
+        <svg viewBox="0 0 ${totalViewBox*2} ${totalViewBox*2}" style="width:${Math.min(160, totalViewBox*2)}px;height:${Math.min(160, totalViewBox*2)}px;transform:rotate(-90deg)">
           ${rings}
         </svg>
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column">
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Goal</div>
-          <div style="font-size:22px;font-weight:800;color:var(--text)">${maxTarget}</div>
-          <div style="font-size:10px;color:var(--muted)">points</div>
+          <div style="font-size:16px;font-weight:800;color:var(--text)">${maxTarget}</div>
+          <div style="font-size:8px;color:var(--muted)">goal</div>
         </div>
       </div>
-      <div style="min-width:160px">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Points Progress</div>
+      <div>
+        <div style="font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Points Progress</div>
         ${legend}
       </div>
     </div>`;
