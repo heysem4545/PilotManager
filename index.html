@@ -1729,14 +1729,24 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
         </select>
       </div>
-      <div class="fg"><label>Apply To Month</label>
-        <select id="mtgTemplateMonth">
-          <option value="all">All Months</option>
-          <option value="0">January</option><option value="1">February</option><option value="2">March</option>
-          <option value="3">April</option><option value="4">May</option><option value="5">June</option>
-          <option value="6">July</option><option value="7">August</option><option value="8">September</option>
-          <option value="9">October</option><option value="10">November</option><option value="11">December</option>
-        </select>
+      <div class="fg" style="grid-column:1/-1"><label>Apply To Months</label>
+        <div id="mtgTemplateMonths" style="display:flex;flex-wrap:wrap;gap:4px">
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--accent-dim);border:1px solid var(--accent-dim);cursor:pointer;font-size:11px">
+            <input type="checkbox" value="all" checked style="accent-color:var(--accent)" onchange="document.querySelectorAll('#mtgTemplateMonths input[value!=all]').forEach(c=>{c.checked=this.checked})"> All
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="0" style="accent-color:var(--accent)"> Jan</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="1" style="accent-color:var(--accent)"> Feb</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="2" style="accent-color:var(--accent)"> Mar</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="3" style="accent-color:var(--accent)"> Apr</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="4" style="accent-color:var(--accent)"> May</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="5" style="accent-color:var(--accent)"> Jun</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="6" style="accent-color:var(--accent)"> Jul</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="7" style="accent-color:var(--accent)"> Aug</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="8" style="accent-color:var(--accent)"> Sep</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="9" style="accent-color:var(--accent)"> Oct</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="10" style="accent-color:var(--accent)"> Nov</label>
+          <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:11px"><input type="checkbox" value="11" style="accent-color:var(--accent)"> Dec</label>
+        </div>
       </div>
       <div class="fg"><label>Difficulty (Stars)</label>
         <select id="mtgTemplateDifficulty">
@@ -11265,7 +11275,7 @@ function renderTemplatesTab(){
       const MNAMES_S2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const stars='⭐'.repeat(t.difficulty||3);
       const dayLabel=t.dayOfWeek?DNAMES_F[parseInt(t.dayOfWeek)]:'Any day';
-      const monthLabel=t.applyMonth&&t.applyMonth!=='all'?MNAMES_S2[parseInt(t.applyMonth)]:'All months';
+      const monthLabel=t.applyMonths&&!t.applyMonths.includes('all')?t.applyMonths.map(m=>MNAMES_S2[parseInt(m)]).join(', '):(t.applyMonth&&t.applyMonth!=='all'?t.applyMonth.split(',').map(m=>MNAMES_S2[parseInt(m)]).join(', '):'All months');
       const agendaCount=(t.agenda||[]).length;
       html += `<div class="mtg-card" style="cursor:default">
         <div class="mtg-card-head">
@@ -11377,7 +11387,12 @@ async function openTemplateModal(id){
   document.getElementById('mtgTemplateName').value = tpl ? tpl.name||'' : '';
   document.getElementById('mtgTemplateRecurrence').value = tpl ? tpl.recurrence||'Weekly' : 'Weekly';
   document.getElementById('mtgTemplateDay').value = tpl ? tpl.dayOfWeek||'' : '';
-  document.getElementById('mtgTemplateMonth').value = tpl ? tpl.applyMonth||'all' : 'all';
+  // Set month checkboxes
+  const applyMonths=tpl&&tpl.applyMonths?tpl.applyMonths:(tpl&&tpl.applyMonth&&tpl.applyMonth!=='all'?[tpl.applyMonth]:['all']);
+  document.querySelectorAll('#mtgTemplateMonths input').forEach(cb=>{
+    if(applyMonths.includes('all')) cb.checked=true;
+    else cb.checked=applyMonths.includes(cb.value);
+  });
   document.getElementById('mtgTemplateDifficulty').value = tpl ? tpl.difficulty||'3' : '3';
   document.getElementById('mtgTemplateLocation').value = tpl ? tpl.location||'' : '';
   const durTotal = tpl ? (tpl.defaultDuration||0) : 60;
@@ -11436,15 +11451,17 @@ async function saveTemplate(){
   checkboxes.forEach(cb=>{ if(cb.checked) defaultAttendees.push(cb.value); });
 
   const dayOfWeek=document.getElementById('mtgTemplateDay').value;
-  const applyMonth=document.getElementById('mtgTemplateMonth').value;
+  const monthCbs=document.querySelectorAll('#mtgTemplateMonths input:checked');
+  const applyMonths=[...monthCbs].map(cb=>cb.value);
+  const applyMonth=applyMonths.includes('all')?'all':applyMonths.join(',');
   const difficulty=document.getElementById('mtgTemplateDifficulty').value;
   const location=document.getElementById('mtgTemplateLocation').value.trim();
   const agenda=[...mtgAgendaDraft];
 
-  const data = { name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, difficulty:parseInt(difficulty)||3, location, agenda, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid };
+  const data = { name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, applyMonths, difficulty:parseInt(difficulty)||3, location, agenda, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid };
   try {
     if(id){
-      await db.collection('meetingTemplates').doc(id).update({name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, difficulty:parseInt(difficulty)||3, location, agenda});
+      await db.collection('meetingTemplates').doc(id).update({name, recurrence, defaultDuration, defaultAttendees, dayOfWeek, applyMonth, applyMonths, difficulty:parseInt(difficulty)||3, location, agenda});
     } else {
       await db.collection('meetingTemplates').add(data);
     }
