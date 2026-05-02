@@ -3819,19 +3819,22 @@ async function renderBalancesOnly(){
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
   // Status filter
-  const statusCounts={all:rows.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
-  rows.forEach(r=>{if(statusCounts[r.status]!==undefined)statusCounts[r.status]++;});
-  const filtered=allBalancesStatusFilter==='all'?rows:rows.filter(r=>r.status===allBalancesStatusFilter);
+  const statusCounts={all:rows.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0,NO_STATUS:0};
+  rows.forEach(r=>{
+    if(r.status&&statusCounts[r.status]!==undefined) statusCounts[r.status]++;
+    else if(!r.status) statusCounts.NO_STATUS++;
+  });
+  const filtered=allBalancesStatusFilter==='all'?rows:allBalancesStatusFilter==='NO_STATUS'?rows.filter(r=>!r.status):rows.filter(r=>r.status===allBalancesStatusFilter);
   const filteredTotals=monthList.map((_,i)=>{
     let cmhaT=0,tenantT=0;
     filtered.forEach(r=>{cmhaT+=r.balances[i].cmhaBal;tenantT+=r.balances[i].tenantBal;});
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
 
-  const filterTabs=['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].map(s=>{
-    const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s.charAt(0)+s.slice(1).toLowerCase();
+  const filterTabs=['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','NO_STATUS'].map(s=>{
+    const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s==='NO_STATUS'?'⚠ No Status':s.charAt(0)+s.slice(1).toLowerCase();
     const cnt=statusCounts[s]||0;
-    return `<button class="ftab ${allBalancesStatusFilter===s?'active':''}" onclick="allBalancesStatusFilter='${s}';renderBalancesOnly()">${label} (${cnt})</button>`;
+    return `<button class="ftab ${allBalancesStatusFilter===s?'active':''}" style="${s==='NO_STATUS'&&cnt>0?'color:var(--red);font-weight:700':''}" onclick="allBalancesStatusFilter='${s}';renderBalancesOnly()">${label} (${cnt})</button>`;
   }).join('');
 
   const boEl=document.getElementById('balancesOnlyView');
