@@ -1,5 +1,6 @@
 const { setGlobalOptions } = require("firebase-functions");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const twilio = require("twilio");
@@ -14,6 +15,8 @@ const TWILIO_SID = defineSecret("TWILIO_SID");
 const TWILIO_AUTH = defineSecret("TWILIO_AUTH");
 const TWILIO_WA_FROM = defineSecret("TWILIO_WA_FROM");
 const ADMIN_WA_TO = defineSecret("ADMIN_WA_TO");
+const SMS_FROM = defineSecret("SMS_FROM");
+const SMS_TO = defineSecret("SMS_TO");
 
 const firestore = getFirestore();
 
@@ -89,6 +92,32 @@ exports.onNewInnovation = onDocumentCreated(
       }
     } catch (e) {
       logger.error("Error checking notification rules:", e.message);
+    }
+  }
+);
+
+// Daily SMS reminder at 6 PM EST
+exports.dailyTechLogReminder = onSchedule(
+  {
+    schedule: "0 18 * * *",
+    timeZone: "America/New_York",
+    secrets: [TWILIO_SID, TWILIO_AUTH, SMS_FROM, SMS_TO],
+  },
+  async () => {
+    const client = twilio(TWILIO_SID.value(), TWILIO_AUTH.value());
+    const message = "Pilot Technician Daily Log";
+
+    try {
+      await client.messages.create({
+        from: SMS_FROM.value(),
+        to: SMS_TO.value(),
+        body: message,
+      });
+      await logNotification("sms", "Daily Tech Log Reminder", "Owner", SMS_TO.value(), message, "delivered");
+      logger.info("Daily SMS reminder sent");
+    } catch (err) {
+      await logNotification("sms", "Daily Tech Log Reminder", "Owner", SMS_TO.value(), message, "failed");
+      logger.error("Daily SMS send failed:", err.message);
     }
   }
 );
