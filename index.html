@@ -3534,11 +3534,11 @@ async function loadAnnouncement(){
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
   el.style.display='';
-  const sc={RENTED:0,VACANT:0,EVICTION:0,CONSTRUCTION:0,'MOVING PROCESS':0};
+  const sc={RENTED:0,VACANT:0,EVICTION:0,CONSTRUCTION:0,'MOVING PROCESS':0,NO_STATUS:0};
   let balCount=0;
-  properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;const mp=getMonthProp(p);if(mp.balance>0)balCount++;});
-  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented ('+sc.RENTED+')'},{k:'VACANT',l:'Vacant ('+sc.VACANT+')'},{k:'EVICTION',l:'Eviction ('+sc.EVICTION+')'},{k:'CONSTRUCTION',l:'Construction ('+sc.CONSTRUCTION+')'},{k:'balance',l:'Has Balance ('+balCount+')'}];
-  el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
+  properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else if(!s)sc.NO_STATUS++;const mp=getMonthProp(p);if(mp.balance>0)balCount++;});
+  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented ('+sc.RENTED+')'},{k:'VACANT',l:'Vacant ('+sc.VACANT+')'},{k:'EVICTION',l:'Eviction ('+sc.EVICTION+')'},{k:'MOVING PROCESS',l:'Moving ('+sc['MOVING PROCESS']+')'},{k:'CONSTRUCTION',l:'Construction ('+sc.CONSTRUCTION+')'},{k:'NO_STATUS',l:'⚠ No Status ('+sc.NO_STATUS+')'},{k:'balance',l:'Has Balance ('+balCount+')'}];
+  el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" style="${t.k==='NO_STATUS'&&sc.NO_STATUS>0?'color:var(--red);font-weight:700':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
 function setFilter(f){currentFilter=f;currentPage=1;renderFilterTabs();renderTable();}
@@ -6338,7 +6338,7 @@ function filteredData(){
   const q=(document.getElementById('searchInput')||{value:''}).value.toLowerCase();
   return properties.filter(p=>{
     const mp=getMonthProp(p);
-    const ms=currentFilter==='all'||mp.status===currentFilter||(currentFilter==='balance'&&mp.balance>0);
+    const ms=currentFilter==='all'||mp.status===currentFilter||(currentFilter==='balance'&&mp.balance>0)||(currentFilter==='NO_STATUS'&&!mp.status);
     const mq=!q||p.addr.toLowerCase().includes(q)||(p.tenant||'').toLowerCase().includes(q);
     return ms&&mq;
   }).sort((a,b)=>{
