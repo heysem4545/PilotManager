@@ -99,7 +99,7 @@ exports.onNewInnovation = onDocumentCreated(
 // Daily SMS reminder at 6 PM EST
 exports.dailyTechLogReminder = onSchedule(
   {
-    schedule: "0 18 * * *",
+    schedule: "0 19 * * *",
     timeZone: "America/New_York",
     secrets: [TWILIO_SID, TWILIO_AUTH, SMS_FROM, SMS_TO],
   },
