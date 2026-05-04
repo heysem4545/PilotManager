@@ -10285,25 +10285,37 @@ async function logUserLogin(){
       location,
       sectionsVisited:[],
       sessionMinutes:0,
+      activeMinutes:0,
+      idleMinutes:0,
       active:true
     });
   }catch(e){console.warn('logUserLogin',e);}
-  startActivityHeartbeat();
+  startActivityTracker();
 }
 
-function startActivityHeartbeat(){
+let _lastActivityTime=Date.now();
+let _activityIdleLimit=2*60*1000; // 2 minutes idle = not working
+
+function startActivityTracker(){
+  // Track real user interactions
+  const resetIdle=()=>{_lastActivityTime=Date.now();};
+  ['click','keydown','scroll','touchstart','mousemove'].forEach(evt=>{
+    document.addEventListener(evt,resetIdle,{passive:true});
+  });
+
+  // Heartbeat every 1 minute — only count if user was active in last 2 min
   if(activityHeartbeatTimer) clearInterval(activityHeartbeatTimer);
   activityHeartbeatTimer=setInterval(async()=>{
     if(!activitySessionId) return;
+    const isActive=(Date.now()-_lastActivityTime)<_activityIdleLimit;
     try{
       const ref=db.collection('userActivity').doc(activitySessionId);
-      const doc=await ref.get();
-      if(!doc.exists) return;
-      const data=doc.data();
-      const mins=(data.sessionMinutes||0)+5;
-      await ref.update({lastSeen:new Date(),sessionMinutes:mins});
+      const updates={lastSeen:new Date(),active:true};
+      if(isActive) updates.activeMinutes=firebase.firestore.FieldValue.increment(1);
+      else updates.idleMinutes=firebase.firestore.FieldValue.increment(1);
+      await ref.update(updates);
     }catch(e){}
-  },5*60*1000); // every 5 minutes
+  },60*1000); // every 1 minute
 }
 
 function logSectionVisit(section){
@@ -10375,9 +10387,10 @@ async function renderActivityView(){
   // Group by user
   const byUser={};
   filteredActivities.forEach(a=>{
-    if(!byUser[a.uid]) byUser[a.uid]={name:a.userName||'Unknown',sessions:[],totalMinutes:0};
+    if(!byUser[a.uid]) byUser[a.uid]={name:a.userName||'Unknown',sessions:[],activeMinutes:0,idleMinutes:0};
     byUser[a.uid].sessions.push(a);
-    byUser[a.uid].totalMinutes+=(a.sessionMinutes||0);
+    byUser[a.uid].activeMinutes+=(a.activeMinutes||0);
+    byUser[a.uid].idleMinutes+=(a.idleMinutes||0);
   });
 
   const users=await getUsers();
@@ -10418,14 +10431,18 @@ async function renderActivityView(){
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Sessions</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--amber)">${Math.round(filteredActivities.reduce((s,a)=>s+(a.sessionMinutes||0),0)/60*10)/10}h</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Time</div>
+        <div style="font-size:22px;font-weight:700;color:#4ade80">${Math.round(filteredActivities.reduce((s,a)=>s+(a.activeMinutes||0),0)/60*10)/10}h</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Active Time</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--red)">${Math.round(filteredActivities.reduce((s,a)=>s+(a.idleMinutes||0),0)/60*10)/10}h</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Idle Time</div>
       </div>
     </div>
 
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${dateLabel}</div>
     <div class="tbl-wrap"><table><thead><tr>
-      <th>User</th>${activityDateRange!=='today'?'<th>Date</th>':''}<th>Status</th><th>Login Time</th><th>Last Seen</th><th>Duration</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
+      <th>User</th>${activityDateRange!=='today'?'<th>Date</th>':''}<th>Status</th><th>Login Time</th><th>Last Seen</th><th>Active</th><th>Idle</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
     </tr></thead><tbody>`;
 
   filteredActivities.forEach(a=>{
@@ -10434,8 +10451,10 @@ async function renderActivityView(){
     const loginStr=loginT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
     const lastStr=lastT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
     const dateStr=loginT.getFullYear()+'-'+String(loginT.getMonth()+1).padStart(2,'0')+'-'+String(loginT.getDate()).padStart(2,'0');
-    const dur=a.sessionMinutes||0;
-    const durStr=dur>=60?Math.floor(dur/60)+'h '+dur%60+'m':dur+'m';
+    const actMin=a.activeMinutes||0;
+    const idleMin=a.idleMinutes||0;
+    const actStr=actMin>=60?Math.floor(actMin/60)+'h '+actMin%60+'m':actMin+'m';
+    const idleStr=idleMin>=60?Math.floor(idleMin/60)+'h '+idleMin%60+'m':idleMin+'m';
     const col=userColor(a.uid);
     const initials=(a.userName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const sections=(a.sectionsVisited||[]).map(s=>`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--surface2);border:1px solid var(--border2);white-space:nowrap">${escapeHtml(s)}</span>`).join(' ');
@@ -10448,7 +10467,8 @@ async function renderActivityView(){
       <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;${a.active?'background:rgba(74,222,128,0.12);color:#4ade80':'background:var(--surface2);color:var(--muted)'}">${a.active?'Online':'Offline'}</span></td>
       <td style="font-family:var(--mono);font-size:11px">${loginStr}</td>
       <td style="font-family:var(--mono);font-size:11px">${lastStr}</td>
-      <td style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--amber)">${durStr}</td>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:600;color:#4ade80">${actStr}</td>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:600;color:${idleMin>actMin?'var(--red)':'var(--muted)'}">${idleStr}</td>
       <td style="font-size:11px">${a.device==='Mobile'?'📱':'💻'} ${a.device||'—'}</td>
       <td style="font-size:11px">${escapeHtml(a.browser||'—')}</td>
       <td style="font-size:11px">${escapeHtml(a.location||'—')}</td>
@@ -10466,8 +10486,10 @@ async function renderActivityView(){
     const isOnline=onlineNow.some(a=>a.uid===u.uid);
     const col=userColor(u.uid);
     const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const totalMin=ud?ud.totalMinutes:0;
-    const durStr=totalMin>=60?Math.floor(totalMin/60)+'h '+totalMin%60+'m':totalMin+'m';
+    const actMin=ud?ud.activeMinutes:0;
+    const idlMin=ud?ud.idleMinutes:0;
+    const actStr=actMin>=60?Math.floor(actMin/60)+'h '+actMin%60+'m':actMin+'m';
+    const idlStr=idlMin>=60?Math.floor(idlMin/60)+'h '+idlMin%60+'m':idlMin+'m';
     const sessionCnt=ud?ud.sessions.length:0;
     const lastLoc=ud&&ud.sessions.length?ud.sessions[0].location:'—';
     html+=`<div style="background:var(--surface2);border:1px solid ${isOnline?'rgba(74,222,128,0.3)':'var(--border2)'};border-left:3px solid ${isOnline?'#4ade80':'var(--border2)'};border-radius:8px;padding:12px">
@@ -10480,8 +10502,9 @@ async function renderActivityView(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">
         <div><span style="color:var(--muted)">Sessions:</span> <strong>${sessionCnt}</strong></div>
-        <div><span style="color:var(--muted)">Time:</span> <strong style="color:var(--amber)">${durStr}</strong></div>
-        <div style="grid-column:1/-1"><span style="color:var(--muted)">Location:</span> ${escapeHtml(lastLoc||'—')}</div>
+        <div><span style="color:var(--muted)">Active:</span> <strong style="color:#4ade80">${actStr}</strong></div>
+        <div><span style="color:var(--muted)">Idle:</span> <strong style="color:${idlMin>actMin?'var(--red)':'var(--muted)'}">${idlStr}</strong></div>
+        <div><span style="color:var(--muted)">Location:</span> ${escapeHtml(lastLoc||'—')}</div>
       </div>
     </div>`;
   });
