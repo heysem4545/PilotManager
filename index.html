@@ -10330,8 +10330,9 @@ async function renderActivityView(){
   }
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
 
-  const today=new Date().toISOString().slice(0,10);
-  const todayStart=new Date(today+'T00:00:00');
+  const now=new Date();
+  const today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
 
   // Load today's activity
   let activities=[];
