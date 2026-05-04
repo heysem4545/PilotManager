@@ -10318,12 +10318,17 @@ function startActivityTracker(){
   },60*1000); // every 1 minute
 }
 
+let _sectionVisitLog=[];
 function logSectionVisit(section){
   if(!activitySessionId||!section) return;
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+  _sectionVisitLog.push({section,time:timeStr,ts:now.getTime()});
   try{
     db.collection('userActivity').doc(activitySessionId).update({
       sectionsVisited:firebase.firestore.FieldValue.arrayUnion(section),
-      lastSeen:new Date(),
+      sectionLog:_sectionVisitLog.map(v=>({section:v.section,time:v.time})),
+      lastSeen:now,
       lastSection:section
     });
   }catch(e){}
@@ -10472,7 +10477,12 @@ async function renderActivityView(){
       <td style="font-size:11px">${a.device==='Mobile'?'📱':'💻'} ${a.device||'—'}</td>
       <td style="font-size:11px">${escapeHtml(a.browser||'—')}</td>
       <td style="font-size:11px">${escapeHtml(a.location||'—')}</td>
-      <td style="max-width:200px;overflow:hidden">${sections||'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="max-width:220px">
+        <div style="cursor:pointer;font-size:10px;color:var(--accent);font-weight:600" onclick="const p=this.nextElementSibling;p.classList.toggle('open');this.innerHTML=p.classList.contains('open')?'▾ Hide Timeline':'▸ Show Timeline (${(a.sectionLog||[]).length} visits)'">▸ Show Timeline (${(a.sectionLog||[]).length} visits)</div>
+        <div class="mtg-detail-panel" style="margin-top:4px;padding:6px 8px;max-height:150px;overflow-y:auto">
+          ${(a.sectionLog||[]).length?(a.sectionLog||[]).map(v=>`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);font-size:10px"><span style="font-family:var(--mono);color:var(--muted)">${escapeHtml(v.time||'')}</span><span style="font-weight:500">${escapeHtml(v.section||'')}</span></div>`).join(''):(sections?`<div style="font-size:10px;color:var(--muted);padding:4px 0">${sections}</div>`:'<div style="font-size:10px;color:var(--muted)">No activity</div>')}
+        </div>
+      </td>
     </tr>`;
   });
 
