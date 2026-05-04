@@ -11235,6 +11235,19 @@ let utilityYear = new Date().getFullYear();
 let utilityWaterLimit = parseFloat(localStorage.getItem('pm-util-water-limit')) || 0;
 let utilitySewerLimit = parseFloat(localStorage.getItem('pm-util-sewer-limit')) || 0;
 
+async function loadUtilityLimits(){
+  try{
+    const doc=await db.collection('settings').doc('utilityLimits').get();
+    if(doc.exists){
+      const d=doc.data();
+      utilityWaterLimit=d.water||0;
+      utilitySewerLimit=d.sewer||0;
+      localStorage.setItem('pm-util-water-limit',utilityWaterLimit);
+      localStorage.setItem('pm-util-sewer-limit',utilitySewerLimit);
+    }
+  }catch(e){console.warn('loadUtilityLimits',e);}
+}
+
 async function loadUtilityData(){
   try {
     const snap = await db.collection('utilityTracking').get();
@@ -11258,7 +11271,7 @@ async function renderUtilityView(){
   const el = document.getElementById('utilityView');
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
   await loadUtilityData();
-  console.log('Utility: rendering', properties.length, 'properties');
+  await loadUtilityLimits();
   const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const sorted = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
@@ -11291,8 +11304,8 @@ async function renderUtilityView(){
       <span style="font-size:12px;font-weight:500;color:var(--muted)">Year:</span>
       <select onchange="utilityYear=parseInt(this.value);renderUtilityView()">${yearOpts}</select>`;
 
-  if(canEdit()){
-    html += `<button class="btn btn-ghost btn-sm" onclick="openUtilityLimits()" style="margin-left:4px">Limits</button>`;
+  if(isAdmin()){
+    html += `<button class="btn btn-ghost btn-sm" onclick="openUtilityLimits()" style="margin-left:4px">Set Limits</button>`;
   }
 
   html += `<div class="util-stats">
@@ -11300,6 +11313,7 @@ async function renderUtilityView(){
         <span>Water: <strong>$${grandWater.toFixed(2)}</strong></span>
         <span>Sewer: <strong>$${grandSewer.toFixed(2)}</strong></span>
         <span>Total: <strong>$${(grandWater+grandSewer).toFixed(2)}</strong></span>
+        ${utilityWaterLimit||utilitySewerLimit?`<span style="border-left:1px solid var(--border2);padding-left:8px;margin-left:4px">Limits: ${utilityWaterLimit?'<strong style="color:var(--amber)">Water $'+utilityWaterLimit.toFixed(2)+'</strong>':''} ${utilitySewerLimit?'<strong style="color:var(--amber)">Sewer $'+utilitySewerLimit.toFixed(2)+'</strong>':''}</span>`:''}
       </div>
     </div>
     <div class="tbl-wrap">
@@ -11471,11 +11485,14 @@ function openUtilityLimits(){
   document.getElementById('utilLimitModal').classList.add('open');
 }
 
-function saveUtilityLimits(){
+async function saveUtilityLimits(){
   utilityWaterLimit = parseFloat(document.getElementById('utilWaterLimitInput').value) || 0;
   utilitySewerLimit = parseFloat(document.getElementById('utilSewerLimitInput').value) || 0;
   localStorage.setItem('pm-util-water-limit', utilityWaterLimit);
   localStorage.setItem('pm-util-sewer-limit', utilitySewerLimit);
+  try{
+    await db.collection('settings').doc('utilityLimits').set({water:utilityWaterLimit,sewer:utilitySewerLimit});
+  }catch(e){console.warn('save utility limits to firestore',e);}
   closeModal('utilLimitModal');
   toast('Limits saved');
   if(currentView==='utility') renderUtilityView();
