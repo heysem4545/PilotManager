@@ -10257,6 +10257,8 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 let activitySessionId=null;
 let activityHeartbeatTimer=null;
+let activityUserFilter='all';
+let activityDateFilter='';
 
 async function logUserLogin(){
   if(!currentUser) return;
@@ -10331,28 +10333,47 @@ async function renderActivityView(){
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
 
   const now=new Date();
-  const today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const filterDate=activityDateFilter||now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const [fy,fm,fd]=filterDate.split('-').map(Number);
+  const dateStart=new Date(fy,fm-1,fd);
+  const dateEnd=new Date(fy,fm-1,fd+1);
+  const isToday=filterDate===(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
 
-  // Load today's activity
+  // Load activity for selected date
   let activities=[];
   try{
-    const snap=await db.collection('userActivity').where('loginTime','>=',todayStart).orderBy('loginTime','desc').get();
+    const snap=await db.collection('userActivity').where('loginTime','>=',dateStart).where('loginTime','<',dateEnd).orderBy('loginTime','desc').get();
     activities=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.error('loadActivity',e);}
 
+  // Filter by user
+  const filteredActivities=activityUserFilter==='all'?activities:activities.filter(a=>a.uid===activityUserFilter);
+
   // Group by user
   const byUser={};
-  activities.forEach(a=>{
+  filteredActivities.forEach(a=>{
     if(!byUser[a.uid]) byUser[a.uid]={name:a.userName||'Unknown',sessions:[],totalMinutes:0};
     byUser[a.uid].sessions.push(a);
     byUser[a.uid].totalMinutes+=(a.sessionMinutes||0);
   });
 
   const users=await getUsers();
-  const onlineNow=activities.filter(a=>a.active);
+  const onlineNow=filteredActivities.filter(a=>a.active);
+
+  // Build user filter tabs
+  const userTabs=`<button class="ftab ${activityUserFilter==='all'?'active':''}" onclick="activityUserFilter='all';renderActivityView()">All</button>`+
+    users.map(u=>{
+      const cnt=activities.filter(a=>a.uid===u.uid).length;
+      return `<button class="ftab ${activityUserFilter===u.uid?'active':''}" onclick="activityUserFilter='${u.uid}';renderActivityView()">${escapeHtml(u.name||u.email)}${cnt?' ('+cnt+')':''}</button>`;
+    }).join('');
 
   let html=`<div class="table-card" style="padding:18px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Date:</span>
+      <input type="date" value="${filterDate}" onchange="activityDateFilter=this.value;renderActivityView()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+      ${!isToday?`<button class="btn btn-ghost btn-sm" onclick="activityDateFilter='';renderActivityView()">Today</button>`:''}
+    </div>
+    <div class="ftabs" style="margin-bottom:14px;flex-wrap:wrap">${userTabs}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
         <div style="font-size:22px;font-weight:700;color:#4ade80">${onlineNow.length}</div>
@@ -10360,24 +10381,24 @@ async function renderActivityView(){
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
         <div style="font-size:22px;font-weight:700;color:var(--accent)">${Object.keys(byUser).length}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users Today</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users${isToday?' Today':''}</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--text)">${activities.length}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Sessions Today</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text)">${filteredActivities.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Sessions</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:700;color:var(--amber)">${Math.round(activities.reduce((s,a)=>s+(a.sessionMinutes||0),0)/60*10)/10}h</div>
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${Math.round(filteredActivities.reduce((s,a)=>s+(a.sessionMinutes||0),0)/60*10)/10}h</div>
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Time</div>
       </div>
     </div>
 
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${today}</div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${filterDate}</div>
     <div class="tbl-wrap"><table><thead><tr>
       <th>User</th><th>Status</th><th>Login Time</th><th>Last Seen</th><th>Duration</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
     </tr></thead><tbody>`;
 
-  activities.forEach(a=>{
+  filteredActivities.forEach(a=>{
     const loginT=a.loginTime?.toDate?a.loginTime.toDate():new Date(a.loginTime);
     const lastT=a.lastSeen?.toDate?a.lastSeen.toDate():new Date(a.lastSeen);
     const loginStr=loginT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
