@@ -201,5 +201,13 @@ service cloud.firestore {
     match /salaryRecords/{docId} {
       allow read, write: if request.auth != null;
     }
+
+    // User Activity — any authenticated user can create/update their own,
+    // only admins can read all.
+    match /userActivity/{docId} {
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow create, update: if request.auth != null;
+    }
   }
 }

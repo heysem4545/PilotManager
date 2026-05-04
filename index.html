@@ -1048,6 +1048,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><circle cx="11" cy="7" r="2"/><path d="M1 14c0-2.8 2.2-5 5-5"/><path d="M8.5 14c0-2 1.6-3.5 3.5-3.5"/></svg>
         Team
       </button>
+      <button class="nav-item" id="nav-activity" onclick="showView('activity')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8h3l2-5 3 10 2-5h4"/></svg>
+        Activity
+      </button>
       <div class="nav-label" id="nav-label-system">System</div>
       <button class="nav-item" id="nav-backups" onclick="showView('backups')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4.5a2.5 2.5 0 015 0v.5h2v-.5a2.5 2.5 0 015 0V6a2 2 0 01-1 1.73V13a1 1 0 01-1 1H4a1 1 0 01-1-1V7.73A2 2 0 012 6V4.5z"/><path d="M6 9h4M6 11h4"/></svg>
@@ -1182,6 +1186,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           </div>
         </div>
       </div>
+
+      <div id="activityView" style="display:none"></div>
 
       <!-- MODULE VIEWS (coming soon) -->
       <div id="tasksView" style="display:none"></div>
@@ -2569,6 +2575,10 @@ auth.onAuthStateChanged(async (firebaseUser) => {
     const navTeam = document.getElementById('nav-team');
     if(navTeam) navTeam.style.display = 'none';
   }
+  if(!isAdmin()){
+    const navAct = document.getElementById('nav-activity');
+    if(navAct) navAct.style.display = 'none';
+  }
   if(!canEdit()){
     document.getElementById('addPropBtn').style.display='none';
   }
@@ -2583,6 +2593,9 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   document.getElementById('registerPage').style.display='none';
   document.getElementById('appPage').style.display='block';
   initApp();
+
+  // Log user login for activity tracking
+  logUserLogin();
 
   // Auto daily backup for admins
   if(isAdmin()) checkAndRunDailyBackup();
@@ -10240,6 +10253,190 @@ async function tmNavMonth(dir){
   await renderTasksView();
 }
 // ─────────────────────────────────────────────
+// ACTIVITY TRACKER
+// ─────────────────────────────────────────────
+let activitySessionId=null;
+let activityHeartbeatTimer=null;
+
+async function logUserLogin(){
+  if(!currentUser) return;
+  const ua=navigator.userAgent;
+  const isMobile=/Mobile|Android|iPhone|iPad/i.test(ua);
+  const browser=(()=>{if(ua.includes('Chrome')&&!ua.includes('Edg'))return 'Chrome';if(ua.includes('Safari')&&!ua.includes('Chrome'))return 'Safari';if(ua.includes('Firefox'))return 'Firefox';if(ua.includes('Edg'))return 'Edge';return 'Other';})();
+  let location='Unknown';
+  try{
+    const res=await fetch('https://ipapi.co/json/');
+    if(res.ok){const d=await res.json();location=`${d.city||''}, ${d.region||''}, ${d.country_name||''}`;}
+  }catch(e){}
+  const sessionId=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  activitySessionId=sessionId;
+  try{
+    await db.collection('userActivity').doc(sessionId).set({
+      uid:currentUser.uid,
+      userName:currentUser.name||currentUser.email,
+      loginTime:new Date(),
+      lastSeen:new Date(),
+      device:isMobile?'Mobile':'Desktop',
+      browser,
+      location,
+      sectionsVisited:[],
+      sessionMinutes:0,
+      active:true
+    });
+  }catch(e){console.warn('logUserLogin',e);}
+  startActivityHeartbeat();
+}
+
+function startActivityHeartbeat(){
+  if(activityHeartbeatTimer) clearInterval(activityHeartbeatTimer);
+  activityHeartbeatTimer=setInterval(async()=>{
+    if(!activitySessionId) return;
+    try{
+      const ref=db.collection('userActivity').doc(activitySessionId);
+      const doc=await ref.get();
+      if(!doc.exists) return;
+      const data=doc.data();
+      const mins=(data.sessionMinutes||0)+5;
+      await ref.update({lastSeen:new Date(),sessionMinutes:mins});
+    }catch(e){}
+  },5*60*1000); // every 5 minutes
+}
+
+function logSectionVisit(section){
+  if(!activitySessionId||!section) return;
+  try{
+    db.collection('userActivity').doc(activitySessionId).update({
+      sectionsVisited:firebase.firestore.FieldValue.arrayUnion(section),
+      lastSeen:new Date(),
+      lastSection:section
+    });
+  }catch(e){}
+}
+
+// Mark session inactive on page close
+window.addEventListener('beforeunload',()=>{
+  if(!activitySessionId) return;
+  navigator.sendBeacon||null;
+  try{
+    db.collection('userActivity').doc(activitySessionId).update({active:false,lastSeen:new Date()});
+  }catch(e){}
+});
+
+async function renderActivityView(){
+  const el=document.getElementById('activityView');
+  if(!isAdmin()){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Admin access required</div>';
+    return;
+  }
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+
+  const today=new Date().toISOString().slice(0,10);
+  const todayStart=new Date(today+'T00:00:00');
+
+  // Load today's activity
+  let activities=[];
+  try{
+    const snap=await db.collection('userActivity').where('loginTime','>=',todayStart).orderBy('loginTime','desc').get();
+    activities=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error('loadActivity',e);}
+
+  // Group by user
+  const byUser={};
+  activities.forEach(a=>{
+    if(!byUser[a.uid]) byUser[a.uid]={name:a.userName||'Unknown',sessions:[],totalMinutes:0};
+    byUser[a.uid].sessions.push(a);
+    byUser[a.uid].totalMinutes+=(a.sessionMinutes||0);
+  });
+
+  const users=await getUsers();
+  const onlineNow=activities.filter(a=>a.active);
+
+  let html=`<div class="table-card" style="padding:18px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:#4ade80">${onlineNow.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Online Now</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${Object.keys(byUser).length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users Today</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--text)">${activities.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Sessions Today</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${Math.round(activities.reduce((s,a)=>s+(a.sessionMinutes||0),0)/60*10)/10}h</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Time</div>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${today}</div>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>User</th><th>Status</th><th>Login Time</th><th>Last Seen</th><th>Duration</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
+    </tr></thead><tbody>`;
+
+  activities.forEach(a=>{
+    const loginT=a.loginTime?.toDate?a.loginTime.toDate():new Date(a.loginTime);
+    const lastT=a.lastSeen?.toDate?a.lastSeen.toDate():new Date(a.lastSeen);
+    const loginStr=loginT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    const lastStr=lastT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    const dur=a.sessionMinutes||0;
+    const durStr=dur>=60?Math.floor(dur/60)+'h '+dur%60+'m':dur+'m';
+    const col=userColor(a.uid);
+    const initials=(a.userName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const sections=(a.sectionsVisited||[]).map(s=>`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--surface2);border:1px solid var(--border2);white-space:nowrap">${escapeHtml(s)}</span>`).join(' ');
+    html+=`<tr>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <span style="width:26px;height:26px;border-radius:50%;background:${col}22;color:${col};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+        <span style="font-weight:500">${escapeHtml(a.userName||'Unknown')}</span>
+      </div></td>
+      <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;${a.active?'background:rgba(74,222,128,0.12);color:#4ade80':'background:var(--surface2);color:var(--muted)'}">${a.active?'Online':'Offline'}</span></td>
+      <td style="font-family:var(--mono);font-size:11px">${loginStr}</td>
+      <td style="font-family:var(--mono);font-size:11px">${lastStr}</td>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--amber)">${durStr}</td>
+      <td style="font-size:11px">${a.device==='Mobile'?'📱':'💻'} ${a.device||'—'}</td>
+      <td style="font-size:11px">${escapeHtml(a.browser||'—')}</td>
+      <td style="font-size:11px">${escapeHtml(a.location||'—')}</td>
+      <td style="max-width:200px;overflow:hidden">${sections||'<span style="color:var(--muted)">—</span>'}</td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table></div>`;
+
+  // Per-user summary
+  html+=`<div style="font-size:13px;font-weight:600;color:var(--text);margin:18px 0 10px">User Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">`;
+  users.forEach(u=>{
+    const ud=byUser[u.uid];
+    const isOnline=onlineNow.some(a=>a.uid===u.uid);
+    const col=userColor(u.uid);
+    const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const totalMin=ud?ud.totalMinutes:0;
+    const durStr=totalMin>=60?Math.floor(totalMin/60)+'h '+totalMin%60+'m':totalMin+'m';
+    const sessionCnt=ud?ud.sessions.length:0;
+    const lastLoc=ud&&ud.sessions.length?ud.sessions[0].location:'—';
+    html+=`<div style="background:var(--surface2);border:1px solid ${isOnline?'rgba(74,222,128,0.3)':'var(--border2)'};border-left:3px solid ${isOnline?'#4ade80':'var(--border2)'};border-radius:8px;padding:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:30px;height:30px;border-radius:50%;background:${col}22;color:${col};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">${initials}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${escapeHtml(u.name||u.email)}</div>
+          <div style="font-size:9px;color:${isOnline?'#4ade80':'var(--muted)'};font-weight:600">${isOnline?'● Online':'○ Offline'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px">
+        <div><span style="color:var(--muted)">Sessions:</span> <strong>${sessionCnt}</strong></div>
+        <div><span style="color:var(--muted)">Time:</span> <strong style="color:var(--amber)">${durStr}</strong></div>
+        <div style="grid-column:1/-1"><span style="color:var(--muted)">Location:</span> ${escapeHtml(lastLoc||'—')}</div>
+      </div>
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  el.innerHTML=html;
+}
+
+// ─────────────────────────────────────────────
 // LEGAL CASES
 // ─────────────────────────────────────────────
 let legalCases = [];
@@ -10660,11 +10857,12 @@ function showView(v){
     if(v !== 'dashboard'){ showView('dashboard'); return; }
   }
   currentView = v;
+  logSectionVisit(v);
 
   // Map view names to their element IDs
   const viewMap = {
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
-    team:'teamView', tasks:'tasksView', meetings:'meetingsView',
+    team:'teamView', activity:'activityView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView',
@@ -10695,7 +10893,7 @@ function showView(v){
   // Update title
   const titles={
     dashboard:'Portfolio Dashboard', properties:'Properties',
-    team:'Team Management',
+    team:'Team Management', activity:'Activity Tracker',
     tasks:'Task Management', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
@@ -10759,6 +10957,7 @@ function showView(v){
   if(v==='constProjects') renderConstProjectsView();
   if(v==='turnover') renderTurnoverView();
   if(v==='salaryPool') renderSalaryPoolView();
+  if(v==='activity') renderActivityView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
