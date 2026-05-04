@@ -16056,7 +16056,7 @@ async function renderSalaryPoolAdmin(el, users){
       <div style="background:linear-gradient(135deg,rgba(176,106,245,0.12),rgba(201,245,99,0.06));border:2px solid rgba(176,106,245,0.3);border-radius:14px;padding:20px;text-align:center;cursor:pointer;position:relative;overflow:hidden" ondblclick="editReleaseDate()" title="Double-click to set release date">
         <div style="position:absolute;top:-20px;right:-20px;font-size:80px;opacity:0.06">💎</div>
         <div style="font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🏦 Reserve Pool</div>
-        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmtc(totalReservesAll)}</div>
+        <div id="reservePoolAmount" style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em;cursor:pointer" onclick="const v=this.dataset.revealed==='true';this.textContent=v?'Tap to reveal':this.dataset.val;this.dataset.revealed=v?'false':'true'" data-val="${fmtc(totalReservesAll)}" data-revealed="false">Tap to reveal</div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px">Saved for ${selUser?escapeHtml(selUser.name):''}</div>
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${usDate(releaseDate)}</span>
@@ -16144,7 +16144,7 @@ async function renderSalaryPoolUser(el){
       <div style="background:linear-gradient(135deg,rgba(176,106,245,0.12),rgba(201,245,99,0.06));border:2px solid rgba(176,106,245,0.3);border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden">
         <div style="position:absolute;top:-20px;right:-20px;font-size:80px;opacity:0.06">💎</div>
         <div style="font-size:10px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🏦 My Reserve Pool</div>
-        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em">${fmtc(totalReservesAll)}</div>
+        <div style="font-size:36px;font-weight:800;color:var(--purple);letter-spacing:-0.02em;cursor:pointer" onclick="const v=this.dataset.revealed==='true';this.textContent=v?'Tap to reveal':this.dataset.val;this.dataset.revealed=v?'false':'true'" data-val="${fmtc(totalReservesAll)}" data-revealed="false">Tap to reveal</div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px">Saved for you</div>
         ${releaseDate?`<div style="margin-top:10px;padding:6px 14px;background:rgba(245,201,106,0.1);border:1px solid rgba(245,201,106,0.25);border-radius:8px;display:inline-block">
           <span style="font-size:11px;color:var(--amber);font-weight:600">📅 Pay by ${usDate(releaseDate)}</span>
