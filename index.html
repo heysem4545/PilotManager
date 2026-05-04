@@ -10258,7 +10258,9 @@ async function tmNavMonth(dir){
 let activitySessionId=null;
 let activityHeartbeatTimer=null;
 let activityUserFilter='all';
-let activityDateFilter='';
+let activityDateRange='today'; // today, week, month, custom
+let activityDateFrom='';
+let activityDateTo='';
 
 async function logUserLogin(){
   if(!currentUser) return;
@@ -10333,13 +10335,34 @@ async function renderActivityView(){
   el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
 
   const now=new Date();
-  const filterDate=activityDateFilter||now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  const [fy,fm,fd]=filterDate.split('-').map(Number);
-  const dateStart=new Date(fy,fm-1,fd);
-  const dateEnd=new Date(fy,fm-1,fd+1);
-  const isToday=filterDate===(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
+  const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  let dateStart,dateEnd,dateLabel;
+  if(activityDateRange==='today'){
+    dateStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    dateEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+    dateLabel='Today — '+todayStr;
+  } else if(activityDateRange==='week'){
+    dateStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6);
+    dateEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+    const fromStr=dateStart.getFullYear()+'-'+String(dateStart.getMonth()+1).padStart(2,'0')+'-'+String(dateStart.getDate()).padStart(2,'0');
+    dateLabel='Last 7 Days — '+fromStr+' to '+todayStr;
+  } else if(activityDateRange==='month'){
+    dateStart=new Date(now.getFullYear(),now.getMonth(),1);
+    dateEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+    const fromStr=dateStart.getFullYear()+'-'+String(dateStart.getMonth()+1).padStart(2,'0')+'-01';
+    dateLabel='This Month — '+fromStr+' to '+todayStr;
+  } else {
+    // custom
+    const from=activityDateFrom||todayStr;
+    const to=activityDateTo||todayStr;
+    const [fy,fm,fd]=from.split('-').map(Number);
+    const [ty,tm,td]=to.split('-').map(Number);
+    dateStart=new Date(fy,fm-1,fd);
+    dateEnd=new Date(ty,tm-1,td+1);
+    dateLabel=from+' to '+to;
+  }
 
-  // Load activity for selected date
+  // Load activity for date range
   let activities=[];
   try{
     const snap=await db.collection('userActivity').where('loginTime','>=',dateStart).where('loginTime','<',dateEnd).orderBy('loginTime','desc').get();
@@ -10367,11 +10390,18 @@ async function renderActivityView(){
       return `<button class="ftab ${activityUserFilter===u.uid?'active':''}" onclick="activityUserFilter='${u.uid}';renderActivityView()">${escapeHtml(u.name||u.email)}${cnt?' ('+cnt+')':''}</button>`;
     }).join('');
 
+  const dateInputStyle='font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none';
   let html=`<div class="table-card" style="padding:18px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Date:</span>
-      <input type="date" value="${filterDate}" onchange="activityDateFilter=this.value;renderActivityView()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
-      ${!isToday?`<button class="btn btn-ghost btn-sm" onclick="activityDateFilter='';renderActivityView()">Today</button>`:''}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="ftab ${activityDateRange==='today'?'active':''}" onclick="activityDateRange='today';renderActivityView()">Today</button>
+      <button class="ftab ${activityDateRange==='week'?'active':''}" onclick="activityDateRange='week';renderActivityView()">Last 7 Days</button>
+      <button class="ftab ${activityDateRange==='month'?'active':''}" onclick="activityDateRange='month';renderActivityView()">This Month</button>
+      <button class="ftab ${activityDateRange==='custom'?'active':''}" onclick="activityDateRange='custom';renderActivityView()">Custom</button>
+      ${activityDateRange==='custom'?`
+        <input type="date" value="${activityDateFrom||todayStr}" onchange="activityDateFrom=this.value;renderActivityView()" style="${dateInputStyle}">
+        <span style="font-size:11px;color:var(--muted)">to</span>
+        <input type="date" value="${activityDateTo||todayStr}" onchange="activityDateTo=this.value;renderActivityView()" style="${dateInputStyle}">
+      `:''}
     </div>
     <div class="ftabs" style="margin-bottom:14px;flex-wrap:wrap">${userTabs}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px">
@@ -10381,7 +10411,7 @@ async function renderActivityView(){
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
         <div style="font-size:22px;font-weight:700;color:var(--accent)">${Object.keys(byUser).length}</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users${isToday?' Today':''}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Users</div>
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
         <div style="font-size:22px;font-weight:700;color:var(--text)">${filteredActivities.length}</div>
@@ -10393,9 +10423,9 @@ async function renderActivityView(){
       </div>
     </div>
 
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${filterDate}</div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">User Sessions — ${dateLabel}</div>
     <div class="tbl-wrap"><table><thead><tr>
-      <th>User</th><th>Status</th><th>Login Time</th><th>Last Seen</th><th>Duration</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
+      <th>User</th>${activityDateRange!=='today'?'<th>Date</th>':''}<th>Status</th><th>Login Time</th><th>Last Seen</th><th>Duration</th><th>Device</th><th>Browser</th><th>Location</th><th>Sections Visited</th>
     </tr></thead><tbody>`;
 
   filteredActivities.forEach(a=>{
@@ -10403,6 +10433,7 @@ async function renderActivityView(){
     const lastT=a.lastSeen?.toDate?a.lastSeen.toDate():new Date(a.lastSeen);
     const loginStr=loginT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
     const lastStr=lastT.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    const dateStr=loginT.getFullYear()+'-'+String(loginT.getMonth()+1).padStart(2,'0')+'-'+String(loginT.getDate()).padStart(2,'0');
     const dur=a.sessionMinutes||0;
     const durStr=dur>=60?Math.floor(dur/60)+'h '+dur%60+'m':dur+'m';
     const col=userColor(a.uid);
@@ -10413,6 +10444,7 @@ async function renderActivityView(){
         <span style="width:26px;height:26px;border-radius:50%;background:${col}22;color:${col};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
         <span style="font-weight:500">${escapeHtml(a.userName||'Unknown')}</span>
       </div></td>
+      ${activityDateRange!=='today'?`<td style="font-family:var(--mono);font-size:11px">${dateStr}</td>`:''}
       <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;${a.active?'background:rgba(74,222,128,0.12);color:#4ade80':'background:var(--surface2);color:var(--muted)'}">${a.active?'Online':'Offline'}</span></td>
       <td style="font-family:var(--mono);font-size:11px">${loginStr}</td>
       <td style="font-family:var(--mono);font-size:11px">${lastStr}</td>
