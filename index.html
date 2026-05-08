@@ -2596,6 +2596,8 @@ auth.onAuthStateChanged(async (firebaseUser) => {
 
   // Log user login for activity tracking
   logUserLogin();
+  startVersionListener();
+  startNightlyIdleLogout();
 
   // Auto daily backup for admins
   if(isAdmin()) checkAndRunDailyBackup();
@@ -10252,6 +10254,58 @@ async function tmNavMonth(dir){
   tasksListenerKey = null; // force re-subscribe to new month
   await renderTasksView();
 }
+// ─────────────────────────────────────────────
+// AUTO-RELOAD ON DEPLOY + NIGHTLY IDLE LOGOUT
+// ─────────────────────────────────────────────
+// Bump APP_VERSION on every deploy. Open tabs that subscribe below will
+// reload within seconds once a fresher value lands in system/appVersion.
+const APP_VERSION='2026-05-07-1';
+
+let _versionListenerUnsub=null;
+let _firstVersionEvent=true;
+function startVersionListener(){
+  if(_versionListenerUnsub) return;
+  _versionListenerUnsub=db.collection('system').doc('appVersion').onSnapshot(snap=>{
+    const remote=snap.exists?snap.data().version:null;
+    if(_firstVersionEvent){
+      _firstVersionEvent=false;
+      // On subscribe: if the doc is missing/older, announce our version so
+      // peers running an older build pick it up. If it's newer, reload now.
+      if(!remote||remote<APP_VERSION){
+        db.collection('system').doc('appVersion').set({version:APP_VERSION,updatedAt:new Date()},{merge:true}).catch(()=>{});
+      } else if(remote>APP_VERSION){
+        console.log('Newer app version available ('+remote+'), reloading…');
+        location.reload();
+      }
+      return;
+    }
+    if(remote&&remote!==APP_VERSION){
+      console.log('App updated remotely ('+remote+'), reloading…');
+      location.reload();
+    }
+  },err=>console.warn('versionListener',err));
+}
+
+// Safety net: at 3 AM local time, log out users who have been idle 30+ min
+// and reload. Picks up any code changes that the version listener missed.
+let _nightlyLogoutTimer=null;
+function startNightlyIdleLogout(){
+  if(_nightlyLogoutTimer) clearInterval(_nightlyLogoutTimer);
+  _nightlyLogoutTimer=setInterval(async()=>{
+    const now=new Date();
+    if(now.getHours()!==3) return;
+    const idleMs=Date.now()-_lastActivityTime;
+    if(idleMs<30*60*1000) return;
+    try{
+      if(activitySessionId){
+        await db.collection('userActivity').doc(activitySessionId).update({active:false,lastSeen:new Date()});
+      }
+      await auth.signOut();
+    }catch(e){}
+    location.reload();
+  },5*60*1000);
+}
+
 // ─────────────────────────────────────────────
 // ACTIVITY TRACKER
 // ─────────────────────────────────────────────
