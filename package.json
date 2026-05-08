@@ -4,7 +4,9 @@
   "private": true,
   "description": "PilotManager mobile app (Capacitor wrapper around the Firebase web app)",
   "scripts": {
+    "prepare": "node scripts/install-hooks.js",
     "bump": "node scripts/bump-version.js",
+    "deploy": "node scripts/deploy.js",
     "build:www": "rm -rf www && mkdir -p www && cp index.html firebase-config.js www/",
     "sync": "npm run build:www && npx cap sync ios",
     "ios": "npm run sync && npx cap open ios"
