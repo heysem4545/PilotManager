@@ -1,0 +1,9 @@
+{
+  "appId": "com.sam.pilotmanager",
+  "appName": "PilotManager",
+  "webDir": "www",
+  "server": {
+    "url": "https://mypilotmanager.com",
+    "cleartext": false
+  }
+}

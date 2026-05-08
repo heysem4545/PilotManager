@@ -1,0 +1,16 @@
+{
+  "name": "pilotmanager-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PilotManager mobile app (Capacitor wrapper around the Firebase web app)",
+  "scripts": {
+    "build:www": "rm -rf www && mkdir -p www && cp index.html firebase-config.js www/",
+    "sync": "npm run build:www && npx cap sync ios",
+    "ios": "npm run sync && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/ios": "^8.3.1"
+  }
+}
