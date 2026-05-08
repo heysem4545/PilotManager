@@ -10267,13 +10267,10 @@ async function logUserLogin(){
   const ua=navigator.userAgent;
   const isMobile=/Mobile|Android|iPhone|iPad/i.test(ua);
   const browser=(()=>{if(ua.includes('Chrome')&&!ua.includes('Edg'))return 'Chrome';if(ua.includes('Safari')&&!ua.includes('Chrome'))return 'Safari';if(ua.includes('Firefox'))return 'Firefox';if(ua.includes('Edg'))return 'Edge';return 'Other';})();
-  let location='Unknown';
-  try{
-    const res=await fetch('https://ipapi.co/json/');
-    if(res.ok){const d=await res.json();location=`${d.city||''}, ${d.region||''}, ${d.country_name||''}`;}
-  }catch(e){}
   const sessionId=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   activitySessionId=sessionId;
+  _sessionVisitLog=[];
+  // Write session doc FIRST so tracking works even if the IP lookup fails or hangs.
   try{
     await db.collection('userActivity').doc(sessionId).set({
       uid:currentUser.uid,
@@ -10282,7 +10279,7 @@ async function logUserLogin(){
       lastSeen:new Date(),
       device:isMobile?'Mobile':'Desktop',
       browser,
-      location,
+      location:'Unknown',
       sectionsVisited:[],
       sessionMinutes:0,
       activeMinutes:0,
@@ -10291,22 +10288,60 @@ async function logUserLogin(){
     });
   }catch(e){console.warn('logUserLogin',e);}
   startActivityTracker();
+  // Look up location in the background with a 3s timeout; update doc when ready.
+  (async()=>{
+    try{
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),3000);
+      const res=await fetch('https://ipapi.co/json/',{signal:ctrl.signal});
+      clearTimeout(timer);
+      if(!res.ok) return;
+      const d=await res.json();
+      const location=`${d.city||''}, ${d.region||''}, ${d.country_name||''}`;
+      await db.collection('userActivity').doc(sessionId).update({location});
+    }catch(e){}
+  })();
 }
 
 let _lastActivityTime=Date.now();
 let _activityIdleLimit=2*60*1000; // 2 minutes idle = not working
+let _activityListenersAdded=false;
+let _sessionDateKey=null;
+
+function _activityDateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 
 function startActivityTracker(){
-  // Track real user interactions
-  const resetIdle=()=>{_lastActivityTime=Date.now();};
-  ['click','keydown','scroll','touchstart','mousemove'].forEach(evt=>{
-    document.addEventListener(evt,resetIdle,{passive:true});
-  });
+  // Track real user interactions — register listeners only once across rollovers.
+  if(!_activityListenersAdded){
+    const resetIdle=()=>{_lastActivityTime=Date.now();};
+    ['click','keydown','scroll','touchstart','mousemove'].forEach(evt=>{
+      document.addEventListener(evt,resetIdle,{passive:true});
+    });
+    _activityListenersAdded=true;
+  }
+
+  _sessionDateKey=_activityDateKey(new Date());
 
   // Heartbeat every 1 minute — only count if user was active in last 2 min
   if(activityHeartbeatTimer) clearInterval(activityHeartbeatTimer);
   activityHeartbeatTimer=setInterval(async()=>{
     if(!activitySessionId) return;
+    // Roll over to a fresh session at midnight so per-day metrics stay accurate
+    // for users who leave a tab open across days.
+    const todayKey=_activityDateKey(new Date());
+    if(todayKey!==_sessionDateKey){
+      const oldId=activitySessionId;
+      activitySessionId=null;
+      clearInterval(activityHeartbeatTimer);
+      activityHeartbeatTimer=null;
+      try{
+        await db.collection('userActivity').doc(oldId).update({active:false,lastSeen:new Date()});
+      }catch(e){}
+      logUserLogin();
+      return;
+    }
     const isActive=(Date.now()-_lastActivityTime)<_activityIdleLimit;
     try{
       const ref=db.collection('userActivity').doc(activitySessionId);
