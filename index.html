@@ -10291,7 +10291,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-08-2';
+const APP_VERSION='2026-05-08-3';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -10652,10 +10652,22 @@ let myPaymentsYear=(new Date()).getFullYear();
 const MY_PAYMENTS_YEARS=[2026,2027,2028,2029,2030,2031];
 const MY_PAYMENTS_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+function _parseDueDay(s){
+  if(!s) return Infinity;
+  const m=String(s).match(/(\d+)/);
+  return m?parseInt(m[1],10):Infinity;
+}
+
 async function loadMyPayments(){
   try{
-    const snap=await db.collection('myPayments').orderBy('payTo').get();
+    const snap=await db.collection('myPayments').get();
     myPaymentsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    myPaymentsCache.sort((a,b)=>{
+      const da=_parseDueDay(a.dueDate);
+      const dbb=_parseDueDay(b.dueDate);
+      if(da!==dbb) return da-dbb;
+      return (a.payTo||'').localeCompare(b.payTo||'');
+    });
   }catch(e){
     console.error('loadMyPayments',e);
     myPaymentsCache=[];
