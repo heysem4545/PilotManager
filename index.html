@@ -1055,6 +1055,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8h3l2-5 3 10 2-5h4"/></svg>
         Activity
       </button>
+      <button class="nav-item" id="nav-myPayments" onclick="showView('myPayments')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1"/><path d="M2 7h12M5 10.5h2"/></svg>
+        My Payments
+      </button>
       <div class="nav-label" id="nav-label-system">System</div>
       <button class="nav-item" id="nav-backups" onclick="showView('backups')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4.5a2.5 2.5 0 015 0v.5h2v-.5a2.5 2.5 0 015 0V6a2 2 0 01-1 1.73V13a1 1 0 01-1 1H4a1 1 0 01-1-1V7.73A2 2 0 012 6V4.5z"/><path d="M6 9h4M6 11h4"/></svg>
@@ -1191,6 +1195,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
 
       <div id="activityView" style="display:none"></div>
+      <div id="myPaymentsView" style="display:none"></div>
 
       <!-- MODULE VIEWS (coming soon) -->
       <div id="tasksView" style="display:none"></div>
@@ -2603,6 +2608,8 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   if(!isAdmin()){
     const navAct = document.getElementById('nav-activity');
     if(navAct) navAct.style.display = 'none';
+    const navMyPay = document.getElementById('nav-myPayments');
+    if(navMyPay) navMyPay.style.display = 'none';
   }
   if(!canEdit()){
     document.getElementById('addPropBtn').style.display='none';
@@ -10284,7 +10291,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-08-1';
+const APP_VERSION='2026-05-08-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -10635,6 +10642,137 @@ async function renderActivityView(){
   html+=`</div></div>`;
 
   el.innerHTML=html;
+}
+
+// ─────────────────────────────────────────────
+// MY PAYMENTS (admin-only personal recurring bills tracker)
+// ─────────────────────────────────────────────
+let myPaymentsCache=[];
+let myPaymentsYear=(new Date()).getFullYear();
+const MY_PAYMENTS_YEARS=[2026,2027,2028,2029,2030,2031];
+const MY_PAYMENTS_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+async function loadMyPayments(){
+  try{
+    const snap=await db.collection('myPayments').orderBy('payTo').get();
+    myPaymentsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    console.error('loadMyPayments',e);
+    myPaymentsCache=[];
+  }
+}
+
+async function renderMyPaymentsView(){
+  const el=document.getElementById('myPaymentsView');
+  if(!isAdmin()){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">Admin access required</div>';
+    return;
+  }
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadMyPayments();
+
+  const yearOptions=MY_PAYMENTS_YEARS.map(y=>`<option value="${y}" ${y===myPaymentsYear?'selected':''}>${y}</option>`).join('');
+  const selectStyle='font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none';
+
+  let html=`<div class="table-card" style="padding:18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="openAddMyPayment()">+ Add Payment</button>
+      <div style="flex:1"></div>
+      <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Year</label>
+      <select onchange="myPaymentsYear=parseInt(this.value);renderMyPaymentsView()" style="${selectStyle}">${yearOptions}</select>
+    </div>
+
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>Pay To</th>
+      <th>Due</th>
+      ${MY_PAYMENTS_MONTHS.map(m=>`<th style="text-align:center;font-size:10px">${m}</th>`).join('')}
+      <th></th>
+    </tr></thead><tbody>`;
+
+  if(myPaymentsCache.length===0){
+    html+=`<tr><td colspan="${MY_PAYMENTS_MONTHS.length+3}" style="text-align:center;padding:32px;color:var(--muted)">No payments yet — click <strong>+ Add Payment</strong> to get started</td></tr>`;
+  } else {
+    myPaymentsCache.forEach(p=>{
+      const cells=MY_PAYMENTS_MONTHS.map((m,i)=>{
+        const key=myPaymentsYear+'-'+String(i+1).padStart(2,'0');
+        const checked=p.paid&&p.paid[key]===true;
+        return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleMyPaymentPaid('${p.id}','${key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
+      }).join('');
+      html+=`<tr>
+        <td style="font-weight:500">${escapeHtml(p.payTo||'')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(p.dueDate||'—')}</td>
+        ${cells}
+        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Edit" onclick="editMyPayment('${p.id}')">✎</button> <button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteMyPayment('${p.id}')">🗑</button></td>
+      </tr>`;
+    });
+  }
+  html+=`</tbody></table></div></div>`;
+  el.innerHTML=html;
+}
+
+async function toggleMyPaymentPaid(id,key,checked){
+  try{
+    await db.collection('myPayments').doc(id).update({['paid.'+key]:checked,updatedAt:new Date()});
+    const p=myPaymentsCache.find(x=>x.id===id);
+    if(p){ if(!p.paid)p.paid={}; p.paid[key]=checked; }
+  }catch(e){
+    toast('Failed to save: '+e.message);
+    renderMyPaymentsView();
+  }
+}
+
+function openAddMyPayment(existing){
+  const isEdit=!!existing;
+  const inputStyle='font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%';
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='addMyPaymentModal';
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:380px">
+    <div class="modal-title"><span>${isEdit?'Edit':'Add'} Payment</span><button class="modal-close" onclick="document.getElementById('addMyPaymentModal').remove()">×</button></div>
+    <div class="fg"><label>Pay To</label><input type="text" id="mpPayTo" placeholder="e.g., Spectrum, Insurance, Mortgage" value="${isEdit?escapeAttr(existing.payTo||''):''}" style="${inputStyle}"></div>
+    <div class="fg"><label>Due Date</label><input type="text" id="mpDueDate" placeholder="e.g., 5th, 1st of month" value="${isEdit?escapeAttr(existing.dueDate||''):''}" style="${inputStyle}"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('addMyPaymentModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMyPayment(${isEdit?`'${existing.id}'`:'null'})">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('mpPayTo')?.focus(),50);
+}
+
+async function saveMyPayment(id){
+  const payTo=document.getElementById('mpPayTo').value.trim();
+  const dueDate=document.getElementById('mpDueDate').value.trim();
+  if(!payTo){ toast('Pay To is required'); return; }
+  try{
+    if(id){
+      await db.collection('myPayments').doc(id).update({payTo,dueDate,updatedAt:new Date()});
+    } else {
+      await db.collection('myPayments').add({payTo,dueDate,paid:{},createdAt:new Date(),createdBy:currentUser?.uid||null});
+    }
+    document.getElementById('addMyPaymentModal')?.remove();
+    renderMyPaymentsView();
+  }catch(e){
+    toast('Failed to save: '+e.message);
+  }
+}
+
+function editMyPayment(id){
+  const p=myPaymentsCache.find(x=>x.id===id);
+  if(p) openAddMyPayment(p);
+}
+
+async function deleteMyPayment(id){
+  const p=myPaymentsCache.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm('Delete payment "'+(p.payTo||'')+'"? This cannot be undone.')) return;
+  try{
+    await db.collection('myPayments').doc(id).delete();
+    renderMyPaymentsView();
+  }catch(e){
+    toast('Failed to delete: '+e.message);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -11063,7 +11201,7 @@ function showView(v){
   // Map view names to their element IDs
   const viewMap = {
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
-    team:'teamView', activity:'activityView', tasks:'tasksView', meetings:'meetingsView',
+    team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
     tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView',
@@ -11094,7 +11232,7 @@ function showView(v){
   // Update title
   const titles={
     dashboard:'Portfolio Dashboard', properties:'Properties',
-    team:'Team Management', activity:'Activity Tracker',
+    team:'Team Management', activity:'Activity Tracker', myPayments:'My Payments',
     tasks:'Task Management', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
@@ -11159,6 +11297,7 @@ function showView(v){
   if(v==='turnover') renderTurnoverView();
   if(v==='salaryPool') renderSalaryPoolView();
   if(v==='activity') renderActivityView();
+  if(v==='myPayments') renderMyPaymentsView();
   if(v==='team'){
     if(!currentUser||!canViewSection('team')){
       document.getElementById('teamList').innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">Access required</div><div>You don\'t have permission to view Team Management.</div></div>';
