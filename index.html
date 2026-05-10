@@ -10291,7 +10291,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-10-1';
+const APP_VERSION='2026-05-10-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13259,6 +13259,17 @@ function renderCallLogReport(){
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Most Called${sorted[0]?' ('+sorted[0][1].total+')':''}</div>
       </div>
     </div>
+
+    ${topReasons.length ? `<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Calls by Reason — ${periodLabel}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px">
+      ${topReasons.map(([reason, count]) => {
+        const col = CALL_LOG_REASON_COLORS[reason] || '#9ca3af';
+        return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;text-align:center;border-left:3px solid ${col}">
+          <div style="font-size:26px;font-weight:700;color:${col}">${count}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">${escapeHtml(reason)}</div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
 
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Per-Property Breakdown — ${periodLabel}</div>`;
 
