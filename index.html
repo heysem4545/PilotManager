@@ -10291,7 +10291,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-08-3';
+const APP_VERSION='2026-05-10-1';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12905,12 +12905,19 @@ async function renderCallLogView(skipLoad){
   const historyTab = isAdmin ? `<button class="ftab ${callLogTab==='history'?'active':''}" onclick="switchCallLogTab('history')">📜 Edit History</button>` : '';
   const tabBar = `<div class="ftabs" style="margin-bottom:12px">
     <button class="ftab ${callLogTab==='log'?'active':''}" onclick="switchCallLogTab('log')">📋 Call Log</button>
+    <button class="ftab ${callLogTab==='report'?'active':''}" onclick="switchCallLogTab('report')">📊 Report</button>
     ${historyTab}
   </div>`;
 
   if(callLogTab === 'history' && isAdmin){
     el.innerHTML = tabBar + `<div id="callLogHistoryWrap"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
     renderCallLogHistory();
+    return;
+  }
+
+  if(callLogTab === 'report'){
+    el.innerHTML = tabBar + `<div id="callLogReportWrap"></div>`;
+    renderCallLogReport();
     return;
   }
 
@@ -13155,6 +13162,132 @@ async function saveCallLogNote(){
 function switchCallLogTab(tab){
   callLogTab = tab;
   renderCallLogView(true);
+}
+
+// ─────────────────────────────────────────────
+// CALL LOG — REPORT (per-property monthly breakdown)
+// ─────────────────────────────────────────────
+let callLogReportYear = (new Date()).getFullYear();
+let callLogReportMonth = (new Date()).getMonth() + 1; // 1-12, or 0 = whole year
+const CALL_LOG_REASON_COLORS = {
+  'Maintenance':'#f59e0b',
+  'Maintenance Follow Up':'#fb923c',
+  'Payments':'#4ade80',
+  'For Rent':'#60a5fa',
+  'Paperwork':'#a78bfa',
+  'Appointment':'#22d3ee',
+  'Unspecified':'#6b7280'
+};
+
+function setCallLogReportPeriod(year, month){
+  callLogReportYear = year;
+  callLogReportMonth = month;
+  renderCallLogReport();
+}
+
+function renderCallLogReport(){
+  const wrap = document.getElementById('callLogReportWrap');
+  if(!wrap) return;
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const yearsAvailable = (() => {
+    const ys = new Set([callLogReportYear, (new Date()).getFullYear()]);
+    callLogData.forEach(c => { if(c.date && /^\d{4}/.test(c.date)) ys.add(parseInt(c.date.slice(0,4),10)); });
+    return [...ys].sort((a,b)=>b-a);
+  })();
+
+  // Filter calls to selected period
+  const ymPrefix = callLogReportMonth === 0
+    ? String(callLogReportYear)
+    : callLogReportYear + '-' + String(callLogReportMonth).padStart(2,'0');
+  const calls = callLogData.filter(c => (c.date||'').startsWith(ymPrefix));
+
+  // Group by property → counts per reason
+  const byAddr = {};
+  calls.forEach(c => {
+    const addr = (c.propertyAddress||'').trim() || '(no address)';
+    if(!byAddr[addr]) byAddr[addr] = { total: 0, reasons: {} };
+    byAddr[addr].total++;
+    const reason = (c.reason||'').trim() || 'Unspecified';
+    byAddr[addr].reasons[reason] = (byAddr[addr].reasons[reason] || 0) + 1;
+  });
+  const sorted = Object.entries(byAddr).sort((a,b) => b[1].total - a[1].total || a[0].localeCompare(b[0]));
+
+  // Aggregate stats
+  const totalCalls = calls.length;
+  const uniqueAddrs = sorted.length;
+  const reasonTotals = {};
+  calls.forEach(c => {
+    const r = (c.reason||'').trim() || 'Unspecified';
+    reasonTotals[r] = (reasonTotals[r] || 0) + 1;
+  });
+  const topReasons = Object.entries(reasonTotals).sort((a,b)=>b[1]-a[1]);
+
+  const periodLabel = callLogReportMonth === 0
+    ? String(callLogReportYear)
+    : months[callLogReportMonth-1] + ' ' + callLogReportYear;
+
+  const selectStyle = 'font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer';
+  const monthBtns = months.map((m,i) =>
+    `<button class="ftab ${callLogReportMonth===i+1?'active':''}" onclick="setCallLogReportPeriod(${callLogReportYear},${i+1})">${m}</button>`
+  ).join('');
+
+  let html = `<div class="table-card" style="padding:18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <select onchange="setCallLogReportPeriod(parseInt(this.value),callLogReportMonth)" style="${selectStyle}">
+        ${yearsAvailable.map(y=>`<option value="${y}" ${y===callLogReportYear?'selected':''}>${y}</option>`).join('')}
+      </select>
+      <button class="ftab ${callLogReportMonth===0?'active':''}" onclick="setCallLogReportPeriod(${callLogReportYear},0)">All Year</button>
+      <div class="ftabs" style="display:inline-flex;flex-wrap:wrap;gap:4px">${monthBtns}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:var(--accent)">${totalCalls}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Total Calls</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:var(--text)">${uniqueAddrs}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Properties Called</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.3">${topReasons[0]?escapeHtml(topReasons[0][0]):'—'}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Top Reason${topReasons[0]?' ('+topReasons[0][1]+')':''}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.3">${sorted[0]?escapeHtml(sorted[0][0].length>30?sorted[0][0].slice(0,30)+'…':sorted[0][0]):'—'}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Most Called${sorted[0]?' ('+sorted[0][1].total+')':''}</div>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Per-Property Breakdown — ${periodLabel}</div>`;
+
+  if(sorted.length === 0){
+    html += `<div style="padding:32px;text-align:center;color:var(--muted)">No calls logged for ${periodLabel}.</div>`;
+  } else {
+    html += `<div class="tbl-wrap"><table><thead><tr>
+      <th>Property Address</th>
+      <th style="text-align:center;width:80px">Total</th>
+      <th>Reasons</th>
+    </tr></thead><tbody>`;
+    sorted.forEach(([addr, data]) => {
+      const reasonChips = Object.entries(data.reasons)
+        .sort((a,b)=>b[1]-a[1])
+        .map(([r,n]) => {
+          const col = CALL_LOG_REASON_COLORS[r] || '#9ca3af';
+          return `<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:${col}22;color:${col};border:1px solid ${col}55;margin:2px 4px 2px 0;white-space:nowrap">${escapeHtml(r)} · ${n}</span>`;
+        }).join('');
+      html += `<tr>
+        <td style="font-weight:500">${escapeHtml(addr)}</td>
+        <td style="text-align:center;font-family:var(--mono);font-weight:700;color:var(--accent);font-size:14px">${data.total}</td>
+        <td>${reasonChips}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  html += `</div>`;
+  wrap.innerHTML = html;
 }
 
 async function renderCallLogHistory(){
