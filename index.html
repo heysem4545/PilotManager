@@ -10320,7 +10320,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-10-5';
+const APP_VERSION='2026-05-10-6';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11371,9 +11371,15 @@ async function assignCallTo(callId, uid){
 let leadsEditId = null;
 let leadsActiveUserUid = null; // which user's tab is currently visible
 let leadsAddForUid = null;     // set while opening callLogModal from Leads, so save assigns it
+let leadsSubTab = 'callLog';   // 'callLog' = leads from Call Log, 'own' = self-created leads
 
 function switchLeadsTab(uid){
   leadsActiveUserUid = uid;
+  renderLeadsView(true);
+}
+
+function switchLeadsSubTab(sub){
+  leadsSubTab = sub;
   renderLeadsView(true);
 }
 
@@ -11412,13 +11418,33 @@ async function renderLeadsView(skipLoad){
     tabBar = `<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">${tabs}</div>`;
   }
 
-  const myLeads = callLogData.filter(c => c.assignedToUid === activeUid);
+  // All leads for the active user (both sub-tabs combined) — used for sub-tab counts.
+  const userAllLeads = callLogData.filter(c => c.assignedToUid === activeUid);
+  const callLogLeads = userAllLeads.filter(c => c.leadSource !== 'self');
+  const ownLeads     = userAllLeads.filter(c => c.leadSource === 'self');
+
+  // Sub-tab bar (Call Log vs Own Leads). Always visible.
+  const subTabBar = `<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">
+    <button class="ftab ${leadsSubTab==='callLog'?'active':''}" onclick="switchLeadsSubTab('callLog')">📞 From Call Log${callLogLeads.length?' ('+callLogLeads.length+')':''}</button>
+    <button class="ftab ${leadsSubTab==='own'?'active':''}" onclick="switchLeadsSubTab('own')">🎯 Own Leads${ownLeads.length?' ('+ownLeads.length+')':''}</button>
+  </div>`;
+
+  const myLeads = leadsSubTab === 'own' ? ownLeads : callLogLeads;
 
   let body;
   if(myLeads.length === 0){
-    const emptyMsg = activeUid === currentUser.uid
-      ? `<div class="call-empty-title">No leads in your tab yet</div>Click <strong>+ Add Lead</strong> to create one, or have someone assign a call to you from the Call Log.`
-      : `<div class="call-empty-title">No leads in ${escapeHtml(activeFirst)}'s tab yet</div>Click <strong>+ Add Lead</strong> to create one for ${escapeHtml(activeFirst)}.`;
+    const isSelfTab = leadsSubTab === 'own';
+    const ownerYou = activeUid === currentUser.uid;
+    let emptyMsg;
+    if(isSelfTab){
+      emptyMsg = ownerYou
+        ? `<div class="call-empty-title">No own leads yet</div>Click <strong>+ Add Lead</strong> to create one from your own outreach.`
+        : `<div class="call-empty-title">${escapeHtml(activeFirst)} has no own leads yet</div>Click <strong>+ Add Lead</strong> to create one for ${escapeHtml(activeFirst)}.`;
+    } else {
+      emptyMsg = ownerYou
+        ? `<div class="call-empty-title">No call-log leads yet</div>When someone assigns a call to you in the Call Log it will appear here.`
+        : `<div class="call-empty-title">${escapeHtml(activeFirst)} has no call-log leads yet</div>Calls assigned to ${escapeHtml(activeFirst)} from the Call Log will appear here.`;
+    }
     body = `<tbody><tr><td colspan="50"><div class="call-empty">${emptyMsg}</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + myLeads.map(c => {
@@ -11504,13 +11530,14 @@ async function renderLeadsView(skipLoad){
     }).join('') + '</tbody>';
   }
 
+  const sourceLabel = leadsSubTab === 'own' ? 'own lead' : 'call-log lead';
   const ownerLabel = activeUid === currentUser.uid
-    ? `assigned to <strong style="color:var(--text)">you</strong>`
-    : `in <strong style="color:var(--text)">${escapeHtml(activeFirst)}'s</strong> tab`;
-  el.innerHTML = tabBar + `
+    ? `for <strong style="color:var(--text)">you</strong>`
+    : `for <strong style="color:var(--text)">${escapeHtml(activeFirst)}</strong>`;
+  el.innerHTML = tabBar + subTabBar + `
     <div class="table-card">
       <div class="call-log-toolbar">
-        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${myLeads.length}</strong> lead${myLeads.length===1?'':'s'} ${ownerLabel}</div>
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${myLeads.length}</strong> ${sourceLabel}${myLeads.length===1?'':'s'} ${ownerLabel}</div>
         <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" onclick="openLeadAdd('${activeUid}')">+ Add Lead</button></div>
       </div>
       <div class="tbl-wrap">
@@ -13165,9 +13192,14 @@ async function saveCallLogEntry(){
     } else {
       data.createdAt = new Date();
       data.createdBy = userLabel;
-      // If launched from the Leads section, pre-assign the new entry to that tab's user.
+      data.createdByUid = (currentUser && currentUser.uid) || null;
+      // Tag origin so the Leads section can split into "From Call Log" and
+      // "Own Leads" sub-tabs. 'self' = added from the Own Leads tab.
       if(leadsAddForUid){
         data.assignedToUid = leadsAddForUid;
+        data.leadSource = (leadsSubTab === 'own') ? 'self' : 'callLog';
+      } else {
+        data.leadSource = 'callLog';
       }
       await db.collection('callLog').add(data);
       toast(leadsAddForUid ? 'Lead added' : 'Call logged');
