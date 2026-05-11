@@ -1669,6 +1669,16 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <thead><tr><th>Section</th><th>View</th><th>Edit</th></tr></thead>
       <tbody id="permTableBody"></tbody>
     </table>
+    <div style="margin-top:14px;padding:12px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px">
+      <div style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Extra Permissions</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="role_extra_seeAllLeads" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;margin-top:2px;flex-shrink:0">
+        <span>
+          <span style="font-weight:500;color:var(--text)">See all users' leads</span>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">When on, this role sees per-user tabs in the Leads section and can view & create leads for anyone.</div>
+        </span>
+      </label>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('roleModal')">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveRole()">Save role</button>
@@ -2219,6 +2229,7 @@ function toggleTheme(){
 // ─────────────────────────────────────────────
 let currentUser = null;
 let currentPermissions = null;
+let currentExtras = {};
 let rolesCache = []; // cached roles from Firestore
 let editingRoleId = null; // for role modal edit mode
 let properties = [];
@@ -2885,9 +2896,19 @@ function canEdit(){
   return canEditSection(getCurrentSectionId());
 }
 
+// True if the user is admin, or their role has the seeAllLeads extra enabled.
+// Controls whether the per-user tab bar in the Leads section is shown.
+function canSeeAllLeads(){
+  if(isAdmin()) return true;
+  return !!(currentExtras && currentExtras.seeAllLeads);
+}
+
 async function loadUserPermissions(){
+  // Reset extras so a previous role's extras don't leak across reloads.
+  currentExtras = {};
   if(isAdmin()){
     currentPermissions=allPermsTrue();
+    currentExtras = {seeAllLeads: true};
     return;
   }
   // Try loading by roleId first
@@ -2895,7 +2916,9 @@ async function loadUserPermissions(){
     try{
       const roleDoc=await db.collection('roles').doc(currentUser.roleId).get();
       if(roleDoc.exists){
-        currentPermissions=roleDoc.data().permissions||allPermsTrue();
+        const data = roleDoc.data();
+        currentPermissions=data.permissions||allPermsTrue();
+        currentExtras = data.extras || {};
         currentUser._resolvedRoleId = currentUser.roleId;
         return;
       }
@@ -2915,6 +2938,7 @@ async function loadUserPermissions(){
         const data = match.data();
         if(data.permissions){
           currentPermissions = data.permissions;
+          currentExtras = data.extras || {};
           currentUser._resolvedRoleId = match.id;
           // Keep rolesCache in sync
           const idx = rolesCache.findIndex(r=>r.id===match.id);
@@ -8785,6 +8809,8 @@ function openRoleModal(roleId){
       <td><input type="checkbox" class="perm-check" data-section="${s.id}" data-perm="edit" ${p.edit?'checked':''}></td>
     </tr>`;
   }).join('');
+  const extras = (role && role.extras) || {};
+  document.getElementById('role_extra_seeAllLeads').checked = !!extras.seeAllLeads;
   document.getElementById('roleModal').classList.add('open');
 }
 
@@ -8800,15 +8826,18 @@ async function saveRole(){
     if(!permissions[sec]) permissions[sec]={view:false,edit:false};
     permissions[sec][perm]=cb.checked;
   });
+  const extras = {
+    seeAllLeads: document.getElementById('role_extra_seeAllLeads').checked
+  };
   try{
     if(editingRoleId){
-      await db.collection('roles').doc(editingRoleId).update({name,permissions});
+      await db.collection('roles').doc(editingRoleId).update({name,permissions,extras});
       const idx=rolesCache.findIndex(r=>r.id===editingRoleId);
-      if(idx>=0) rolesCache[idx]={...rolesCache[idx],name,permissions};
+      if(idx>=0) rolesCache[idx]={...rolesCache[idx],name,permissions,extras};
       toast('Role updated');
     } else {
-      const ref=await db.collection('roles').add({name,permissions,createdAt:new Date()});
-      rolesCache.push({id:ref.id,name,permissions});
+      const ref=await db.collection('roles').add({name,permissions,extras,createdAt:new Date()});
+      rolesCache.push({id:ref.id,name,permissions,extras});
       toast('Role created');
     }
     closeModal('roleModal');
@@ -10291,7 +10320,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-10-3';
+const APP_VERSION='2026-05-10-4';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11358,18 +11387,18 @@ async function renderLeadsView(skipLoad){
   }
 
   const users = await ensureUsersCache();
-  const isAdminUser = currentUser && currentUser.role === 'admin';
+  const canSeeAll = canSeeAllLeads();
 
-  // Default the active tab to the current user; non-admins are locked to their own tab.
-  if(!leadsActiveUserUid || !isAdminUser) leadsActiveUserUid = currentUser.uid;
+  // Default the active tab to the current user; users without seeAll are locked to their own tab.
+  if(!leadsActiveUserUid || !canSeeAll) leadsActiveUserUid = currentUser.uid;
   const activeUid = leadsActiveUserUid;
   const activeUser = users.find(u => u.uid === activeUid) || currentUser;
   const activeName = (activeUser && (activeUser.name || activeUser.email)) || 'You';
   const activeFirst = activeName.split(/\s+/)[0];
 
-  // Build per-user tab bar (admin only).
+  // Per-user tab bar — visible to admin and to roles with the seeAllLeads extra.
   let tabBar = '';
-  if(isAdminUser && users.length){
+  if(canSeeAll && users.length){
     const tabs = users.map(u => {
       const cnt = callLogData.filter(c => c.assignedToUid === u.uid).length;
       const first = ((u.name || u.email || '').split(/\s+/)[0]) || 'User';
