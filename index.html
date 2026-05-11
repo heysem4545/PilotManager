@@ -10320,7 +10320,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-10-4';
+const APP_VERSION='2026-05-10-5';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11396,10 +11396,15 @@ async function renderLeadsView(skipLoad){
   const activeName = (activeUser && (activeUser.name || activeUser.email)) || 'You';
   const activeFirst = activeName.split(/\s+/)[0];
 
-  // Per-user tab bar — visible to admin and to roles with the seeAllLeads extra.
+  // Per-user tab bar. Users with seeAllLeads see every user's tab and can
+  // switch between them; everyone else still sees their own tab as a single
+  // header so they know which "space" they're in.
   let tabBar = '';
-  if(canSeeAll && users.length){
-    const tabs = users.map(u => {
+  const tabUsers = canSeeAll
+    ? users
+    : users.filter(u => u.uid === currentUser.uid);
+  if(tabUsers.length){
+    const tabs = tabUsers.map(u => {
       const cnt = callLogData.filter(c => c.assignedToUid === u.uid).length;
       const first = ((u.name || u.email || '').split(/\s+/)[0]) || 'User';
       return `<button class="ftab ${activeUid===u.uid?'active':''}" onclick="switchLeadsTab('${u.uid}')">${escapeHtml(first)}'s Leads${cnt?' ('+cnt+')':''}</button>`;
