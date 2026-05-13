@@ -10320,7 +10320,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-13-2';
+const APP_VERSION='2026-05-13-3';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12766,6 +12766,21 @@ async function deleteMeetingFromLog(){
 // CALL LOG
 // ─────────────────────────────────────────────
 let callLogData = [];
+let callLogSearch = '';
+
+function setCallLogSearch(v){
+  callLogSearch = v;
+  renderCallLogView(true);
+  // Re-render replaces the input element; refocus and put the cursor at the end
+  // so typing keeps flowing without the user noticing.
+  setTimeout(() => {
+    const input = document.getElementById('callLogSearchInput');
+    if(input){
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }, 0);
+}
 let editCallId = null;
 let callLogTab = 'log'; // 'log' or 'history'
 let activeCallNoteId = null;
@@ -12878,11 +12893,21 @@ async function renderCallLogView(skipLoad){
 
   const addBtn = `<button class="btn btn-primary btn-sm" onclick="openCallLogAdd()">+ Add Call</button>`;
 
+  // Filter calls by free-text search against the most useful fields.
+  const q = callLogSearch.trim().toLowerCase();
+  const filteredCalls = q ? callLogData.filter(c => {
+    const hay = [c.propertyAddress, c.name, c.number, c.email, c.reason, c.notes, c.status, c.direction, c.followUp, c.comments, c.anyNotes]
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }) : callLogData;
+
   let body;
   if(callLogData.length === 0){
     body = `<tbody><tr><td colspan="50"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
+  } else if(filteredCalls.length === 0){
+    body = `<tbody><tr><td colspan="50"><div class="call-empty"><div class="call-empty-title">No matches for "${escapeHtml(callLogSearch)}"</div>Try a different search term, or clear the box to see all calls.</div></td></tr></tbody>`;
   } else {
-    body = '<tbody>' + callLogData.map(c => {
+    body = '<tbody>' + filteredCalls.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
       const statusKey = (c.status || 'Completed');
       const statusCls = statusKey === 'Needs Attention' ? 'needs-attention'
@@ -13014,11 +13039,15 @@ async function renderCallLogView(skipLoad){
     return;
   }
 
+  const matchesLabel = q
+    ? `<strong style="color:var(--text)">${filteredCalls.length}</strong> of ${callLogData.length} match "${escapeHtml(callLogSearch)}"`
+    : `${callLogData.length} call${callLogData.length===1?'':'s'} logged`;
+  const searchInput = `<input type="search" id="callLogSearchInput" placeholder="🔍 Search address, name, number, notes…" value="${escapeAttr(callLogSearch)}" oninput="setCallLogSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:280px;max-width:50vw">`;
   el.innerHTML = tabBar + `
     <div class="table-card">
       <div class="call-log-toolbar">
-        <div class="call-log-toolbar-left">${callLogData.length} call${callLogData.length===1?'':'s'} logged</div>
-        <div style="display:flex;gap:8px;align-items:center">${addBtn}</div>
+        <div class="call-log-toolbar-left">${matchesLabel}</div>
+        <div style="display:flex;gap:8px;align-items:center">${searchInput}${addBtn}</div>
       </div>
       <div class="tbl-wrap">
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
