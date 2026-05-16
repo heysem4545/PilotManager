@@ -1,14 +1,60 @@
 const { setGlobalOptions } = require("firebase-functions");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const twilio = require("twilio");
 const { getFirestore } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 const { initializeApp } = require("firebase-admin/app");
 
 initializeApp();
 setGlobalOptions({ maxInstances: 10 });
+
+// Admin-only: mint a Firebase custom token for another user so an admin can
+// sign in as them and see exactly what they see. Logged for audit.
+// Cannot impersonate self or another admin (privilege protection).
+exports.impersonateUser = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+  const callerUid = request.auth.uid;
+  const firestore = getFirestore();
+  const callerDoc = await firestore.collection("users").doc(callerUid).get();
+  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin only");
+  }
+  const targetUid = request.data && request.data.targetUid;
+  if (!targetUid || typeof targetUid !== "string") {
+    throw new HttpsError("invalid-argument", "targetUid required");
+  }
+  if (targetUid === callerUid) {
+    throw new HttpsError("invalid-argument", "Cannot impersonate yourself");
+  }
+  const targetDoc = await firestore.collection("users").doc(targetUid).get();
+  if (!targetDoc.exists) {
+    throw new HttpsError("not-found", "Target user not found");
+  }
+  if (targetDoc.data().role === "admin") {
+    throw new HttpsError("permission-denied", "Cannot impersonate another admin");
+  }
+  await firestore.collection("impersonationLog").add({
+    actorUid: callerUid,
+    actorEmail: callerDoc.data().email || null,
+    actorName: callerDoc.data().name || null,
+    targetUid: targetUid,
+    targetEmail: targetDoc.data().email || null,
+    targetName: targetDoc.data().name || null,
+    timestamp: new Date(),
+  });
+  const token = await getAuth().createCustomToken(targetUid, {
+    impersonatedBy: callerUid,
+    impersonatorEmail: callerDoc.data().email || null,
+    impersonatorName: callerDoc.data().name || null,
+  });
+  return { token };
+});
 
 // Secrets (stored in Google Cloud Secret Manager, not in code)
 const TWILIO_SID = defineSecret("TWILIO_SID");

@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
 
 <style>
 :root {
@@ -2646,6 +2647,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   logUserLogin();
   startVersionListener();
   startNightlyIdleLogout();
+  checkImpersonationMode();
 
   // Auto daily backup for admins
   if(isAdmin()) checkAndRunDailyBackup();
@@ -8491,6 +8493,7 @@ async function renderTeam(){
       const suspendLabel = suspended ? 'Unsuspend' : 'Suspend';
       adminActions = `
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="openViewAsUser('${u.uid}')">👁 View as</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="signInAsUser('${u.uid}')">🪪 Sign in as</button>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="toggleSuspendUser('${u.uid}',${!suspended})">${suspendLabel}</button>
         <button class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:10px" onclick="removeUser('${u.uid}')">Remove</button>
       `;
@@ -8612,6 +8615,77 @@ async function openViewAsUser(uid){
     </div>
   </div>`;
   document.body.appendChild(modal);
+}
+
+// Admin tool: actually sign in as another user via a server-minted custom
+// token. Audited in Firestore. Returns to admin by signing out + signing
+// back in with the admin's own password.
+async function signInAsUser(uid){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  const users = await getUsers();
+  const target = users.find(u => u.uid === uid);
+  if(!target){ toast('User not found'); return; }
+  if((target.role||'').toLowerCase() === 'admin'){
+    toast('Cannot sign in as another admin');
+    return;
+  }
+  const ok = confirm(
+    `Sign in as ${target.name || target.email}?\n\n` +
+    `You will see exactly what they see. To return to your own account, click ` +
+    `"Return to admin" in the banner at the top — you'll need to enter your password again.\n\n` +
+    `This action is logged.`
+  );
+  if(!ok) return;
+  try{
+    sessionStorage.setItem('impersonationAdminEmail', currentUser.email || '');
+    sessionStorage.setItem('impersonationAdminName', currentUser.name || '');
+    const fn = firebase.functions().httpsCallable('impersonateUser');
+    const res = await fn({ targetUid: uid });
+    const token = res.data && res.data.token;
+    if(!token){ throw new Error('No token returned'); }
+    await auth.signOut();
+    await auth.signInWithCustomToken(token);
+    location.reload();
+  }catch(e){
+    sessionStorage.removeItem('impersonationAdminEmail');
+    sessionStorage.removeItem('impersonationAdminName');
+    console.error('signInAsUser', e);
+    toast('Sign-in failed: ' + (e.message || 'unknown'));
+  }
+}
+
+// Detect that the current session was started via custom-token impersonation
+// (the minted token carries an impersonatedBy custom claim). Show a sticky
+// banner at the top with a one-click way to return to the admin account.
+async function checkImpersonationMode(){
+  try{
+    if(!auth.currentUser) return;
+    const tokenResult = await auth.currentUser.getIdTokenResult();
+    if(tokenResult.claims && tokenResult.claims.impersonatedBy){
+      showImpersonationBanner();
+    }
+  }catch(e){ /* not fatal — banner just won't appear */ }
+}
+
+function showImpersonationBanner(){
+  if(document.getElementById('impersonationBanner')) return;
+  const adminEmail = sessionStorage.getItem('impersonationAdminEmail') || 'an admin';
+  const banner = document.createElement('div');
+  banner.id = 'impersonationBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#0d0d10;padding:9px 14px;font-size:12px;font-weight:600;text-align:center;z-index:9999;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);flex-wrap:wrap';
+  banner.innerHTML = `
+    <span>🪪 Viewing as <strong>${escapeHtml(currentUser?.name || currentUser?.email || 'user')}</strong> · Signed in by ${escapeHtml(adminEmail)}</span>
+    <button onclick="returnToAdmin()" style="background:#0d0d10;color:#f59e0b;border:none;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Return to admin</button>
+  `;
+  document.body.appendChild(banner);
+  document.body.style.paddingTop = '38px';
+}
+
+async function returnToAdmin(){
+  sessionStorage.removeItem('impersonationAdminEmail');
+  sessionStorage.removeItem('impersonationAdminName');
+  try{ await auth.signOut(); }catch(e){}
+  location.reload();
 }
 
 async function toggleSuspendUser(uid, suspend){
@@ -10433,7 +10507,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-16-1';
+const APP_VERSION='2026-05-16-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;

@@ -222,5 +222,13 @@ service cloud.firestore {
       allow read, write: if request.auth != null
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+
+    // Impersonation Log — written by the impersonateUser Cloud Function via
+    // Admin SDK (which bypasses rules). Admins can read for audit.
+    match /impersonationLog/{logId} {
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if false;
+    }
   }
 }
