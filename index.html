@@ -2475,18 +2475,23 @@ function refreshSidebarAfterPermissionChange(notify){
     el.style.display = '';
   });
   applySidebarPermissions();
-  // Redirect if the current view is now restricted.
-  const viewToSection = {
-    dashboard:'dashboard', properties:'properties', monthly:'monthly',
-    team:'team', tasks:'tasks', meetings:'meetings',
-    maintenance:'maintenance', technician:'technician', available:'available'
-  };
+  // Build the view→section map dynamically from the sidebar so newly added
+  // nav items are covered automatically (was hardcoded to 9 sections, which
+  // meant revoked access to leads/callLog/dailyLog/etc didn't redirect).
+  const viewToSection = {};
+  document.querySelectorAll('.sidebar .nav-item[id^="nav-"]').forEach(btn=>{
+    const id = btn.id.replace(/^nav-/,'');
+    if(id) viewToSection[id] = id;
+  });
   const section = viewToSection[currentView];
   if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
     if(notify) toast('Your permissions have changed');
     showView('dashboard');
-  } else if(notify){
-    toast('Your access was updated');
+  } else {
+    // Still has access — re-render the current view so internal filters
+    // that depend on permissions/extras (e.g. Leads "see all" tabs) update.
+    if(currentView) showView(currentView);
+    if(notify) toast('Your access was updated');
   }
 }
 
@@ -8485,6 +8490,7 @@ async function renderTeam(){
     if(isAdmin() && !isMe){
       const suspendLabel = suspended ? 'Unsuspend' : 'Suspend';
       adminActions = `
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="openViewAsUser('${u.uid}')">👁 View as</button>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="toggleSuspendUser('${u.uid}',${!suspended})">${suspendLabel}</button>
         <button class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:10px" onclick="removeUser('${u.uid}')">Remove</button>
       `;
@@ -8499,6 +8505,113 @@ async function renderTeam(){
     </div>`;
   }).join('');
   updateInviteRoleDropdown();
+}
+
+// Admin tool: preview the sidebar + permissions a specific user would see,
+// based on their role doc. Read-only — does not switch session.
+async function openViewAsUser(uid){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  const users = await getUsers();
+  const target = users.find(u => u.uid === uid);
+  if(!target){ toast('User not found'); return; }
+
+  // Resolve permissions + extras + role name from the role doc.
+  let perms = {}, extras = {}, roleName = 'Unknown';
+  if((target.role || '').toLowerCase() === 'admin'){
+    perms = allPermsTrue();
+    extras = {seeAllLeads: true};
+    roleName = 'Admin (full access)';
+  } else if(target.roleId){
+    try{
+      const rd = await db.collection('roles').doc(target.roleId).get();
+      if(rd.exists){
+        const data = rd.data();
+        perms = data.permissions || {};
+        extras = data.extras || {};
+        roleName = data.name || 'Custom Role';
+      }
+    }catch(e){ console.warn('viewAs role load', e); }
+  } else if(target.role){
+    try{
+      const snap = await db.collection('roles').get();
+      const match = snap.docs.find(d => (d.data().name || '').toLowerCase() === (target.role||'').toLowerCase());
+      if(match){
+        const data = match.data();
+        perms = data.permissions || {};
+        extras = data.extras || {};
+        roleName = data.name + ' (resolved by name)';
+      } else {
+        roleName = target.role + ' (legacy fallback — role doc missing)';
+      }
+    }catch(e){}
+  }
+
+  // Scan the live sidebar so the table reflects every nav item currently in the app.
+  const sections = [];
+  document.querySelectorAll('.sidebar .nav-item[id^="nav-"]').forEach(btn=>{
+    const id = btn.id.replace(/^nav-/,'');
+    const label = (btn.textContent || id).trim().replace(/\s+/g,' ');
+    sections.push({id, label});
+  });
+
+  const isTargetAdmin = (target.role || '').toLowerCase() === 'admin';
+  const sectionRows = sections.map(s=>{
+    const p = perms[s.id];
+    const view = isTargetAdmin || (p && p.view);
+    const edit = isTargetAdmin || (p && p.edit);
+    return `<tr>
+      <td style="padding:5px 8px">${escapeHtml(s.label)}</td>
+      <td style="padding:5px 8px;text-align:center">${view ? '<span style="color:#4ade80;font-weight:600">✓ Visible</span>' : '<span style="color:var(--muted)">— Hidden</span>'}</td>
+      <td style="padding:5px 8px;text-align:center">${edit ? '<span style="color:#4ade80;font-weight:600">✓ Yes</span>' : '<span style="color:var(--muted)">— No</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const extrasEntries = Object.entries(extras).filter(([_,v]) => v === true);
+  const extrasList = extrasEntries.length
+    ? extrasEntries.map(([k]) => `<li style="margin-bottom:3px">${escapeHtml(k)}</li>`).join('')
+    : '<li style="color:var(--muted)">None</li>';
+
+  const visibleCount = sections.filter(s => isTargetAdmin || (perms[s.id] && perms[s.id].view)).length;
+
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'viewAsModal';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:560px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title">
+      <span>👁 What ${escapeHtml(target.name || target.email)} sees</span>
+      <button class="modal-close" onclick="document.getElementById('viewAsModal').remove()">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Role</div>
+        <div style="font-size:14px;font-weight:600;margin-top:3px">${escapeHtml(roleName)}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Sidebar items visible</div>
+        <div style="font-size:14px;font-weight:600;margin-top:3px">${visibleCount} of ${sections.length}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Sidebar Sections</div>
+    <div style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:18px">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead style="background:var(--surface2)">
+          <tr>
+            <th style="text-align:left;padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Section</th>
+            <th style="text-align:center;padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">View</th>
+            <th style="text-align:center;padding:8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Edit</th>
+          </tr>
+        </thead>
+        <tbody>${sectionRows}</tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Extra Permissions Enabled</div>
+    <ul style="margin:0 0 18px;padding-left:20px;font-size:13px">${extrasList}</ul>
+    <div style="font-size:11px;color:var(--muted);padding:10px;background:var(--surface2);border-radius:6px;line-height:1.5">
+      💡 Live preview from the user's role doc. Changes you make to their role appear here on next reload. The user's own browser will pick up role changes within seconds if their tab is open.
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
 }
 
 async function toggleSuspendUser(uid, suspend){
@@ -10320,7 +10433,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-13-3';
+const APP_VERSION='2026-05-16-1';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
