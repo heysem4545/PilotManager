@@ -56,6 +56,34 @@ exports.impersonateUser = onCall(async (request) => {
   return { token };
 });
 
+// Pair of impersonateUser: mints a token to return to the admin's own
+// session without re-entering a password. Validates via the impersonatedBy
+// custom claim that was placed on the impersonation token; only the user
+// the admin signed in as can call this.
+exports.returnToAdmin = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+  const claims = request.auth.token || {};
+  const adminUid = claims.impersonatedBy;
+  if (!adminUid) {
+    throw new HttpsError("permission-denied", "Not in impersonation mode");
+  }
+  const firestore = getFirestore();
+  const adminDoc = await firestore.collection("users").doc(adminUid).get();
+  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Original admin no longer exists or is no longer admin");
+  }
+  await firestore.collection("impersonationLog").add({
+    action: "return",
+    fromUid: request.auth.uid,
+    toUid: adminUid,
+    timestamp: new Date(),
+  });
+  const token = await getAuth().createCustomToken(adminUid);
+  return { token };
+});
+
 // Secrets (stored in Google Cloud Secret Manager, not in code)
 const TWILIO_SID = defineSecret("TWILIO_SID");
 const TWILIO_AUTH = defineSecret("TWILIO_AUTH");
