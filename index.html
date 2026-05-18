@@ -8697,6 +8697,23 @@ function showImpersonationBanner(){
 }
 
 async function returnToAdmin(){
+  // Seamless path: call returnToAdmin Cloud Function which mints a custom
+  // token for the admin so we can swap sessions without re-entering a password.
+  try{
+    const fn = firebase.functions().httpsCallable('returnToAdmin');
+    const res = await fn({});
+    const token = res && res.data && res.data.token;
+    if(!token) throw new Error('No token returned');
+    await auth.signOut();
+    await auth.signInWithCustomToken(token);
+    sessionStorage.removeItem('impersonationAdminEmail');
+    sessionStorage.removeItem('impersonationAdminName');
+    location.reload();
+    return;
+  }catch(e){
+    console.warn('returnToAdmin token swap failed, falling back to manual login', e);
+  }
+  // Fallback: sign out and force a fresh manual login.
   sessionStorage.removeItem('impersonationAdminEmail');
   sessionStorage.removeItem('impersonationAdminName');
   try{ await auth.signOut(); }catch(e){}
@@ -10522,7 +10539,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-18-1';
+const APP_VERSION='2026-05-18-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
