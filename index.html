@@ -2487,7 +2487,8 @@ function refreshSidebarAfterPermissionChange(notify){
   const section = viewToSection[currentView];
   if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
     if(notify) toast('Your permissions have changed');
-    showView('dashboard');
+    const fb = firstAllowedView();
+    if(fb) showView(fb);
   } else {
     // Still has access — re-render the current view so internal filters
     // that depend on permissions/extras (e.g. Leads "see all" tabs) update.
@@ -2901,6 +2902,20 @@ function getCurrentSectionId(){
 
 function canEdit(){
   return canEditSection(getCurrentSectionId());
+}
+
+// First sidebar section the current user is allowed to view. Used in place of
+// hardcoded 'dashboard' so users without dashboard access don't briefly see it.
+// Falls back to null if the user has no allowed sections.
+function firstAllowedView(){
+  if(isAdmin()) return 'dashboard';
+  if(canViewSection('dashboard')) return 'dashboard';
+  const navItems = document.querySelectorAll('.sidebar .nav-item[id^="nav-"]');
+  for(const btn of navItems){
+    const id = btn.id.replace(/^nav-/,'');
+    if(id && id !== 'dashboard' && canViewSection(id)) return id;
+  }
+  return null;
 }
 
 // True if the user is admin, or their role has the seeAllLeads extra enabled.
@@ -10507,7 +10522,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-16-2';
+const APP_VERSION='2026-05-18-1';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11421,7 +11436,11 @@ function showView(v){
   const section = viewToSection[v];
   if(section && !isAdmin() && currentPermissions && !canViewSection(section)){
     toast("You don\u2019t have access to this section");
-    if(v !== 'dashboard'){ showView('dashboard'); return; }
+    // Fall back to the user's first allowed section instead of always
+    // bouncing to dashboard (which may itself be denied).
+    const fb = firstAllowedView();
+    if(fb && fb !== v){ showView(fb); return; }
+    return; // No allowed section \u2014 refuse the navigation entirely
   }
   currentView = v;
   logSectionVisit(v);
@@ -11855,7 +11874,19 @@ function initApp(){
   if(localStorage.getItem('sidebarCollapsed')==='true') document.getElementById('appRoot').classList.add('sidebar-collapsed');
   renderCourtAlerts(); // update badge immediately
   renderInspectionAlerts();
-  showView('dashboard');
+  // Land on the first section this user is actually allowed to view so
+  // restricted users never see the dashboard render even briefly.
+  const initialView = firstAllowedView();
+  if(initialView){
+    showView(initialView);
+  } else {
+    document.getElementById('viewTitle').textContent = 'No access';
+    const dash = document.getElementById('dashView');
+    if(dash){
+      dash.style.display = 'block';
+      dash.innerHTML = '<div style="padding:60px;text-align:center;color:var(--muted)"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No sections available</div>Your role has no view permissions. Contact your admin to grant access.</div>';
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
