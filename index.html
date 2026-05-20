@@ -1038,6 +1038,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><path d="M10.5 10.5l3 3"/></svg>
         Inspection Tracker
       </button>
+      <button class="nav-item" id="nav-certificates" onclick="showView('certificates')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="8" rx="1"/><path d="M5 5.5h6M5 7.5h4"/><circle cx="8" cy="13" r="1.5"/><path d="M6.7 12.2l-1 2 1.5-.6 1 .9.5-2"/></svg>
+        Certificates
+      </button>
       <button class="nav-item" id="nav-dailyLog" onclick="showView('dailyLog')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v4"/><path d="M11 2v4"/><path d="M5 9h2M5 11h4"/></svg>
         Daily Log
@@ -1215,6 +1219,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="innovationView" style="display:none"></div>
       <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
+      <div id="certificatesView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
       <div id="backupsView" style="display:none"></div>
       <div id="constructionView" style="display:none"></div>
@@ -10539,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-18-2';
+const APP_VERSION='2026-05-19-1';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11036,6 +11041,139 @@ async function deleteMyPayment(id){
 }
 
 // ─────────────────────────────────────────────
+// PROPERTY CERTIFICATES (per-property compliance checklist)
+// ─────────────────────────────────────────────
+const CERT_TYPES = [
+  {key:'propertyTaxStatement', label:'Property Tax', icon:'🧾'},
+  {key:'leadCertificate',      label:'Lead Cert',    icon:'🛡'},
+  {key:'ohioCertificate',      label:'Ohio Cert',    icon:'🏛'},
+  {key:'localAgent',           label:'Local Agent',  icon:'👤'},
+  {key:'hvacCertificate',      label:'HVAC Cert',    icon:'🌡'},
+  {key:'utilityBills',         label:'Utility Bills',icon:'💡'}
+];
+let certificatesCache = {}; // {propertyId: {field: bool, ...}}
+let certificatesSearch = '';
+
+function setCertificatesSearch(v){
+  certificatesSearch = v;
+  renderCertificatesView();
+  setTimeout(()=>{
+    const input = document.getElementById('certificatesSearchInput');
+    if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  }, 0);
+}
+
+async function loadCertificates(){
+  try{
+    const snap = await db.collection('certificates').get();
+    certificatesCache = {};
+    snap.docs.forEach(d => { certificatesCache[d.id] = d.data() || {}; });
+  }catch(e){
+    console.error('loadCertificates', e);
+    certificatesCache = {};
+  }
+}
+
+async function renderCertificatesView(){
+  const el = document.getElementById('certificatesView');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadCertificates();
+
+  const allProps = (typeof properties !== 'undefined' && Array.isArray(properties))
+    ? [...properties].sort((a,b) => (a.addr||'').localeCompare(b.addr||''))
+    : [];
+
+  // Stats — completed count per cert type across all properties
+  const totals = {};
+  CERT_TYPES.forEach(c => totals[c.key] = 0);
+  allProps.forEach(p => {
+    const certs = certificatesCache[p.id] || {};
+    CERT_TYPES.forEach(c => { if(certs[c.key] === true) totals[c.key]++; });
+  });
+
+  // Apply search filter
+  const q = certificatesSearch.trim().toLowerCase();
+  const filteredProps = q ? allProps.filter(p => (p.addr||'').toLowerCase().includes(q)) : allProps;
+
+  const searchInput = `<input type="search" id="certificatesSearchInput" placeholder="🔍 Search address…" value="${escapeAttr(certificatesSearch)}" oninput="setCertificatesSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:240px;max-width:50vw">`;
+
+  let html = `<div class="table-card" style="padding:18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--muted)">
+        ${q ? `<strong style="color:var(--text)">${filteredProps.length}</strong> of ${allProps.length} match` : `<strong style="color:var(--text)">${allProps.length}</strong> properties`} · click any cell to toggle
+      </div>
+      <div style="flex:1"></div>
+      ${searchInput}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">
+      ${CERT_TYPES.map(c => `
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--accent)" data-cert-stat="${c.key}">${totals[c.key]}/${allProps.length}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px">${c.icon} ${escapeHtml(c.label)}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>Property Address</th>
+      ${CERT_TYPES.map(c => `<th style="text-align:center;font-size:11px">${c.icon} ${escapeHtml(c.label)}</th>`).join('')}
+      <th style="text-align:center;font-size:11px;width:60px">Done</th>
+    </tr></thead><tbody>`;
+
+  if(allProps.length === 0){
+    html += `<tr><td colspan="${CERT_TYPES.length + 2}" style="text-align:center;padding:32px;color:var(--muted)">No properties yet — add properties first to track their certificates.</td></tr>`;
+  } else if(filteredProps.length === 0){
+    html += `<tr><td colspan="${CERT_TYPES.length + 2}" style="text-align:center;padding:32px;color:var(--muted)">No properties match "${escapeHtml(certificatesSearch)}". Try a different search term.</td></tr>`;
+  } else {
+    filteredProps.forEach(p => {
+      const certs = certificatesCache[p.id] || {};
+      const doneCount = CERT_TYPES.filter(c => certs[c.key] === true).length;
+      const allDone = doneCount === CERT_TYPES.length;
+      const cellsHtml = CERT_TYPES.map(c => {
+        const checked = certs[c.key] === true;
+        return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleCertificate('${p.id}','${c.key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
+      }).join('');
+      html += `<tr ${allDone?'style="background:rgba(74,222,128,0.04)"':''}>
+        <td style="font-weight:500">${escapeHtml(p.addr||'')}</td>
+        ${cellsHtml}
+        <td style="text-align:center;font-family:var(--mono);font-size:11px;color:${allDone?'#4ade80':'var(--muted)'};font-weight:600">${doneCount}/${CERT_TYPES.length}</td>
+      </tr>`;
+    });
+  }
+
+  html += `</tbody></table></div></div>`;
+  el.innerHTML = html;
+}
+
+async function toggleCertificate(propertyId, certKey, checked){
+  try{
+    await db.collection('certificates').doc(propertyId).set({
+      [certKey]: checked,
+      updatedAt: new Date(),
+      updatedBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
+    }, {merge: true});
+    if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
+    const prev = certificatesCache[propertyId][certKey];
+    certificatesCache[propertyId][certKey] = checked;
+    // Update the stat counter in place to avoid a full re-render losing scroll.
+    const card = document.querySelector(`[data-cert-stat="${certKey}"]`);
+    if(card){
+      const parts = card.textContent.split('/');
+      let n = parseInt(parts[0], 10) || 0;
+      const total = parseInt(parts[1], 10) || 0;
+      if(checked && prev !== true) n++;
+      else if(!checked && prev === true) n--;
+      card.textContent = n + '/' + total;
+    }
+  }catch(e){
+    toast('Failed to save: ' + e.message);
+    renderCertificatesView();
+  }
+}
+
+// ─────────────────────────────────────────────
 // LEGAL CASES
 // ─────────────────────────────────────────────
 let legalCases = [];
@@ -11468,7 +11606,7 @@ function showView(v){
     team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', utility:'utilityView',
-    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -11501,7 +11639,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker', certificates:'Property Certificates',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
@@ -11556,6 +11694,7 @@ function showView(v){
   if(v==='leads') renderLeadsView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
+  if(v==='certificates') renderCertificatesView();
   if(v==='construction') renderConstructionView();
   if(v==='constProjects') renderConstProjectsView();
   if(v==='turnover') renderTurnoverView();
