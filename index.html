@@ -4633,7 +4633,7 @@ async function renderMonthlyMaintView(){
     ).join('');
 
   const filtered=monthlyMaintPerformer==='all'?visits:visits.filter(v=>(v.performedBy||'Unknown')===monthlyMaintPerformer);
-  filtered.sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  filtered.sort((a,b)=>(a.addr||'').localeCompare(b.addr||'', undefined, {numeric:true, sensitivity:'base'}));
 
   const filteredCost=filtered.reduce((s,v)=>s+(parseFloat(v.cost)||0),0);
 
@@ -5065,7 +5065,7 @@ async function renderMaintenanceSummary(){
   const rows = properties.map(p => {
     const a = agg[p.id] || {total:0, byType:{}};
     return {id:p.id, addr:p.addr||'', total:a.total, byType:a.byType};
-  }).sort((x,y)=> y.total - x.total || (x.addr||'').localeCompare(y.addr||''));
+  }).sort((x,y)=> y.total - x.total || (x.addr||'').localeCompare(y.addr||'', undefined, {numeric:true, sensitivity:'base'}));
 
   const totalVisits = rows.reduce((s,r)=>s+r.total, 0);
   const propsWithVisits = rows.filter(r=>r.total>0).length;
@@ -10544,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-19-2';
+const APP_VERSION='2026-05-19-3';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11089,7 +11089,7 @@ async function renderCertificatesView(){
   await loadCertificates();
 
   const allProps = (typeof properties !== 'undefined' && Array.isArray(properties))
-    ? [...properties].sort((a,b) => (a.addr||'').localeCompare(b.addr||''))
+    ? [...properties].sort((a,b) => (a.addr||'').localeCompare(b.addr||'', undefined, {numeric:true, sensitivity:'base'}))
     : [];
 
   // Stats — completed count per cert type across all properties
@@ -13391,7 +13391,7 @@ async function renderCallLogView(skipLoad){
       return `<tr>
         <td><input type="date" value="${c.date||''}" style="${is};width:125px" onchange="logCallChange('${c.id}','date',this.value,'${escapeAttr(c.date||'')}');updateCallLogField('${c.id}','date',this.value)"></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','direction',this.value,'${escapeAttr(c.direction||'')}');updateCallLogField('${c.id}','direction',this.value)">${dirOpts}</select></td>
-        <td><input type="text" list="clPropDl_${c.id}" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"><datalist id="clPropDl_${c.id}">${[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||'')).map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist></td>
+        <td><input type="text" list="clPropDl_${c.id}" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"><datalist id="clPropDl_${c.id}">${[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||'', undefined, {numeric:true, sensitivity:'base'})).map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','reason',this.value,'${escapeAttr(c.reason||'')}');updateCallLogField('${c.id}','reason',this.value)"><option value="">—</option>${reasonOpts}</select></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','status',this.value,'${escapeAttr(c.status||'')}');updateCallLogField('${c.id}','status',this.value)">${statusOpts2}</select></td>
         <td><input type="text" value="${escapeAttr(c.name||'')}" placeholder="Name" style="${is};width:100px" onblur="logCallChange('${c.id}','name',this.value,'${escapeAttr(c.name||'')}');updateCallLogField('${c.id}','name',this.value)"></td>
@@ -13547,7 +13547,7 @@ function populateCallLogPropertyDropdown(selectedId){
   const input = document.getElementById('cl_property');
   const list = document.getElementById('cl_propertyList');
   if(!input || !list) return;
-  const sorted = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const sorted = [...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||'', undefined, {numeric:true, sensitivity:'base'}));
   list.innerHTML = sorted.map(p=>{
     const addr = p.addr || '(no address)';
     return `<option value="${escapeAttr(addr)}">`;
@@ -14834,7 +14834,7 @@ function renderConstructionMonthly(el, tabs){
 
 function openMutualExpense(){
   const list=document.getElementById('mutualPropList');
-  const sorted=[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const sorted=[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||'', undefined, {numeric:true, sensitivity:'base'}));
   list.innerHTML=sorted.map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;cursor:pointer;font-size:12px;transition:background .1s" onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
     <input type="checkbox" class="mutual-prop-check" value="${p.id}" data-addr="${escapeAttr(p.addr||'')}" onchange="updateMutualPreview()" style="accent-color:var(--accent);width:14px;height:14px">
     <span style="color:var(--text)">${escapeHtml(p.addr||'(no address)')}</span>
