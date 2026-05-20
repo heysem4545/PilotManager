@@ -10544,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-19-1';
+const APP_VERSION='2026-05-19-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11051,8 +11051,16 @@ const CERT_TYPES = [
   {key:'hvacCertificate',      label:'HVAC Cert',    icon:'🌡'},
   {key:'utilityBills',         label:'Utility Bills',icon:'💡'}
 ];
-let certificatesCache = {}; // {propertyId: {field: bool, ...}}
+const CERT_DEFAULT_DUE_DATE = '2026-03-01'; // shown if a property has no saved dueDate
+let certificatesCache = {}; // {propertyId: {field: bool|string, ...}}
 let certificatesSearch = '';
+
+function _certIsPast(dateStr){
+  if(!dateStr) return false;
+  // Compare at end-of-day so a due date that is *today* is not yet "past".
+  const d = new Date(dateStr + 'T23:59:59');
+  return !isNaN(d) && d < new Date();
+}
 
 function setCertificatesSearch(v){
   certificatesSearch = v;
@@ -11117,27 +11125,43 @@ async function renderCertificatesView(){
     </div>
 
     <div class="tbl-wrap"><table><thead><tr>
+      <th style="text-align:center;font-size:11px">📅 Due Date</th>
       <th>Property Address</th>
+      <th style="text-align:center;font-size:11px">📤 Summit Date</th>
       ${CERT_TYPES.map(c => `<th style="text-align:center;font-size:11px">${c.icon} ${escapeHtml(c.label)}</th>`).join('')}
+      <th style="text-align:center;font-size:11px">📝 Update</th>
       <th style="text-align:center;font-size:11px;width:60px">Done</th>
     </tr></thead><tbody>`;
 
+  const totalCols = CERT_TYPES.length + 5; // dueDate + addr + summitDate + N certs + update + done
   if(allProps.length === 0){
-    html += `<tr><td colspan="${CERT_TYPES.length + 2}" style="text-align:center;padding:32px;color:var(--muted)">No properties yet — add properties first to track their certificates.</td></tr>`;
+    html += `<tr><td colspan="${totalCols}" style="text-align:center;padding:32px;color:var(--muted)">No properties yet — add properties first to track their certificates.</td></tr>`;
   } else if(filteredProps.length === 0){
-    html += `<tr><td colspan="${CERT_TYPES.length + 2}" style="text-align:center;padding:32px;color:var(--muted)">No properties match "${escapeHtml(certificatesSearch)}". Try a different search term.</td></tr>`;
+    html += `<tr><td colspan="${totalCols}" style="text-align:center;padding:32px;color:var(--muted)">No properties match "${escapeHtml(certificatesSearch)}". Try a different search term.</td></tr>`;
   } else {
     filteredProps.forEach(p => {
       const certs = certificatesCache[p.id] || {};
       const doneCount = CERT_TYPES.filter(c => certs[c.key] === true).length;
       const allDone = doneCount === CERT_TYPES.length;
+      const dueDateVal = certs.dueDate || CERT_DEFAULT_DUE_DATE;
+      const duePast = _certIsPast(dueDateVal);
+      const summitDateVal = certs.summitDate || '';
+      const updateVal = certs.updateNote || '';
+      const dateInputBase = 'font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);font-family:var(--mono);cursor:pointer';
+      const dueStyle = `${dateInputBase};color:${duePast?'#ef4444':'var(--text)'};font-weight:${duePast?'700':'normal'};border-color:${duePast?'rgba(239,68,68,0.45)':'var(--border2)'}`;
+      const dueInput = `<input type="date" id="cert-due-${p.id}" value="${dueDateVal}" onchange="updateCertField('${p.id}','dueDate',this.value)" style="${dueStyle}">`;
+      const summitInput = `<input type="date" value="${summitDateVal}" onchange="updateCertField('${p.id}','summitDate',this.value)" style="${dateInputBase};color:var(--text)">`;
+      const updateInput = `<input type="text" value="${escapeAttr(updateVal)}" placeholder="Update…" onblur="updateCertField('${p.id}','updateNote',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:140px">`;
       const cellsHtml = CERT_TYPES.map(c => {
         const checked = certs[c.key] === true;
         return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleCertificate('${p.id}','${c.key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
       }).join('');
       html += `<tr ${allDone?'style="background:rgba(74,222,128,0.04)"':''}>
+        <td style="text-align:center">${dueInput}</td>
         <td style="font-weight:500">${escapeHtml(p.addr||'')}</td>
+        <td style="text-align:center">${summitInput}</td>
         ${cellsHtml}
+        <td style="text-align:center">${updateInput}</td>
         <td style="text-align:center;font-family:var(--mono);font-size:11px;color:${allDone?'#4ade80':'var(--muted)'};font-weight:600">${doneCount}/${CERT_TYPES.length}</td>
       </tr>`;
     });
@@ -11170,6 +11194,32 @@ async function toggleCertificate(propertyId, certKey, checked){
   }catch(e){
     toast('Failed to save: ' + e.message);
     renderCertificatesView();
+  }
+}
+
+// Generic per-property field update for certificates (dueDate, summitDate,
+// updateNote). Updates the cache and, for dueDate, re-applies the red/normal
+// styling in place without a full table re-render.
+async function updateCertField(propertyId, field, value){
+  try{
+    await db.collection('certificates').doc(propertyId).set({
+      [field]: value,
+      updatedAt: new Date(),
+      updatedBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
+    }, {merge: true});
+    if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
+    certificatesCache[propertyId][field] = value;
+    if(field === 'dueDate'){
+      const input = document.getElementById('cert-due-' + propertyId);
+      if(input){
+        const past = _certIsPast(value);
+        input.style.color = past ? '#ef4444' : 'var(--text)';
+        input.style.fontWeight = past ? '700' : 'normal';
+        input.style.borderColor = past ? 'rgba(239,68,68,0.45)' : 'var(--border2)';
+      }
+    }
+  }catch(e){
+    toast('Failed to save: ' + e.message);
   }
 }
 
