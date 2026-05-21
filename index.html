@@ -3615,31 +3615,49 @@ function editAnnouncement(){
   const text=prompt('Enter announcement for your team:',current);
   if(text===null) return;
   localStorage.setItem('dashAnnouncement',text);
-  // Also save to Firestore so all users see it
   db.collection('settings').doc('announcement').set({text,updatedAt:new Date()}).then(()=>{
     toast('Announcement updated');
-    const display = text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
-    ['dashAnnouncementText','leasingAnnouncementText'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.innerHTML = display;
-    });
+    const el=document.getElementById('dashAnnouncementText');
+    if(el) el.innerHTML=text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
     if(currentView === 'dashboard' && typeof renderDonut === 'function') renderDonut();
   }).catch(e=>toast('Error: '+e.message));
 }
 
-// Load announcement from Firestore on render. Updates every visible
-// announcement element (dashboard + leasing dashboard).
+function editLeasingAnnouncement(){
+  const current=localStorage.getItem('leasingAnnouncement')||'';
+  const text=prompt('Enter Leasing Dashboard announcement:',current);
+  if(text===null) return;
+  localStorage.setItem('leasingAnnouncement',text);
+  db.collection('settings').doc('leasingAnnouncement').set({text,updatedAt:new Date()}).then(()=>{
+    toast('Leasing announcement updated');
+    const el=document.getElementById('leasingAnnouncementText');
+    if(el) el.innerHTML=text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
+  }).catch(e=>toast('Error: '+e.message));
+}
+
+// Load main-dashboard announcement from Firestore.
 async function loadAnnouncement(){
   try{
     const doc=await db.collection('settings').doc('announcement').get();
     if(doc.exists){
       const text=doc.data().text||'';
       localStorage.setItem('dashAnnouncement',text);
-      const display = text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
-      ['dashAnnouncementText','leasingAnnouncementText'].forEach(id=>{
-        const el = document.getElementById(id);
-        if(el) el.innerHTML = display;
-      });
+      const el=document.getElementById('dashAnnouncementText');
+      if(el) el.innerHTML=text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
+    }
+  }catch(e){}
+}
+
+// Load Leasing-Dashboard announcement — separate Firestore doc so it never
+// overwrites the main dashboard's announcement.
+async function loadLeasingAnnouncement(){
+  try{
+    const doc=await db.collection('settings').doc('leasingAnnouncement').get();
+    if(doc.exists){
+      const text=doc.data().text||'';
+      localStorage.setItem('leasingAnnouncement',text);
+      const el=document.getElementById('leasingAnnouncementText');
+      if(el) el.innerHTML=text?escapeHtml(text):'<span style="color:var(--muted2)">No announcement</span>';
     }
   }catch(e){}
 }
@@ -10559,7 +10577,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-13';
+const APP_VERSION='2026-05-20-14';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12421,13 +12439,13 @@ async function renderLeasingDashboardView(opts){
 
   const announcementCard = includeAnnouncement ? `<div style="background:linear-gradient(135deg,rgba(201,245,99,0.08),rgba(106,180,245,0.06));border:2px solid rgba(201,245,99,0.25);border-radius:14px;padding:18px 22px;margin-bottom:18px;position:relative;overflow:hidden">
     <div style="position:absolute;top:-15px;right:-15px;font-size:70px;opacity:0.05">📢</div>
-    <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📢 Announcement</div>
-    <div id="leasingAnnouncementText" style="font-size:14px;color:var(--text);line-height:1.7;min-height:36px;font-weight:500">${(()=>{const saved=localStorage.getItem('dashAnnouncement');return saved?escapeHtml(saved):'<span style="color:var(--muted2)">No announcement</span>';})()}</div>
-    ${isAdmin()?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="editAnnouncement()">✏ Edit</button>`:''}
+    <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">📢 Leasing Announcement</div>
+    <div id="leasingAnnouncementText" style="font-size:14px;color:var(--text);line-height:1.7;min-height:36px;font-weight:500">${(()=>{const saved=localStorage.getItem('leasingAnnouncement');return saved?escapeHtml(saved):'<span style="color:var(--muted2)">No announcement</span>';})()}</div>
+    ${isAdmin()?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="editLeasingAnnouncement()">✏ Edit</button>`:''}
   </div>` : '';
 
   el.innerHTML = announcementCard + occupancyCard + statsGrid + sectionsHtml;
-  if(includeAnnouncement) loadAnnouncement();
+  if(includeAnnouncement) loadLeasingAnnouncement();
 }
 
 function renderAvailableView(){
