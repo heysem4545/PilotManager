@@ -10544,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-1';
+const APP_VERSION='2026-05-20-2';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11054,6 +11054,19 @@ const CERT_TYPES = [
 const CERT_DEFAULT_DUE_DATE = '2026-03-01'; // shown if a property has no saved dueDate
 let certificatesCache = {}; // {propertyId: {field: bool|string, ...}}
 let certificatesSearch = '';
+let certificatesTab = 'all'; // 'all' = master matrix, 'lead' = lead-cert focused view
+
+function switchCertificatesTab(tab){
+  certificatesTab = tab;
+  renderCertificatesView();
+}
+
+function _certTabBar(){
+  return `<div class="ftabs" style="margin-bottom:14px;flex-wrap:wrap">
+    <button class="ftab ${certificatesTab==='all'?'active':''}" onclick="switchCertificatesTab('all')">📋 All Certificates</button>
+    <button class="ftab ${certificatesTab==='lead'?'active':''}" onclick="switchCertificatesTab('lead')">🛡 Lead Certificate</button>
+  </div>`;
+}
 
 function _certIsPast(dateStr){
   if(!dateStr) return false;
@@ -11088,6 +11101,11 @@ async function renderCertificatesView(){
   el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
   await loadCertificates();
 
+  if(certificatesTab === 'lead'){
+    renderCertificatesLeadTab(el);
+    return;
+  }
+
   const allProps = (typeof properties !== 'undefined' && Array.isArray(properties))
     ? [...properties].sort((a,b) => (a.rowIndex||0)-(b.rowIndex||0))
     : [];
@@ -11107,6 +11125,7 @@ async function renderCertificatesView(){
   const searchInput = `<input type="search" id="certificatesSearchInput" placeholder="🔍 Search address…" value="${escapeAttr(certificatesSearch)}" oninput="setCertificatesSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:240px;max-width:50vw">`;
 
   let html = `<div class="table-card" style="padding:18px">
+    ${_certTabBar()}
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       ${searchInput}
       <div style="font-size:12px;color:var(--muted)">
@@ -11197,29 +11216,119 @@ async function toggleCertificate(propertyId, certKey, checked){
 }
 
 // Generic per-property field update for certificates (dueDate, summitDate,
-// updateNote). Updates the cache and, for dueDate, re-applies the red/normal
-// styling in place without a full table re-render.
+// updateNote, leadExpireDate, leadSummitDate, leadRepresentative, leadAmountPaid).
+// Updates the local cache synchronously *first* so any follow-up re-render
+// sees the new value, then persists to Firestore. Date fields also re-color
+// in place to avoid a full table re-render.
 async function updateCertField(propertyId, field, value){
+  if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
+  certificatesCache[propertyId][field] = value;
+  if(field === 'dueDate' || field === 'leadExpireDate'){
+    const inputId = field === 'dueDate'
+      ? 'cert-due-' + propertyId
+      : 'cert-lead-expire-' + propertyId;
+    const input = document.getElementById(inputId);
+    if(input){
+      const past = _certIsPast(value);
+      input.style.color = past ? '#ef4444' : 'var(--text)';
+      input.style.fontWeight = past ? '700' : 'normal';
+      input.style.borderColor = past ? 'rgba(239,68,68,0.45)' : 'var(--border2)';
+    }
+  }
   try{
     await db.collection('certificates').doc(propertyId).set({
       [field]: value,
       updatedAt: new Date(),
       updatedBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
     }, {merge: true});
-    if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
-    certificatesCache[propertyId][field] = value;
-    if(field === 'dueDate'){
-      const input = document.getElementById('cert-due-' + propertyId);
-      if(input){
-        const past = _certIsPast(value);
-        input.style.color = past ? '#ef4444' : 'var(--text)';
-        input.style.fontWeight = past ? '700' : 'normal';
-        input.style.borderColor = past ? 'rgba(239,68,68,0.45)' : 'var(--border2)';
-      }
-    }
   }catch(e){
     toast('Failed to save: ' + e.message);
   }
+}
+
+// Lead Certificate tab: dedicated tracking with expire date, summit date,
+// representative name, and amount paid per property.
+function renderCertificatesLeadTab(el){
+  const allProps = (typeof properties !== 'undefined' && Array.isArray(properties))
+    ? [...properties].sort((a,b) => (a.rowIndex||0)-(b.rowIndex||0))
+    : [];
+
+  // Stats across all properties (not just filtered)
+  let totalTracked = 0, totalExpired = 0, totalPaid = 0;
+  allProps.forEach(p => {
+    const certs = certificatesCache[p.id] || {};
+    if(certs.leadExpireDate) totalTracked++;
+    if(certs.leadExpireDate && _certIsPast(certs.leadExpireDate)) totalExpired++;
+    const paid = parseFloat(String(certs.leadAmountPaid || '').replace(/[^\d.]/g, '')) || 0;
+    totalPaid += paid;
+  });
+
+  const q = certificatesSearch.trim().toLowerCase();
+  const filteredProps = q ? allProps.filter(p => (p.addr||'').toLowerCase().includes(q)) : allProps;
+
+  const searchInput = `<input type="search" id="certificatesSearchInput" placeholder="🔍 Search address…" value="${escapeAttr(certificatesSearch)}" oninput="setCertificatesSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:240px;max-width:50vw">`;
+
+  let html = `<div class="table-card" style="padding:18px">
+    ${_certTabBar()}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      ${searchInput}
+      <div style="font-size:12px;color:var(--muted)">
+        ${q ? `<strong style="color:var(--text)">${filteredProps.length}</strong> of ${allProps.length} match` : `<strong style="color:var(--text)">${allProps.length}</strong> properties`}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px">
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;border-left:3px solid var(--accent)">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalTracked}/${allProps.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px">🛡 Tracked</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;border-left:3px solid #ef4444">
+        <div style="font-size:22px;font-weight:700;color:#ef4444">${totalExpired}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px">⚠ Expired</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center;border-left:3px solid #4ade80">
+        <div style="font-size:22px;font-weight:700;color:#4ade80">$${totalPaid.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px">💰 Total Paid</div>
+      </div>
+    </div>
+
+    <div class="tbl-wrap"><table><thead><tr>
+      <th style="text-align:center;font-size:11px">📅 Expire Date</th>
+      <th>Property Address</th>
+      <th style="text-align:center;font-size:11px">📤 Summit Date</th>
+      <th style="text-align:center;font-size:11px">👤 Representative</th>
+      <th style="text-align:center;font-size:11px">💰 Amount Paid</th>
+    </tr></thead><tbody>`;
+
+  if(allProps.length === 0){
+    html += `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No properties yet — add properties first.</td></tr>`;
+  } else if(filteredProps.length === 0){
+    html += `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No properties match "${escapeHtml(certificatesSearch)}". Try a different search term.</td></tr>`;
+  } else {
+    filteredProps.forEach(p => {
+      const certs = certificatesCache[p.id] || {};
+      const expireVal = certs.leadExpireDate || '';
+      const expirePast = expireVal && _certIsPast(expireVal);
+      const summitVal = certs.leadSummitDate || '';
+      const repVal = certs.leadRepresentative || '';
+      const paidVal = certs.leadAmountPaid || '';
+      const dateBase = 'font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);font-family:var(--mono);cursor:pointer';
+      const expireStyle = `${dateBase};color:${expirePast?'#ef4444':'var(--text)'};font-weight:${expirePast?'700':'normal'};border-color:${expirePast?'rgba(239,68,68,0.45)':'var(--border2)'}`;
+      const expireInput = `<input type="date" id="cert-lead-expire-${p.id}" value="${expireVal}" onchange="updateCertField('${p.id}','leadExpireDate',this.value);renderCertificatesView()" style="${expireStyle}">`;
+      const summitInput = `<input type="date" value="${summitVal}" onchange="updateCertField('${p.id}','leadSummitDate',this.value)" style="${dateBase};color:var(--text)">`;
+      const repInput = `<input type="text" value="${escapeAttr(repVal)}" placeholder="Name…" onblur="updateCertField('${p.id}','leadRepresentative',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:140px">`;
+      const paidInput = `<input type="text" value="${escapeAttr(paidVal)}" placeholder="$0" onblur="updateCertField('${p.id}','leadAmountPaid',this.value);renderCertificatesView()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);width:110px;text-align:right">`;
+      html += `<tr>
+        <td style="text-align:center">${expireInput}</td>
+        <td style="font-weight:500">${escapeHtml(p.addr||'')}</td>
+        <td style="text-align:center">${summitInput}</td>
+        <td style="text-align:center">${repInput}</td>
+        <td style="text-align:center">${paidInput}</td>
+      </tr>`;
+    });
+  }
+  html += `</tbody></table></div></div>`;
+  el.innerHTML = html;
 }
 
 // ─────────────────────────────────────────────
