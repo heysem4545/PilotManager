@@ -954,6 +954,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
         Dashboard
       </button>
+      <button class="nav-item" id="nav-leasingDashboard" onclick="showView('leasingDashboard')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="6" rx="1"/><rect x="9" y="2" width="5" height="3" rx="1"/><rect x="2" y="10" width="5" height="4" rx="1"/><rect x="9" y="7" width="5" height="7" rx="1"/></svg>
+        Leasing Dashboard
+      </button>
       <button class="nav-item" id="nav-properties" onclick="showView('properties')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z"/></svg>
         All Properties
@@ -1115,10 +1119,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <div id="collectionDonuts" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
         <div id="bonusCardsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:16px"></div>
         <div class="metrics" id="metricsGrid"></div>
-        <div style="margin:28px 0 14px;padding-top:18px;border-top:1px solid var(--border)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">🏢 Leasing Dashboard</div>
-        </div>
-        <div id="leasingDashboardEmbed"></div>
       </div>
 
 
@@ -1216,6 +1216,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="noticesView" style="display:none"></div>
       <div id="leadsView" style="display:none"></div>
       <div id="availableView" style="display:none"></div>
+      <div id="leasingDashboardView" style="display:none"></div>
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
       <div id="dailyLogView" style="display:none"></div>
@@ -10558,7 +10559,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-12';
+const APP_VERSION='2026-05-20-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11893,7 +11894,7 @@ function showView(v){
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
     team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
-    leads:'leadsView', available:'availableView', utility:'utilityView',
+    leads:'leadsView', available:'availableView', leasingDashboard:'leasingDashboardView', utility:'utilityView',
     tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
@@ -11925,7 +11926,7 @@ function showView(v){
     team:'Team Management', activity:'Activity Tracker', myPayments:'My Payments',
     tasks:'Task Management', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
-    leads:'Leads',
+    leads:'Leads', leasingDashboard:'Leasing Dashboard',
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker', certificates:'Property Certificates',
     callLog:'Call Log', backups:'Backups',
@@ -11957,9 +11958,6 @@ function showView(v){
     renderMonthBar();
     renderMetrics();
           renderDonut();
-    // Embed the Leasing Dashboard at the bottom of the main dashboard.
-    // Skip its own announcement card because the main dashboard already has one.
-    renderLeasingDashboardView({targetId:'leasingDashboardEmbed', includeAnnouncement:false});
   }
   if(v==='collection') renderCollectionPage();
   if(v==='properties'){
@@ -11983,6 +11981,7 @@ function showView(v){
   if(v==='tenantLease') renderTenantLeaseView();
   if(v==='available') renderAvailableView();
   if(v==='leads') renderLeadsView();
+  if(v==='leasingDashboard') renderLeasingDashboardView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
   if(v==='certificates') renderCertificatesView();
