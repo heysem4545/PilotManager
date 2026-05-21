@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 
 <style>
 :root {
@@ -10544,7 +10545,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-3';
+const APP_VERSION='2026-05-20-4';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11145,13 +11146,14 @@ async function renderCertificatesView(){
     <div class="tbl-wrap"><table><thead><tr>
       <th style="text-align:center;font-size:11px">📅 Due Date</th>
       <th>Property Address</th>
+      <th style="text-align:center;font-size:11px">📎 PDF</th>
       <th style="text-align:center;font-size:11px">📤 Summit Date</th>
       ${CERT_TYPES.map(c => `<th style="text-align:center;font-size:11px">${c.icon} ${escapeHtml(c.label)}</th>`).join('')}
       <th style="text-align:center;font-size:11px">📝 Update</th>
       <th style="text-align:center;font-size:11px;width:60px">Done</th>
     </tr></thead><tbody>`;
 
-  const totalCols = CERT_TYPES.length + 5; // dueDate + addr + summitDate + N certs + update + done
+  const totalCols = CERT_TYPES.length + 6; // dueDate + addr + pdf + summitDate + N certs + update + done
   if(allProps.length === 0){
     html += `<tr><td colspan="${totalCols}" style="text-align:center;padding:32px;color:var(--muted)">No properties yet — add properties first to track their certificates.</td></tr>`;
   } else if(filteredProps.length === 0){
@@ -11174,9 +11176,11 @@ async function renderCertificatesView(){
         const checked = certs[c.key] === true;
         return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleCertificate('${p.id}','${c.key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
       }).join('');
+      const pdfCell = _certPdfCellHtml(p.id, certs);
       html += `<tr ${allDone?'style="background:rgba(74,222,128,0.04)"':''}>
         <td style="text-align:center">${dueInput}</td>
         <td style="font-weight:500">${escapeHtml(p.addr||'')}</td>
+        <td style="text-align:center">${pdfCell}</td>
         <td style="text-align:center">${summitInput}</td>
         ${cellsHtml}
         <td style="text-align:center">${updateInput}</td>
@@ -11243,6 +11247,103 @@ async function updateCertField(propertyId, field, value){
     }, {merge: true});
   }catch(e){
     toast('Failed to save: ' + e.message);
+  }
+}
+
+// Build the PDF cell HTML — either a drop zone (no file) or a file pill
+// (file attached) with view + delete buttons. Drag-and-drop is wired via
+// inline handlers so it works whether or not the cell was created in this
+// render or a prior one.
+function _certPdfCellHtml(propertyId, certs){
+  const dropBase = 'display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:11px;padding:4px 8px;border-radius:5px;cursor:pointer;min-width:90px;transition:background .15s,border-color .15s';
+  if(certs && certs.rentRegPdfUrl){
+    const name = certs.rentRegPdfName || 'rent-reg.pdf';
+    const shortName = name.length > 18 ? name.slice(0,15) + '…' : name;
+    return `<div style="display:inline-flex;align-items:center;gap:6px">
+      <a href="${escapeAttr(certs.rentRegPdfUrl)}" target="_blank" rel="noopener" title="${escapeAttr(name)}" style="font-size:11px;color:var(--accent);text-decoration:none;border:1px solid var(--border2);padding:4px 8px;border-radius:5px;background:var(--surface2)">📄 ${escapeHtml(shortName)}</a>
+      <button onclick="deleteRentRegPdf('${propertyId}')" title="Remove PDF" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px">🗑</button>
+    </div>`;
+  }
+  return `<label for="pdf-input-${propertyId}" ondragover="_pdfDragOver(event)" ondragleave="_pdfDragLeave(event)" ondrop="_pdfDrop(event,'${propertyId}')" style="${dropBase};border:1.5px dashed var(--border2);color:var(--muted);background:var(--surface2)" title="Drop a PDF here, or click to pick one">+ Drop PDF</label>
+    <input type="file" id="pdf-input-${propertyId}" accept="application/pdf,.pdf" onchange="_pdfPicked(event,'${propertyId}')" style="display:none">`;
+}
+
+function _pdfDragOver(e){
+  e.preventDefault();
+  e.currentTarget.style.background = 'rgba(201,245,99,0.12)';
+  e.currentTarget.style.borderColor = 'var(--accent)';
+  e.currentTarget.style.color = 'var(--accent)';
+}
+function _pdfDragLeave(e){
+  e.currentTarget.style.background = 'var(--surface2)';
+  e.currentTarget.style.borderColor = 'var(--border2)';
+  e.currentTarget.style.color = 'var(--muted)';
+}
+async function _pdfDrop(e, propertyId){
+  e.preventDefault();
+  _pdfDragLeave(e);
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  await _uploadRentRegPdf(file, propertyId);
+}
+async function _pdfPicked(e, propertyId){
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // allow re-picking the same file later
+  await _uploadRentRegPdf(file, propertyId);
+}
+
+async function _uploadRentRegPdf(file, propertyId){
+  if(!file){ return; }
+  const isPdf = (file.type && file.type.includes('pdf')) || /\.pdf$/i.test(file.name);
+  if(!isPdf){ toast('Only PDF files are allowed'); return; }
+  if(file.size > 25 * 1024 * 1024){ toast('PDF is too large (max 25 MB)'); return; }
+  try{
+    toast('Uploading PDF…');
+    // Use a deterministic path per property so re-uploads replace the previous file.
+    // Append timestamp for cache-busting in the download URL.
+    const path = `rentRegistrations/${propertyId}.pdf`;
+    const ref = firebase.storage().ref(path);
+    await ref.put(file, {contentType: 'application/pdf'});
+    const url = await ref.getDownloadURL();
+    const updates = {
+      rentRegPdfUrl: url,
+      rentRegPdfName: file.name,
+      rentRegPdfPath: path,
+      updatedAt: new Date(),
+      updatedBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
+    };
+    await db.collection('certificates').doc(propertyId).set(updates, {merge: true});
+    if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
+    Object.assign(certificatesCache[propertyId], updates);
+    toast('PDF saved');
+    renderCertificatesView();
+  }catch(e){
+    console.error('uploadRentRegPdf', e);
+    toast('Upload failed: ' + (e.message || 'unknown error'));
+  }
+}
+
+async function deleteRentRegPdf(propertyId){
+  if(!confirm('Remove this PDF? The file will be deleted from storage.')) return;
+  const certs = certificatesCache[propertyId] || {};
+  try{
+    if(certs.rentRegPdfPath){
+      try{ await firebase.storage().ref(certs.rentRegPdfPath).delete(); }
+      catch(err){ console.warn('storage delete', err); /* non-fatal */ }
+    }
+    const updates = {
+      rentRegPdfUrl: '',
+      rentRegPdfName: '',
+      rentRegPdfPath: '',
+      updatedAt: new Date(),
+      updatedBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
+    };
+    await db.collection('certificates').doc(propertyId).set(updates, {merge: true});
+    if(!certificatesCache[propertyId]) certificatesCache[propertyId] = {};
+    Object.assign(certificatesCache[propertyId], updates);
+    toast('PDF removed');
+    renderCertificatesView();
+  }catch(e){
+    toast('Delete failed: ' + (e.message || 'unknown'));
   }
 }
 

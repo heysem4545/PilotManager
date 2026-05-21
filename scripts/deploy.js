@@ -35,11 +35,15 @@ if (dirty) {
 
 run('git push origin main');
 
-// If the most recent commit touched firestore.rules, deploy them.
+// If the most recent commit touched firestore.rules or storage.rules, deploy them.
 const lastFiles = out('git log -1 --name-only --format=').split('\n').filter(Boolean);
 if (lastFiles.includes('firestore.rules')) {
   console.log('→ firestore.rules changed — deploying rules');
   run('firebase deploy --only firestore:rules');
+}
+if (lastFiles.includes('storage.rules')) {
+  console.log('→ storage.rules changed — deploying rules');
+  run('firebase deploy --only storage');
 }
 
 console.log('✓ Deploy complete');
