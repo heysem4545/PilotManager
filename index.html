@@ -10544,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-2';
+const APP_VERSION='2026-05-20-3';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11063,7 +11063,7 @@ function switchCertificatesTab(tab){
 
 function _certTabBar(){
   return `<div class="ftabs" style="margin-bottom:14px;flex-wrap:wrap">
-    <button class="ftab ${certificatesTab==='all'?'active':''}" onclick="switchCertificatesTab('all')">📋 All Certificates</button>
+    <button class="ftab ${certificatesTab==='all'?'active':''}" onclick="switchCertificatesTab('all')">📋 Rent Registration</button>
     <button class="ftab ${certificatesTab==='lead'?'active':''}" onclick="switchCertificatesTab('lead')">🛡 Lead Certificate</button>
   </div>`;
 }
