@@ -27,7 +27,9 @@ const parts = current.match(/^(\d{4}-\d{2}-\d{2})(?:-(\d+))?$/);
 const currentDate = parts ? parts[1] : null;
 const currentNum = parts && parts[2] ? parseInt(parts[2], 10) : 0;
 const newNum = currentDate === dateStr ? currentNum + 1 : 1;
-const newVersion = `${dateStr}-${newNum}`;
+// Pad counter to 2 digits so versions sort correctly as plain strings too
+// (avoids 2026-05-20-9 vs 2026-05-20-10 string-sort confusion).
+const newVersion = `${dateStr}-${String(newNum).padStart(2, '0')}`;
 
 const updated = html.replace(versionRegex, `const APP_VERSION='${newVersion}';`);
 fs.writeFileSync(filePath, updated);

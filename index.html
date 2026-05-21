@@ -10558,10 +10558,24 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-11';
+const APP_VERSION='2026-05-20-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
+// Compare two YYYY-MM-DD-N version strings properly. Plain string compare
+// breaks once the counter hits double digits ("2026-05-20-9" sorts AFTER
+// "2026-05-20-10" lexicographically). Parses the counter as a number.
+function _versionGt(a, b){
+  if(!a || !b) return false;
+  const pa = String(a).match(/^(\d{4}-\d{2}-\d{2})-(\d+)$/);
+  const pb = String(b).match(/^(\d{4}-\d{2}-\d{2})-(\d+)$/);
+  if(pa && pb){
+    if(pa[1] !== pb[1]) return pa[1] > pb[1];
+    return parseInt(pa[2], 10) > parseInt(pb[2], 10);
+  }
+  return String(a) > String(b);
+}
+
 function startVersionListener(){
   if(_versionListenerUnsub) return;
   _versionListenerUnsub=db.collection('system').doc('appVersion').onSnapshot(snap=>{
@@ -10570,15 +10584,17 @@ function startVersionListener(){
       _firstVersionEvent=false;
       // On subscribe: if the doc is missing/older, announce our version so
       // peers running an older build pick it up. If it's newer, reload now.
-      if(!remote||remote<APP_VERSION){
+      if(!remote || _versionGt(APP_VERSION, remote)){
         db.collection('system').doc('appVersion').set({version:APP_VERSION,updatedAt:new Date()},{merge:true}).catch(()=>{});
-      } else if(remote>APP_VERSION){
+      } else if(_versionGt(remote, APP_VERSION)){
         console.log('Newer app version available ('+remote+'), reloading…');
         location.reload();
       }
       return;
     }
-    if(remote&&remote!==APP_VERSION){
+    // Subsequent events: only reload if remote is *actually newer*. Equal or
+    // older is ignored (older means we just need to write our own version).
+    if(_versionGt(remote, APP_VERSION)){
       console.log('App updated remotely ('+remote+'), reloading…');
       location.reload();
     }
