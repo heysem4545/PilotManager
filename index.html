@@ -1004,6 +1004,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </button>
 
       <div class="nav-label">Leasing & Calls</div>
+      <button class="nav-item" id="nav-leasingDashboard" onclick="showView('leasingDashboard')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="6" rx="1"/><rect x="9" y="2" width="5" height="3" rx="1"/><rect x="2" y="10" width="5" height="4" rx="1"/><rect x="9" y="7" width="5" height="7" rx="1"/></svg>
+        Leasing Dashboard
+      </button>
       <button class="nav-item" id="nav-callLog" onclick="showView('callLog')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 2.5h2.2l1 3-1.5 1a8 8 0 004.3 4.3l1-1.5 3 1v2.2a1 1 0 01-1.1 1A11 11 0 012.5 3.6a1 1 0 011-1.1z"/></svg>
         Call Log
@@ -1212,6 +1216,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="noticesView" style="display:none"></div>
       <div id="leadsView" style="display:none"></div>
       <div id="availableView" style="display:none"></div>
+      <div id="leasingDashboardView" style="display:none"></div>
       <div id="utilityView" style="display:none"></div>
       <div id="tenantsView" style="display:none"></div>
       <div id="dailyLogView" style="display:none"></div>
@@ -10545,7 +10550,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-6';
+const APP_VERSION='2026-05-20-7';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11864,7 +11869,7 @@ function showView(v){
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
     team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
-    leads:'leadsView', available:'availableView', utility:'utilityView',
+    leads:'leadsView', available:'availableView', leasingDashboard:'leasingDashboardView', utility:'utilityView',
     tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
@@ -11896,7 +11901,7 @@ function showView(v){
     team:'Team Management', activity:'Activity Tracker', myPayments:'My Payments',
     tasks:'Task Management', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
-    leads:'Leads',
+    leads:'Leads', leasingDashboard:'Leasing Dashboard',
     available:'Available Units', utility:'Utility Tracking',
     tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker', certificates:'Property Certificates',
     callLog:'Call Log', backups:'Backups',
@@ -11951,6 +11956,7 @@ function showView(v){
   if(v==='tenantLease') renderTenantLeaseView();
   if(v==='available') renderAvailableView();
   if(v==='leads') renderLeadsView();
+  if(v==='leasingDashboard') renderLeasingDashboardView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
   if(v==='certificates') renderCertificatesView();
@@ -12213,6 +12219,118 @@ function openLeadNote(callId){
 // ─────────────────────────────────────────────
 // AVAILABLE UNITS
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// LEASING DASHBOARD — at-a-glance occupancy + active turnover + active construction
+// ─────────────────────────────────────────────
+async function renderLeasingDashboardView(){
+  const el = document.getElementById('leasingDashboardView');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+
+  // Make sure turnover + construction caches are warm. Properties are loaded
+  // on app boot, so they're always available here.
+  try{ if(typeof loadTurnoverProjects === 'function') await loadTurnoverProjects(); }catch(e){}
+  try{ if(typeof loadConstProjects === 'function') await loadConstProjects(); }catch(e){}
+
+  const props = Array.isArray(properties) ? properties : [];
+  const total = props.length;
+
+  // Status counts. The app uses uppercase keys (RENTED, VACANT, EVICTION,
+  // "MOVING PROCESS", CONSTRUCTION, UNKNOWN). Anything without a status
+  // falls into UNKNOWN.
+  const counts = {RENTED:0, VACANT:0, EVICTION:0, 'MOVING PROCESS':0, CONSTRUCTION:0, UNKNOWN:0};
+  props.forEach(p => {
+    const s = p.status || 'UNKNOWN';
+    if(counts.hasOwnProperty(s)) counts[s]++;
+    else counts.UNKNOWN++;
+  });
+  const occupancyPct = total > 0 ? Math.round(counts.RENTED / total * 100) : 0;
+
+  // Active turnover + construction (exclude archived).
+  const activeTurnover = (Array.isArray(turnoverData) ? turnoverData : []).filter(p => !p.archived);
+  const activeConst = (Array.isArray(constProjectsData) ? constProjectsData : []).filter(p => !p.archived);
+
+  // Stat cards layout
+  const statCard = (label, value, color, icon) => `<div style="background:var(--surface);border:1px solid var(--border2);border-left:3px solid ${color};border-radius:10px;padding:14px 16px;text-align:center">
+    <div style="font-size:24px;font-weight:700;color:${color}">${value}</div>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">${icon} ${label}</div>
+  </div>`;
+
+  // Occupancy big card with bar
+  const occupancyCard = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Portfolio Occupancy</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${counts.RENTED} of ${total} units rented</div>
+      </div>
+      <div style="font-size:38px;font-weight:800;color:${occupancyPct>=90?'#4ade80':occupancyPct>=75?'var(--amber)':'#ef4444'};letter-spacing:-0.02em">${occupancyPct}%</div>
+    </div>
+    <div style="height:10px;background:var(--surface2);border-radius:6px;overflow:hidden;position:relative">
+      <div style="height:100%;width:${occupancyPct}%;background:linear-gradient(to right,#4ade80,${occupancyPct>=90?'#22c55e':'var(--amber)'});transition:width .3s"></div>
+    </div>
+  </div>`;
+
+  // 6-card status grid
+  const statsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px">
+    ${statCard('Total Units', total, 'var(--text)', '🏠')}
+    ${statCard('Rented', counts.RENTED, '#4ade80', '✅')}
+    ${statCard('Vacant', counts.VACANT, 'var(--amber)', '🪑')}
+    ${statCard('Eviction', counts.EVICTION, '#ef4444', '⚖')}
+    ${statCard('Moving', counts['MOVING PROCESS'], 'var(--blue)', '📦')}
+    ${statCard('Construction', counts.CONSTRUCTION, 'var(--purple)', '🚧')}
+  </div>`;
+
+  // Build a compact list row for a project
+  const projectRow = (p, kind) => {
+    const prog = p.progress || 0;
+    const targetDate = p.targetDate || p.startDate || '—';
+    const status = p.status || (prog >= 100 ? 'Completed' : 'In Progress');
+    const barColor = prog >= 100 ? '#4ade80' : (prog >= 60 ? 'var(--blue)' : 'var(--amber)');
+    const navTo = kind === 'turnover' ? 'turnover' : 'constProjects';
+    return `<div onclick="showView('${navTo}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(p.propertyAddress || 'Unknown')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${escapeHtml(status)} · Target: ${escapeHtml(targetDate)}</div>
+      </div>
+      <div style="min-width:140px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <div style="flex:1;height:6px;background:var(--surface2);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(prog,100)}%;background:${barColor}"></div>
+          </div>
+          <span style="font-size:11px;font-weight:600;color:${barColor};font-family:var(--mono);min-width:32px;text-align:right">${prog}%</span>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // Two-column section: turnover left, construction right
+  const turnoverHtml = activeTurnover.length
+    ? activeTurnover.sort((a,b) => (b.progress||0) - (a.progress||0)).map(p => projectRow(p,'turnover')).join('')
+    : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">No active turnover projects.</div>';
+  const constHtml = activeConst.length
+    ? activeConst.sort((a,b) => (b.progress||0) - (a.progress||0)).map(p => projectRow(p,'construction')).join('')
+    : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">No active construction projects.</div>';
+
+  const sectionsHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px">
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">🔧 Turnover Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeTurnover.length} active)</span></div>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('turnover')">Open →</button>
+      </div>
+      ${turnoverHtml}
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">🚧 Construction Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeConst.length} active)</span></div>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('constProjects')">Open →</button>
+      </div>
+      ${constHtml}
+    </div>
+  </div>`;
+
+  el.innerHTML = occupancyCard + statsGrid + sectionsHtml;
+}
+
 function renderAvailableView(){
   const el = document.getElementById('availableView');
   const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
