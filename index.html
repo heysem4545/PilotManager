@@ -10550,7 +10550,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-7';
+const APP_VERSION='2026-05-20-8';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12232,53 +12232,83 @@ async function renderLeasingDashboardView(){
   try{ if(typeof loadTurnoverProjects === 'function') await loadTurnoverProjects(); }catch(e){}
   try{ if(typeof loadConstProjects === 'function') await loadConstProjects(); }catch(e){}
 
+  const MNAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const props = Array.isArray(properties) ? properties : [];
   const total = props.length;
 
-  // Status counts. The app uses uppercase keys (RENTED, VACANT, EVICTION,
-  // "MOVING PROCESS", CONSTRUCTION, UNKNOWN). Anything without a status
-  // falls into UNKNOWN.
+  // Per-month status counts via getMonthProp — matches the main dashboard's
+  // numbers exactly. Anything without a status falls into UNKNOWN.
   const counts = {RENTED:0, VACANT:0, EVICTION:0, 'MOVING PROCESS':0, CONSTRUCTION:0, UNKNOWN:0};
   props.forEach(p => {
-    const s = p.status || 'UNKNOWN';
+    const mp = (typeof getMonthProp === 'function') ? getMonthProp(p) : p;
+    const s = mp.status || 'UNKNOWN';
     if(counts.hasOwnProperty(s)) counts[s]++;
     else counts.UNKNOWN++;
   });
-  const occupancyPct = total > 0 ? Math.round(counts.RENTED / total * 100) : 0;
+  const occPct = total > 0 ? Math.round(counts.RENTED / total * 100) : 0;
+
+  // Previous-month occupancy for the delta indicator.
+  let pm = activeMonth - 1, py = activeYear;
+  if(pm < 0){ pm = 11; py--; }
+  const prevKey = (typeof monthKey === 'function') ? monthKey(py, pm) : null;
+  let prevRented = 0;
+  if(prevKey && typeof getMonthPropForKey === 'function'){
+    props.forEach(p => {
+      const mp = getMonthPropForKey(p, prevKey);
+      if((mp.status||'') === 'RENTED') prevRented++;
+    });
+  }
+  const prevPct = total > 0 ? Math.round(prevRented / total * 100) : 0;
+  const delta = occPct - prevPct;
 
   // Active turnover + construction (exclude archived).
   const activeTurnover = (Array.isArray(turnoverData) ? turnoverData : []).filter(p => !p.archived);
   const activeConst = (Array.isArray(constProjectsData) ? constProjectsData : []).filter(p => !p.archived);
 
-  // Stat cards layout
-  const statCard = (label, value, color, icon) => `<div style="background:var(--surface);border:1px solid var(--border2);border-left:3px solid ${color};border-radius:10px;padding:14px 16px;text-align:center">
-    <div style="font-size:24px;font-weight:700;color:${color}">${value}</div>
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">${icon} ${label}</div>
+  // Donut geometry
+  const radius = 52, stroke = 14;
+  const cxy = radius + stroke/2 + 4;
+  const circ = 2 * Math.PI * radius;
+  const dash = (occPct / 100) * circ;
+  const occColor = occPct >= 90 ? '#4ade80' : occPct >= 75 ? 'var(--amber)' : '#ef4444';
+
+  // Chip helper for status breakdown inside the donut card.
+  const chip = (label, value, color) => `<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 12px;border-radius:18px;background:${color}1F;border:1px solid ${color}55;color:${color};font-weight:600">
+    ${escapeHtml(label)} <strong style="font-weight:700">${value}</strong>
   </div>`;
 
-  // Occupancy big card with bar
-  const occupancyCard = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;margin-bottom:18px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-      <div>
-        <div style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Portfolio Occupancy</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">${counts.RENTED} of ${total} units rented</div>
+  const deltaBadge = delta === 0
+    ? ''
+    : `<div style="font-size:11px;color:${delta>0?'#4ade80':'#ef4444'};margin-top:5px;font-weight:700">${delta>0?'▲':'▼'} ${Math.abs(delta)} pt</div>`;
+
+  const occupancyCard = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:22px 26px;margin-bottom:22px;display:flex;align-items:center;gap:30px;flex-wrap:wrap">
+    <div style="position:relative;width:160px;height:160px;flex-shrink:0">
+      <svg viewBox="0 0 ${cxy*2} ${cxy*2}" width="160" height="160" style="transform:rotate(-90deg)">
+        <circle cx="${cxy}" cy="${cxy}" r="${radius}" fill="none" stroke="var(--surface2)" stroke-width="${stroke}"/>
+        <circle cx="${cxy}" cy="${cxy}" r="${radius}" fill="none" stroke="${occColor}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash} ${circ}" style="transition:stroke-dasharray .4s"/>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+        <div style="font-size:32px;font-weight:800;color:${occColor};letter-spacing:-0.02em;line-height:1">${occPct}%</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Occupied</div>
+        ${deltaBadge}
       </div>
-      <div style="font-size:38px;font-weight:800;color:${occupancyPct>=90?'#4ade80':occupancyPct>=75?'var(--amber)':'#ef4444'};letter-spacing:-0.02em">${occupancyPct}%</div>
     </div>
-    <div style="height:10px;background:var(--surface2);border-radius:6px;overflow:hidden;position:relative">
-      <div style="height:100%;width:${occupancyPct}%;background:linear-gradient(to right,#4ade80,${occupancyPct>=90?'#22c55e':'var(--amber)'});transition:width .3s"></div>
+    <div style="flex:1;min-width:240px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px">Portfolio Occupancy</div>
+      <div style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.01em;margin-bottom:3px">${counts.RENTED} of ${total} units rented</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">${MNAMES[activeMonth]} ${activeYear}${delta !== 0 ? ` · ${delta>0?'up':'down'} ${Math.abs(delta)} pt vs ${MNAMES[pm].slice(0,3)} ${py}` : ''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${chip('Rented', counts.RENTED, '#4ade80')}
+        ${chip('Vacant', counts.VACANT, '#f59e0b')}
+        ${chip('Eviction', counts.EVICTION, '#ef4444')}
+        ${chip('Moving', counts['MOVING PROCESS'], '#60a5fa')}
+        ${chip('Construction', counts.CONSTRUCTION, '#a78bfa')}
+        ${counts.UNKNOWN > 0 ? chip('Unknown', counts.UNKNOWN, '#9ca3af') : ''}
+      </div>
     </div>
   </div>`;
 
-  // 6-card status grid
-  const statsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px">
-    ${statCard('Total Units', total, 'var(--text)', '🏠')}
-    ${statCard('Rented', counts.RENTED, '#4ade80', '✅')}
-    ${statCard('Vacant', counts.VACANT, 'var(--amber)', '🪑')}
-    ${statCard('Eviction', counts.EVICTION, '#ef4444', '⚖')}
-    ${statCard('Moving', counts['MOVING PROCESS'], 'var(--blue)', '📦')}
-    ${statCard('Construction', counts.CONSTRUCTION, 'var(--purple)', '🚧')}
-  </div>`;
+  const statsGrid = ''; // status breakdown is now inside the donut card
 
   // Build a compact list row for a project
   const projectRow = (p, kind) => {
