@@ -10544,7 +10544,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-19-4';
+const APP_VERSION='2026-05-20-1';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11107,12 +11107,11 @@ async function renderCertificatesView(){
   const searchInput = `<input type="search" id="certificatesSearchInput" placeholder="🔍 Search address…" value="${escapeAttr(certificatesSearch)}" oninput="setCertificatesSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:240px;max-width:50vw">`;
 
   let html = `<div class="table-card" style="padding:18px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      ${searchInput}
       <div style="font-size:12px;color:var(--muted)">
         ${q ? `<strong style="color:var(--text)">${filteredProps.length}</strong> of ${allProps.length} match` : `<strong style="color:var(--text)">${allProps.length}</strong> properties`} · click any cell to toggle
       </div>
-      <div style="flex:1"></div>
-      ${searchInput}
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">
