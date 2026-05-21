@@ -10545,7 +10545,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-5';
+const APP_VERSION='2026-05-20-6';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15705,6 +15705,11 @@ async function renderConstProjectsView(){
       <div class="cp-card-head">
         <div class="cp-card-addr">${escapeHtml(proj.propertyAddress||'Unknown')}</div>
         <div style="display:flex;gap:6px;align-items:center">`;
+    const cpBeforeCount = (proj.beforePhotos||[]).length;
+    const cpAfterCount  = (proj.afterPhotos||[]).length;
+    const cpPhotoCountStr = (cpBeforeCount || cpAfterCount) ? ` (${cpBeforeCount}+${cpAfterCount})` : '';
+    const cpPhotoIncomplete = cpBeforeCount < 15 || cpAfterCount < 15;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:${cpPhotoIncomplete?'var(--amber)':'#4ade80'};border-color:${cpPhotoIncomplete?'var(--amber-dim,var(--border2))':'rgba(74,222,128,0.35)'}" onclick="openProjectPhotos('construction','${proj.id}')">🖼 Photos${cpPhotoCountStr}${cpPhotoIncomplete?' ⚠':' ✓'}</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveProjectSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleProjectTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+proj.snapshots.length+')':''}</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveProject('${proj.id}')">📦 Archive</button>`;
@@ -16506,7 +16511,7 @@ function renderTurnoverProjects(){
     const afterCount  = (proj.afterPhotos||[]).length;
     const photoCountStr = (beforeCount || afterCount) ? ` (${beforeCount}+${afterCount})` : '';
     const photoIncomplete = beforeCount < 15 || afterCount < 15;
-    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:${photoIncomplete?'var(--amber)':'#4ade80'};border-color:${photoIncomplete?'var(--amber-dim,var(--border2))':'rgba(74,222,128,0.35)'}" onclick="openTurnoverPhotos('${proj.id}')">🖼 Photos${photoCountStr}${photoIncomplete?' ⚠':' ✓'}</button>`;
+    html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:${photoIncomplete?'var(--amber)':'#4ade80'};border-color:${photoIncomplete?'var(--amber-dim,var(--border2))':'rgba(74,222,128,0.35)'}" onclick="openProjectPhotos('turnover','${proj.id}')">🖼 Photos${photoCountStr}${photoIncomplete?' ⚠':' ✓'}</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="saveTurnoverSnapshot('${proj.id}')">📸 Save Snapshot</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="toggleTurnoverTimeline('${proj.id}')">📊 Timeline${(proj.snapshots||[]).length?' ('+(proj.snapshots||[]).length+')':''}</button>`;
     html+=`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTurnoverProject('${proj.id}')">📦 Archive</button>`;
@@ -17146,46 +17151,76 @@ async function deleteTurnoverProject(docId){
 }
 
 // ─────────────────────────────────────────────
-// TURNOVER PHOTOS (before / after, min 15 each)
+// PROJECT PHOTOS (before / after, min 15 each)
+// Shared between Turnover Projects and Construction Projects via a `kind`
+// argument. Each kind maps to its Firestore collection, in-memory cache,
+// storage path prefix, and re-render hook below.
 // ─────────────────────────────────────────────
-const TURNOVER_PHOTO_MIN = 15;
+const PROJECT_PHOTO_MIN = 15;
 
-function openTurnoverPhotos(projectId){
-  const proj = turnoverData.find(p => p.id === projectId);
+function _projectPhotoCfg(kind){
+  if(kind === 'turnover'){
+    return {
+      cache: () => turnoverData,
+      collection: 'turnoverProjects',
+      pathPrefix: 'turnovers',
+      rerender: () => { try{ if(typeof renderTurnoverView==='function') renderTurnoverView(); }catch(e){} },
+      beforeSub: 'Taken when tenant moved out, before any work starts.'
+    };
+  }
+  if(kind === 'construction'){
+    return {
+      cache: () => constProjectsData,
+      collection: 'constructionProjects',
+      pathPrefix: 'constructionProjects',
+      rerender: () => { try{ if(typeof renderConstProjectsView==='function') renderConstProjectsView(); }catch(e){} },
+      beforeSub: 'Taken before construction work begins.'
+    };
+  }
+  return null;
+}
+
+function openProjectPhotos(kind, projectId){
+  const cfg = _projectPhotoCfg(kind);
+  if(!cfg) return;
+  const proj = cfg.cache().find(p => p.id === projectId);
   if(!proj){ toast('Project not found'); return; }
-  const existing = document.getElementById('turnoverPhotosModal');
+  const existing = document.getElementById('projectPhotosModal');
   if(existing) existing.remove();
   const modal = document.createElement('div');
   modal.className = 'overlay open';
-  modal.id = 'turnoverPhotosModal';
+  modal.id = 'projectPhotosModal';
+  modal.dataset.kind = kind;
+  modal.dataset.projectId = projectId;
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
   modal.innerHTML = `<div class="modal" style="width:760px;max-width:95vw;max-height:88vh;overflow-y:auto">
     <div class="modal-title">
       <span>🖼 Photos — ${escapeHtml(proj.propertyAddress||'')}</span>
-      <button class="modal-close" onclick="document.getElementById('turnoverPhotosModal').remove()">×</button>
+      <button class="modal-close" onclick="document.getElementById('projectPhotosModal').remove()">×</button>
     </div>
-    <div id="turnoverPhotosBody" data-project-id="${proj.id}">${_turnoverPhotosBodyHtml(proj)}</div>
+    <div id="projectPhotosBody">${_projectPhotosBodyHtml(kind, proj)}</div>
   </div>`;
   document.body.appendChild(modal);
 }
 
-function _turnoverPhotoSectionHtml(proj, phase, title, sub){
+function _projectPhotoSectionHtml(kind, proj, phase, title, sub){
   const photos = proj[phase + 'Photos'] || [];
-  const isMet = photos.length >= TURNOVER_PHOTO_MIN;
+  const isMet = photos.length >= PROJECT_PHOTO_MIN;
   const countText = isMet
     ? `<span style="color:#4ade80;font-weight:600">✓ ${photos.length} uploaded</span>`
-    : `<span style="color:#ef4444;font-weight:600">⚠ ${photos.length} of ${TURNOVER_PHOTO_MIN} required</span>`;
-  const dropZone = `<label for="turnover-photo-${phase}-${proj.id}" ondragover="_turnoverPhotoDragOver(event)" ondragleave="_turnoverPhotoDragLeave(event)" ondrop="_turnoverPhotoDrop(event,'${proj.id}','${phase}')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border2);border-radius:8px;padding:22px;cursor:pointer;background:var(--surface2);color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center">
+    : `<span style="color:#ef4444;font-weight:600">⚠ ${photos.length} of ${PROJECT_PHOTO_MIN} required</span>`;
+  const inputId = `proj-photo-${kind}-${phase}-${proj.id}`;
+  const dropZone = `<label for="${inputId}" ondragover="_projPhotoDragOver(event)" ondragleave="_projPhotoDragLeave(event)" ondrop="_projPhotoDrop(event,'${kind}','${proj.id}','${phase}')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border2);border-radius:8px;padding:22px;cursor:pointer;background:var(--surface2);color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center">
     <div style="font-size:18px;margin-bottom:4px">📂</div>
     <div>Drop photos here or click to upload</div>
     <div style="font-size:10px;margin-top:4px;color:var(--muted)">Multi-select supported · JPG/PNG/HEIC · max 15 MB each</div>
   </label>
-  <input type="file" id="turnover-photo-${phase}-${proj.id}" accept="image/*" multiple onchange="_turnoverPhotoPicked(event,'${proj.id}','${phase}')" style="display:none">`;
+  <input type="file" id="${inputId}" accept="image/*" multiple onchange="_projPhotoPicked(event,'${kind}','${proj.id}','${phase}')" style="display:none">`;
   const grid = photos.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px">
     ${photos.map((p, i) => `
       <div style="position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid var(--border2);background:var(--surface2)">
         <img src="${escapeAttr(p.url)}" alt="${escapeAttr(p.name||'')}" loading="lazy" onclick="window.open('${escapeAttr(p.url)}','_blank','noopener')" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block">
-        <button onclick="deleteTurnoverPhoto('${proj.id}','${phase}',${i})" title="Delete photo" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:4px;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>
+        <button onclick="deleteProjectPhoto('${kind}','${proj.id}','${phase}',${i})" title="Delete photo" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:4px;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>
       </div>
     `).join('')}
   </div>` : '<div style="color:var(--muted);font-size:11px;text-align:center;padding:8px 0">No photos yet</div>';
@@ -17202,51 +17237,58 @@ function _turnoverPhotoSectionHtml(proj, phase, title, sub){
   </div>`;
 }
 
-function _turnoverPhotosBodyHtml(proj){
+function _projectPhotosBodyHtml(kind, proj){
+  const cfg = _projectPhotoCfg(kind);
+  const beforeSub = cfg ? cfg.beforeSub : 'Before any work starts.';
   return `
-    ${_turnoverPhotoSectionHtml(proj, 'before', '🚪 Before Photos', 'Taken when tenant moved out, before any work starts.')}
+    ${_projectPhotoSectionHtml(kind, proj, 'before', '🚪 Before Photos', beforeSub)}
     <div style="height:24px;border-bottom:1px solid var(--border2);margin:14px 0"></div>
-    ${_turnoverPhotoSectionHtml(proj, 'after', '✨ After Photos', 'Taken once turnover work is complete.')}
+    ${_projectPhotoSectionHtml(kind, proj, 'after', '✨ After Photos', 'Taken once work is complete.')}
   `;
 }
 
-function _refreshTurnoverPhotosModal(projectId){
-  const body = document.getElementById('turnoverPhotosBody');
-  if(!body || body.dataset.projectId !== projectId) return;
-  const proj = turnoverData.find(p => p.id === projectId);
+function _refreshProjectPhotosModal(){
+  const modal = document.getElementById('projectPhotosModal');
+  if(!modal) return;
+  const cfg = _projectPhotoCfg(modal.dataset.kind);
+  if(!cfg) return;
+  const proj = cfg.cache().find(p => p.id === modal.dataset.projectId);
   if(!proj) return;
-  body.innerHTML = _turnoverPhotosBodyHtml(proj);
+  const body = document.getElementById('projectPhotosBody');
+  if(body) body.innerHTML = _projectPhotosBodyHtml(modal.dataset.kind, proj);
 }
 
-function _turnoverPhotoDragOver(e){
+function _projPhotoDragOver(e){
   e.preventDefault();
   e.currentTarget.style.background = 'rgba(201,245,99,0.12)';
   e.currentTarget.style.borderColor = 'var(--accent)';
   e.currentTarget.style.color = 'var(--accent)';
 }
-function _turnoverPhotoDragLeave(e){
+function _projPhotoDragLeave(e){
   e.currentTarget.style.background = 'var(--surface2)';
   e.currentTarget.style.borderColor = 'var(--border2)';
   e.currentTarget.style.color = 'var(--muted)';
 }
-async function _turnoverPhotoDrop(e, projectId, phase){
+async function _projPhotoDrop(e, kind, projectId, phase){
   e.preventDefault();
-  _turnoverPhotoDragLeave(e);
+  _projPhotoDragLeave(e);
   const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
-  await _uploadTurnoverPhotos(files, projectId, phase);
+  await _uploadProjectPhotos(kind, files, projectId, phase);
 }
-async function _turnoverPhotoPicked(e, projectId, phase){
+async function _projPhotoPicked(e, kind, projectId, phase){
   const files = Array.from(e.target.files || []);
   e.target.value = '';
-  await _uploadTurnoverPhotos(files, projectId, phase);
+  await _uploadProjectPhotos(kind, files, projectId, phase);
 }
 
-async function _uploadTurnoverPhotos(files, projectId, phase){
+async function _uploadProjectPhotos(kind, files, projectId, phase){
   if(!files || !files.length) return;
+  const cfg = _projectPhotoCfg(kind);
+  if(!cfg) return;
   const valid = files.filter(f => f.type && f.type.startsWith('image/'));
   if(!valid.length){ toast('Please drop image files only'); return; }
   if(valid.length < files.length){ toast(`${files.length - valid.length} non-image file(s) skipped`); }
-  const proj = turnoverData.find(p => p.id === projectId);
+  const proj = cfg.cache().find(p => p.id === projectId);
   if(!proj){ toast('Project not found'); return; }
   const arrayField = phase + 'Photos';
   const existing = Array.isArray(proj[arrayField]) ? proj[arrayField] : [];
@@ -17260,36 +17302,37 @@ async function _uploadTurnoverPhotos(files, projectId, phase){
     }
     try{
       const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `turnovers/${projectId}/${phase}/${Date.now()}_${i}_${safeName}`;
+      const path = `${cfg.pathPrefix}/${projectId}/${phase}/${Date.now()}_${i}_${safeName}`;
       const ref = firebase.storage().ref(path);
       await ref.put(file, {contentType: file.type});
       const url = await ref.getDownloadURL();
       uploaded.push({url, path, name: file.name || 'photo', uploadedAt: new Date().toISOString()});
     }catch(err){
-      console.error('upload turnover photo', file.name, err);
+      console.error('upload project photo', file.name, err);
       toast(`Failed: ${file.name}`);
     }
   }
   if(!uploaded.length) return;
   const newArray = existing.concat(uploaded);
   try{
-    await db.collection('turnoverProjects').doc(projectId).update({
+    await db.collection(cfg.collection).doc(projectId).update({
       [arrayField]: newArray,
       updatedAt: new Date()
     });
     proj[arrayField] = newArray;
     toast(`Saved ${uploaded.length} photo${uploaded.length===1?'':'s'}`);
-    _refreshTurnoverPhotosModal(projectId);
-    // Also refresh the card so the count badge updates.
-    if(typeof renderTurnoverView === 'function') renderTurnoverView();
+    _refreshProjectPhotosModal();
+    cfg.rerender();
   }catch(e){
     toast('Failed to save: ' + (e.message || 'unknown'));
   }
 }
 
-async function deleteTurnoverPhoto(projectId, phase, index){
+async function deleteProjectPhoto(kind, projectId, phase, index){
   if(!confirm('Delete this photo?')) return;
-  const proj = turnoverData.find(p => p.id === projectId);
+  const cfg = _projectPhotoCfg(kind);
+  if(!cfg) return;
+  const proj = cfg.cache().find(p => p.id === projectId);
   if(!proj) return;
   const arrayField = phase + 'Photos';
   const photos = Array.isArray(proj[arrayField]) ? proj[arrayField] : [];
@@ -17301,14 +17344,14 @@ async function deleteTurnoverPhoto(projectId, phase, index){
   }
   const newArray = photos.filter((_, i) => i !== index);
   try{
-    await db.collection('turnoverProjects').doc(projectId).update({
+    await db.collection(cfg.collection).doc(projectId).update({
       [arrayField]: newArray,
       updatedAt: new Date()
     });
     proj[arrayField] = newArray;
     toast('Photo deleted');
-    _refreshTurnoverPhotosModal(projectId);
-    if(typeof renderTurnoverView === 'function') renderTurnoverView();
+    _refreshProjectPhotosModal();
+    cfg.rerender();
   }catch(e){
     toast('Failed: ' + (e.message || 'unknown'));
   }
