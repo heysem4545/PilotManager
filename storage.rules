@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Rent registration PDFs — uploaded from the Certificates section.
+    // Any authenticated user can read/write; front-end gates by section.
+    match /rentRegistrations/{filename} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Default deny everything else.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
