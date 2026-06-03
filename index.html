@@ -2901,6 +2901,11 @@ function canEditSection(sectionId){
 }
 
 function getCurrentSectionId(){
+  // Rent Tracking routes to the Properties view internally, but it has its
+  // own sidebar entry and role-editor checkbox. Detect it via the active
+  // sidebar item so its own permissions apply, not properties' permissions.
+  const rentNav = document.getElementById('nav-rentTracking');
+  if(rentNav && rentNav.classList.contains('active')) return 'rentTracking';
   if(currentFilter==='balance') return 'collection';
   const map={
     dashboard:'dashboard', properties:'properties',
@@ -2908,7 +2913,10 @@ function getCurrentSectionId(){
     tasks:'tasks', meetings:'meetings', monthly:'monthly',
     team:'team', available:'available'
   };
-  return map[currentView]||'dashboard';
+  // Fall back to the view name itself so newer sections (callLog, leads,
+  // dailyLog, certificates, etc.) honor their own permissions instead of
+  // silently falling back to dashboard.edit.
+  return map[currentView] || currentView || 'dashboard';
 }
 
 function canEdit(){
@@ -10594,7 +10602,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-03-02';
+const APP_VERSION='2026-06-03-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
