@@ -8547,6 +8547,7 @@ async function renderTeam(){
       adminActions = `
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="openViewAsUser('${u.uid}')">👁 View as</button>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="signInAsUser('${u.uid}')">🪪 Sign in as</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px;color:var(--blue);border-color:var(--blue-dim)" onclick="sendUserPasswordReset('${u.uid}','${escapeAttr(u.email||'')}','${escapeAttr(u.name||'')}')">🔑 Reset Pwd</button>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="toggleSuspendUser('${u.uid}',${!suspended})">${suspendLabel}</button>
         <button class="btn btn-danger btn-sm" style="padding:4px 10px;font-size:10px" onclick="removeUser('${u.uid}')">Remove</button>
       `;
@@ -8756,6 +8757,22 @@ async function returnToAdmin(){
   sessionStorage.removeItem('impersonationAdminName');
   try{ await auth.signOut(); }catch(e){}
   location.reload();
+}
+
+// Admin tool: send a Firebase Auth password reset email to a user. Uses
+// the standard SDK call (no Cloud Function needed). The user gets an email
+// with a secure link; they click it and choose a new password themselves.
+async function sendUserPasswordReset(uid, email, name){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  if(!email){ toast('User has no email on file'); return; }
+  if(!confirm('Send a password reset email to ' + (name||email) + '?\n\n' + email + '\n\nThey will get a link to set a new password.')) return;
+  try{
+    await auth.sendPasswordResetEmail(email);
+    toast('Reset link sent to ' + email);
+  }catch(e){
+    console.error('sendUserPasswordReset', e);
+    toast('Failed: ' + (e.message || 'unknown error'));
+  }
 }
 
 async function toggleSuspendUser(uid, suspend){
@@ -10577,7 +10594,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-05-20-14';
+const APP_VERSION='2026-06-03-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
