@@ -1274,7 +1274,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('addModal')">Cancel</button>
-      <button class="btn btn-danger btn-sm" id="deletePropBtn" style="display:none" onclick="deleteProp()">Delete</button>
+      <button class="btn btn-danger btn-sm" id="deletePropBtn" style="display:none" onclick="deletePropFromModal()">Delete</button>
       <button class="btn btn-primary btn-sm" onclick="saveProp()">Save property</button>
     </div>
   </div>
@@ -9211,7 +9211,7 @@ async function saveProp(){
   }catch(e){toast('Error: '+e.message);}
 }
 
-async function deleteProp(){
+async function deletePropFromModal(){
   if(!editPropId||currentUser.role!=='admin')return;
   if(!confirm('Delete this property? This cannot be undone.'))return;
   await deleteProperty(editPropId);
@@ -10594,7 +10594,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-03-01';
+const APP_VERSION='2026-06-03-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
