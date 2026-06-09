@@ -10602,7 +10602,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-03-04';
+const APP_VERSION='2026-06-08-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -10651,6 +10651,9 @@ let _nightlyLogoutTimer=null;
 function startNightlyIdleLogout(){
   if(_nightlyLogoutTimer) clearInterval(_nightlyLogoutTimer);
   _nightlyLogoutTimer=setInterval(async()=>{
+    // Admins are exempt from the safety-net logout — they leave their tab
+    // open overnight intentionally and don't want to re-login every morning.
+    if(isAdmin()) return;
     const now=new Date();
     if(now.getHours()!==3) return;
     const idleMs=Date.now()-_lastActivityTime;
