@@ -2648,6 +2648,11 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   await loadProperties();
   await loadMonthData(activeKey());
   try{ await loadUtilityData(); }catch(e){ console.warn('utility preload', e); }
+  // Preload utility limits at boot so every user has them ready without
+  // needing to first open the Utility view. Also start a real-time listener
+  // so admin changes propagate to everyone's open sessions instantly.
+  try{ await loadUtilityLimits(); }catch(e){ console.warn('utility limits preload', e); }
+  try{ startUtilityLimitsListener(); }catch(e){ console.warn('utility limits listener', e); }
   try{ await loadCallLog(); }catch(e){ console.warn('callLog preload', e); }
   document.getElementById('loader').style.display='none';
   document.getElementById('loginPage').style.display='none';
@@ -10602,7 +10607,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-08-01';
+const APP_VERSION='2026-06-09-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12586,6 +12591,24 @@ async function loadUtilityLimits(){
       localStorage.setItem('pm-util-sewer-limit',utilitySewerLimit);
     }
   }catch(e){console.warn('loadUtilityLimits',e);}
+}
+
+let _utilityLimitsUnsub = null;
+function startUtilityLimitsListener(){
+  if(_utilityLimitsUnsub) return;
+  _utilityLimitsUnsub = db.collection('settings').doc('utilityLimits').onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const d = snap.data();
+    utilityWaterLimit = d.water || 0;
+    utilitySewerLimit = d.sewer || 0;
+    localStorage.setItem('pm-util-water-limit', utilityWaterLimit);
+    localStorage.setItem('pm-util-sewer-limit', utilitySewerLimit);
+    // If the Utility view is currently visible, re-render so the limit
+    // highlighting reflects the new values without a manual refresh.
+    if(currentView === 'utility'){
+      try{ renderUtilityView(); }catch(e){}
+    }
+  }, err=>console.warn('utility limits listener', err?.message));
 }
 
 async function loadUtilityData(){
