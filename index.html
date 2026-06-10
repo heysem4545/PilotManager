@@ -10607,7 +10607,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-09-01';
+const APP_VERSION='2026-06-09-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12579,6 +12579,74 @@ let utilityData = {};
 let utilityYear = new Date().getFullYear();
 let utilityWaterLimit = parseFloat(localStorage.getItem('pm-util-water-limit')) || 0;
 let utilitySewerLimit = parseFloat(localStorage.getItem('pm-util-sewer-limit')) || 0;
+let utilityViewTab = 'tracking';                          // 'tracking' or 'action'
+let utilityActionMonth = new Date().getMonth() + 1;       // 1-12
+let utilityActionsCache = [];                              // [{id, year, month, propertyId, propertyAddress, actionNotes, result1, result2}]
+
+function switchUtilityTab(tab){
+  utilityViewTab = tab;
+  renderUtilityView();
+}
+
+function setUtilityActionMonth(m){
+  utilityActionMonth = m;
+  renderUtilityView();
+}
+
+async function loadUtilityActions(){
+  try{
+    const snap = await db.collection('utilityActions').get();
+    utilityActionsCache = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  }catch(e){
+    console.error('loadUtilityActions', e);
+    utilityActionsCache = [];
+  }
+}
+
+async function addUtilityAction(){
+  const row = {
+    year: utilityYear,
+    month: utilityActionMonth,
+    propertyId: '',
+    propertyAddress: '',
+    actionNotes: '',
+    result1: '',
+    result2: '',
+    createdAt: new Date(),
+    createdBy: (currentUser && (currentUser.email || currentUser.name)) || 'unknown'
+  };
+  try{
+    const ref = await db.collection('utilityActions').add(row);
+    utilityActionsCache.push({id: ref.id, ...row});
+    renderUtilityView();
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+async function updateUtilityActionField(id, field, value){
+  // Optimistic local update for snappy UI
+  const action = utilityActionsCache.find(a => a.id === id);
+  if(action){
+    action[field] = value;
+    if(field === 'propertyId'){
+      const p = properties.find(x => x.id === value);
+      action.propertyAddress = p ? (p.addr || '') : '';
+    }
+  }
+  try{
+    const update = {[field]: value, updatedAt: new Date()};
+    if(field === 'propertyId' && action) update.propertyAddress = action.propertyAddress || '';
+    await db.collection('utilityActions').doc(id).update(update);
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+async function deleteUtilityAction(id){
+  if(!confirm('Delete this action?')) return;
+  try{
+    await db.collection('utilityActions').doc(id).delete();
+    utilityActionsCache = utilityActionsCache.filter(a => a.id !== id);
+    renderUtilityView();
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
 
 async function loadUtilityLimits(){
   try{
@@ -12635,6 +12703,17 @@ async function renderUtilityView(){
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
   await loadUtilityData();
   await loadUtilityLimits();
+  await loadUtilityActions();
+
+  const utilTabBar = `<div class="ftabs" style="margin-bottom:14px;flex-wrap:wrap">
+    <button class="ftab ${utilityViewTab==='tracking'?'active':''}" onclick="switchUtilityTab('tracking')">📊 Tracking</button>
+    <button class="ftab ${utilityViewTab==='action'?'active':''}" onclick="switchUtilityTab('action')">🛠 Utility Action</button>
+  </div>`;
+
+  if(utilityViewTab === 'action'){
+    el.innerHTML = utilTabBar + _buildUtilityActionTabHtml();
+    return;
+  }
   const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const sorted = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
@@ -12662,7 +12741,7 @@ async function renderUtilityView(){
     yearOpts += `<option value="${y}"${y===yr?' selected':''}>${y}</option>`;
   }
 
-  let html = `<div class="table-card">
+  let html = utilTabBar + `<div class="table-card">
     <div class="util-toolbar">
       <span style="font-size:12px;font-weight:500;color:var(--muted)">Year:</span>
       <select onchange="utilityYear=parseInt(this.value);renderUtilityView()">${yearOpts}</select>`;
@@ -12840,6 +12919,65 @@ async function saveUtilityPayment(propertyId, monthKey, type, value){
     toast('Saved');
     renderUtilityView();
   } catch(e){ console.error('saveUtilityPayment',e); toast('Error saving'); renderUtilityView(); }
+}
+
+function _buildUtilityActionTabHtml(){
+  const propsSorted = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const curYr = new Date().getFullYear();
+  let yearOpts = '';
+  for(let y=curYr-3;y<=curYr+3;y++){
+    yearOpts += `<option value="${y}"${y===utilityYear?' selected':''}>${y}</option>`;
+  }
+  const monthTabs = monthNames.map((m,i) =>
+    `<button class="ftab ${utilityActionMonth===i+1?'active':''}" onclick="setUtilityActionMonth(${i+1})">${m}</button>`
+  ).join('');
+  // Actions for the current year + month tab
+  const actions = utilityActionsCache
+    .filter(a => a.year === utilityYear && a.month === utilityActionMonth)
+    .sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+
+  const inputCss = 'font-size:11px;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%';
+  const editable = canEdit();
+
+  const rowsHtml = actions.length ? actions.map(a => {
+    const propOpts = propsSorted.map(p => `<option value="${p.id}" ${p.id===a.propertyId?'selected':''}>${escapeHtml(p.addr || '')}</option>`).join('');
+    const propSelect = `<select ${editable?'':'disabled'} onchange="updateUtilityActionField('${a.id}','propertyId',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'}">
+      <option value="">— select address —</option>${propOpts}
+    </select>`;
+    const notesInput = `<textarea rows="2" ${editable?'':'readonly'} placeholder="What action was taken…" onblur="updateUtilityActionField('${a.id}','actionNotes',this.value)" style="${inputCss};resize:vertical;min-height:34px">${escapeHtml(a.actionNotes||'')}</textarea>`;
+    const r1Input = `<input type="text" value="${escapeAttr(a.result1||'')}" placeholder="Result 1…" ${editable?'':'readonly'} onblur="updateUtilityActionField('${a.id}','result1',this.value)" style="${inputCss}">`;
+    const r2Input = `<input type="text" value="${escapeAttr(a.result2||'')}" placeholder="Result 2…" ${editable?'':'readonly'} onblur="updateUtilityActionField('${a.id}','result2',this.value)" style="${inputCss}">`;
+    const delBtn = editable ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteUtilityAction('${a.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
+    return `<tr>
+      <td style="vertical-align:top">${propSelect}</td>
+      <td style="vertical-align:top">${notesInput}</td>
+      <td style="vertical-align:top">${r1Input}</td>
+      <td style="vertical-align:top">${r2Input}</td>
+      <td style="vertical-align:top;text-align:center">${delBtn}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted)">No actions for ${monthNames[utilityActionMonth-1]} ${utilityYear} yet${editable?'. Click <strong>+ Add Action</strong> to start.':'.'}</td></tr>`;
+
+  const addBtn = editable ? `<button class="btn btn-primary btn-sm" onclick="addUtilityAction()" style="margin-left:auto;font-size:11px;padding:5px 14px">+ Add Action</button>` : '';
+
+  return `<div class="table-card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:500;color:var(--muted)">Year:</span>
+      <select onchange="utilityYear=parseInt(this.value);renderUtilityView()" style="font-size:12px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text)">${yearOpts}</select>
+      ${addBtn}
+    </div>
+    <div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap;gap:4px">${monthTabs}</div>
+    <div class="tbl-wrap"><table style="width:100%">
+      <thead><tr>
+        <th style="width:26%">Property</th>
+        <th style="width:36%">Action Notes</th>
+        <th style="width:16%">Result 1</th>
+        <th style="width:16%">Result 2</th>
+        <th style="width:50px"></th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>
+  </div>`;
 }
 
 function openUtilityLimits(){
