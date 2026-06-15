@@ -997,6 +997,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Task Management
         <span class="nav-badge" id="assignedTaskBadge" style="display:none">0</span>
       </button>
+      <button class="nav-item" id="nav-sosRequests" onclick="showView('sosRequests')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4M8 11v.5"/></svg>
+        SOS Request
+      </button>
       <button class="nav-item" id="nav-meetings" onclick="showView('meetings')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
         Meeting Tracking
@@ -1224,6 +1228,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 
       <!-- MODULE VIEWS (coming soon) -->
       <div id="tasksView" style="display:none"></div>
+      <div id="sosRequestsView" style="display:none"></div>
       <div id="meetingsView" style="display:none"></div>
       <div id="legalView" style="display:none"></div>
       <div id="maintenanceView" style="display:none"></div>
@@ -10622,7 +10627,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-14-02';
+const APP_VERSION='2026-06-14-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11135,6 +11140,206 @@ async function deleteMyPayment(id){
   }catch(e){
     toast('Failed to delete: '+e.message);
   }
+}
+
+// ─────────────────────────────────────────────
+// SOS REQUEST — quick urgent request log per user, with audit trail
+// when the "Request From" is reassigned to a different person.
+// ─────────────────────────────────────────────
+const SOS_STATUSES = [
+  {value:'Not Started', color:'#9ca3af', bg:'rgba(156,163,175,0.12)'},
+  {value:'Pending',     color:'#f59e0b', bg:'rgba(245,158,11,0.15)'},
+  {value:'Done',        color:'#4ade80', bg:'rgba(74,222,128,0.15)'}
+];
+let sosRequestsCache = [];
+
+async function loadSosRequests(){
+  try{
+    const snap = await db.collection('sosRequests').orderBy('createdAt','desc').get();
+    sosRequestsCache = snap.docs.map(d => ({id:d.id, ...d.data()}));
+  }catch(e){
+    console.error('loadSosRequests', e);
+    sosRequestsCache = [];
+  }
+}
+
+async function renderSosRequestsView(){
+  const el = document.getElementById('sosRequestsView');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadSosRequests();
+  const users = await ensureUsersCache();
+
+  const editable = canEdit() || isAdmin();
+  const inputCss = 'font-size:11px;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%';
+
+  const userOpts = users.map(u => `<option value="${u.uid}">${escapeHtml(u.name || u.email || '')}</option>`).join('');
+
+  const statRow = (() => {
+    const counts = {'Not Started':0, 'Pending':0, 'Done':0};
+    sosRequestsCache.forEach(r => { const s = r.requestStatus || 'Not Started'; if(counts[s] !== undefined) counts[s]++; });
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+      ${SOS_STATUSES.map(s => `<div style="background:var(--surface);border:1px solid var(--border2);border-left:3px solid ${s.color};border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:${s.color}">${counts[s.value]||0}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">${s.value}</div>
+      </div>`).join('')}
+      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${sosRequestsCache.length}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Total</div>
+      </div>
+    </div>`;
+  })();
+
+  const rowsHtml = sosRequestsCache.length ? sosRequestsCache.map(r => {
+    const fromUid = r.requestFromUid || '';
+    const fromOpts = users.map(u => `<option value="${u.uid}" ${u.uid===fromUid?'selected':''}>${escapeHtml(u.name || u.email || '')}</option>`).join('');
+    const fromSelect = `<select ${editable?'':'disabled'} onchange="updateSosField('${r.id}','requestFromUid',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'}">
+      <option value="">— select user —</option>${fromOpts}
+    </select>`;
+    const histCount = (r.fromHistory || []).length;
+    const histBadge = histCount > 0
+      ? `<button onclick="openSosHistory('${r.id}')" title="View change history" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;margin-top:4px;cursor:pointer">✎ ${histCount} change${histCount===1?'':'s'}</button>`
+      : '';
+
+    const noteInput = `<textarea rows="2" ${editable?'':'readonly'} placeholder="What's needed…" title="${escapeAttr(r.requestNote||'')}" onblur="updateSosField('${r.id}','requestNote',this.value)" style="${inputCss};resize:vertical;min-height:38px">${escapeHtml(r.requestNote||'')}</textarea>`;
+
+    const currStatus = r.requestStatus || 'Not Started';
+    const statusInfo = SOS_STATUSES.find(s => s.value === currStatus) || SOS_STATUSES[0];
+    const statusSelect = `<select ${editable?'':'disabled'} onchange="updateSosField('${r.id}','requestStatus',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'};background:${statusInfo.bg};color:${statusInfo.color};font-weight:600;border-color:${statusInfo.color}55">
+      ${SOS_STATUSES.map(s => `<option value="${s.value}" ${s.value===currStatus?'selected':''}>${s.value}</option>`).join('')}
+    </select>`;
+
+    const delBtn = (editable && isAdmin()) ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteSosRequest('${r.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
+
+    return `<tr>
+      <td style="vertical-align:top">
+        ${fromSelect}
+        ${histBadge}
+      </td>
+      <td style="vertical-align:top">${noteInput}</td>
+      <td style="vertical-align:top">${statusSelect}</td>
+      <td style="vertical-align:top;text-align:center">${delBtn}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted)">No SOS requests yet${editable?'. Click <strong>+ Add Request</strong> to log one.':'.'}</td></tr>`;
+
+  const addBtn = editable ? `<button class="btn btn-primary btn-sm" onclick="addSosRequest()" style="font-size:12px;padding:6px 14px">+ Add Request</button>` : '';
+
+  el.innerHTML = `<div class="table-card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--muted)">Track urgent requests across the team</div>
+      <div style="flex:1"></div>
+      ${addBtn}
+    </div>
+    ${statRow}
+    <div class="tbl-wrap"><table style="width:100%">
+      <thead><tr>
+        <th style="width:22%">Request From</th>
+        <th style="width:52%">Request Note</th>
+        <th style="width:18%">Status</th>
+        <th style="width:50px"></th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>
+  </div>`;
+}
+
+async function addSosRequest(){
+  try{
+    const now = new Date();
+    const data = {
+      requestFromUid: '',
+      requestFromName: '',
+      requestNote: '',
+      requestStatus: 'Not Started',
+      createdAt: now,
+      createdByUid: (currentUser && currentUser.uid) || null,
+      createdByName: (currentUser && (currentUser.name || currentUser.email)) || 'unknown',
+      fromHistory: []
+    };
+    const ref = await db.collection('sosRequests').add(data);
+    sosRequestsCache.unshift({id: ref.id, ...data});
+    renderSosRequestsView();
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+async function updateSosField(id, field, value){
+  const r = sosRequestsCache.find(x => x.id === id);
+  if(!r) return;
+  const users = await ensureUsersCache();
+  try{
+    const updates = {[field]: value, updatedAt: new Date(), updatedByUid: (currentUser && currentUser.uid) || null, updatedByName: (currentUser && (currentUser.name || currentUser.email)) || ''};
+    if(field === 'requestFromUid'){
+      const newUser = users.find(u => u.uid === value);
+      const newName = newUser ? (newUser.name || newUser.email || '') : '';
+      updates.requestFromName = newName;
+      // If this is a CHANGE (had a previous user assigned), append to history.
+      if(r.requestFromUid && r.requestFromUid !== value){
+        const prevName = r.requestFromName || (users.find(u => u.uid === r.requestFromUid) || {}).name || '';
+        const entry = {
+          fromUid: r.requestFromUid,
+          fromName: prevName,
+          toUid: value,
+          toName: newName,
+          changedByUid: (currentUser && currentUser.uid) || null,
+          changedByName: (currentUser && (currentUser.name || currentUser.email)) || 'unknown',
+          at: new Date().toISOString()
+        };
+        const newHistory = (r.fromHistory || []).concat([entry]);
+        updates.fromHistory = newHistory;
+        r.fromHistory = newHistory;
+      }
+      r.requestFromName = newName;
+    }
+    r[field] = value;
+    await db.collection('sosRequests').doc(id).update(updates);
+    if(field === 'requestFromUid' || field === 'requestStatus'){
+      renderSosRequestsView(); // re-render so status color + history badge update
+    }
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+async function deleteSosRequest(id){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  if(!confirm('Delete this SOS request?')) return;
+  try{
+    await db.collection('sosRequests').doc(id).delete();
+    sosRequestsCache = sosRequestsCache.filter(x => x.id !== id);
+    renderSosRequestsView();
+  }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+function openSosHistory(id){
+  const r = sosRequestsCache.find(x => x.id === id);
+  if(!r) return;
+  const hist = r.fromHistory || [];
+  const existing = document.getElementById('sosHistoryModal');
+  if(existing) existing.remove();
+  const rows = hist.length ? hist.slice().reverse().map(h => {
+    const when = h.at ? new Date(h.at).toLocaleString() : '—';
+    return `<tr>
+      <td style="padding:8px;font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(when)}</td>
+      <td style="padding:8px;font-size:12px"><span style="color:var(--red)">${escapeHtml(h.fromName || '(unset)')}</span> → <span style="color:#4ade80;font-weight:600">${escapeHtml(h.toName || '—')}</span></td>
+      <td style="padding:8px;font-size:11px;color:var(--muted)">${escapeHtml(h.changedByName || '—')}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="3" style="padding:18px;text-align:center;color:var(--muted)">No reassignments yet.</td></tr>';
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'sosHistoryModal';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:560px;max-width:95vw">
+    <div class="modal-title">
+      <span>✎ Request From — Change History</span>
+      <button class="modal-close" onclick="document.getElementById('sosHistoryModal').remove()">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Currently assigned to <strong style="color:var(--text)">${escapeHtml(r.requestFromName || '(none)')}</strong></div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead style="background:var(--surface2)">
+        <tr><th style="text-align:left;padding:8px">When</th><th style="text-align:left;padding:8px">Changed</th><th style="text-align:left;padding:8px">By</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+  document.body.appendChild(modal);
 }
 
 // ─────────────────────────────────────────────
@@ -11966,7 +12171,7 @@ function showView(v){
   // Map view names to their element IDs
   const viewMap = {
     dashboard:'dashView', properties:'propsView', monthly:'monthlyView',
-    team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', meetings:'meetingsView',
+    team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', sosRequests:'sosRequestsView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', leasingDashboard:'leasingDashboardView', utility:'utilityView',
     tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView',
@@ -11998,7 +12203,7 @@ function showView(v){
   const titles={
     dashboard:'Portfolio Dashboard', properties:'Properties',
     team:'Team Management', activity:'Activity Tracker', myPayments:'My Payments',
-    tasks:'Task Management', meetings:'Meeting Tracking',
+    tasks:'Task Management', sosRequests:'SOS Request', meetings:'Meeting Tracking',
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads', leasingDashboard:'Leasing Dashboard',
     available:'Available Units', utility:'Utility Tracking',
@@ -12043,6 +12248,7 @@ function showView(v){
     switchPropsTab(propsViewTab);
   }
   if(v==='tasks') renderTasksView();
+  if(v==='sosRequests') renderSosRequestsView();
   if(v==='legal') renderLegalView();
   if(v==='maintenance') renderMaintenanceView();
   if(v==='technician') renderTechnicianView();
