@@ -767,11 +767,22 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .util-sum-row td{background:var(--surface2)!important;font-weight:600;color:var(--text)!important;font-family:var(--mono);font-size:10px;border-top:2px solid var(--border2)}
 .util-sum-row td:first-child{font-family:var(--font);text-transform:uppercase;letter-spacing:.06em;font-size:10px;color:var(--muted)!important}
 
+.mobile-menu-btn{display:none;position:fixed;top:14px;left:14px;z-index:300;width:42px;height:42px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);cursor:pointer;align-items:center;justify-content:center;font-size:20px;font-family:var(--font);box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.mobile-menu-btn:active{background:var(--accent-dim);color:var(--accent)}
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:240;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
 @media(max-width:860px){
   .app{grid-template-columns:1fr}
   .sidebar{display:none}
   .metrics{grid-template-columns:repeat(2,1fr)}
   .overview-row,.potential-grid{grid-template-columns:1fr}
+  .mobile-menu-btn{display:flex}
+  .main{padding-top:68px}
+  /* When mobile sidebar is toggled open, slide it in as an overlay */
+  .app.sidebar-mobile-open .sidebar{display:flex;position:fixed;top:0;left:0;width:280px;max-width:85vw;height:100vh;z-index:250;box-shadow:0 0 30px rgba(0,0,0,0.5);padding-bottom:120px;overflow-y:auto}
+  .app.sidebar-mobile-open .sidebar-backdrop{display:block}
+  .app.sidebar-mobile-open .sidebar-toggle{display:none}
 }
 
 /* ── MEETING TRACKING ── */
@@ -945,6 +956,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 <!-- MAIN APP -->
 <div id="appPage" style="display:none">
   <div class="app" id="appRoot">
+
+    <!-- Mobile menu trigger — only visible ≤860px wide -->
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open menu">☰</button>
+    <div class="sidebar-backdrop" onclick="toggleMobileSidebar()"></div>
 
     <!-- SIDEBAR -->
     <aside class="sidebar" style="position:relative">
@@ -10607,7 +10622,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-12-01';
+const APP_VERSION='2026-06-14-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -11918,7 +11933,15 @@ function changeCourtAlertDays(){
 // ─────────────────────────────────────────────
 let currentView = 'dashboard';
 
+function toggleMobileSidebar(){
+  const app = document.querySelector('.app');
+  if(app) app.classList.toggle('sidebar-mobile-open');
+}
+
 function showView(v){
+  // On mobile, navigating closes the overlay sidebar automatically.
+  const app = document.querySelector('.app');
+  if(app) app.classList.remove('sidebar-mobile-open');
   // Enforce section-level view permissions. Admins always pass.
   // Non-admins without view permission on a restricted section are
   // redirected to the Dashboard with a toast.
