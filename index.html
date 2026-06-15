@@ -10622,7 +10622,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-14-01';
+const APP_VERSION='2026-06-14-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12968,18 +12968,25 @@ function _buildUtilityActionTabHtml(){
     const propSelect = `<select ${editable?'':'disabled'} onchange="updateUtilityActionField('${a.id}','propertyId',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'}">
       <option value="">— select address —</option>${propOpts}
     </select>`;
+    const utilType = a.utilityType || '';
+    const typeSelect = `<select ${editable?'':'disabled'} onchange="updateUtilityActionField('${a.id}','utilityType',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'}">
+      <option value="">— select —</option>
+      <option value="Water" ${utilType==='Water'?'selected':''}>💧 Water</option>
+      <option value="Sewer" ${utilType==='Sewer'?'selected':''}>🚰 Sewer</option>
+    </select>`;
     const notesInput = `<textarea rows="2" ${editable?'':'readonly'} placeholder="What action was taken…" onblur="updateUtilityActionField('${a.id}','actionNotes',this.value)" style="${inputCss};resize:vertical;min-height:34px">${escapeHtml(a.actionNotes||'')}</textarea>`;
     const r1Input = `<input type="text" value="${escapeAttr(a.result1||'')}" placeholder="Result 1…" ${editable?'':'readonly'} title="${escapeAttr(a.result1||'')}" onblur="updateUtilityActionField('${a.id}','result1',this.value)" style="${inputCss}">`;
     const r2Input = `<input type="text" value="${escapeAttr(a.result2||'')}" placeholder="Result 2…" ${editable?'':'readonly'} title="${escapeAttr(a.result2||'')}" onblur="updateUtilityActionField('${a.id}','result2',this.value)" style="${inputCss}">`;
     const delBtn = editable ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteUtilityAction('${a.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
     return `<tr>
       <td style="vertical-align:top">${propSelect}</td>
+      <td style="vertical-align:top">${typeSelect}</td>
       <td style="vertical-align:top">${notesInput}</td>
       <td style="vertical-align:top">${r1Input}</td>
       <td style="vertical-align:top">${r2Input}</td>
       <td style="vertical-align:top;text-align:center">${delBtn}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted)">No actions for ${monthNames[utilityActionMonth-1]} ${utilityYear} yet${editable?'. Click <strong>+ Add Action</strong> to start.':'.'}</td></tr>`;
+  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted)">No actions for ${monthNames[utilityActionMonth-1]} ${utilityYear} yet${editable?'. Click <strong>+ Add Action</strong> to start.':'.'}</td></tr>`;
 
   const addBtn = editable ? `<button class="btn btn-primary btn-sm" onclick="addUtilityAction()" style="margin-left:auto;font-size:11px;padding:5px 14px">+ Add Action</button>` : '';
 
@@ -12992,8 +12999,9 @@ function _buildUtilityActionTabHtml(){
     <div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap;gap:4px">${monthTabs}</div>
     <div class="tbl-wrap"><table style="width:100%">
       <thead><tr>
-        <th style="width:26%">Property</th>
-        <th style="width:36%">Action Notes</th>
+        <th style="width:24%">Property</th>
+        <th style="width:11%">Utility Type</th>
+        <th style="width:30%">Action Notes</th>
         <th style="width:16%">Result 1</th>
         <th style="width:16%">Result 2</th>
         <th style="width:50px"></th>
