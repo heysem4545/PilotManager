@@ -8573,6 +8573,12 @@ async function renderTeam(){
     const suspendBadge = suspended
       ? `<span class="u-role" style="background:var(--red-dim);color:var(--red);margin-left:6px">Suspended</span>`
       : '';
+    // Telegram management — visible for admins on every row (incl. self).
+    let telegramBtn = '';
+    if(isAdmin()){
+      const linked = !!u.telegramChatId;
+      telegramBtn = `<button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px;color:#0088cc;border-color:rgba(0,136,204,0.45)" onclick="openTelegramModal('${u.uid}')">📨 Telegram${linked?' ✓':''}</button>`;
+    }
     // Admin-only actions: Suspend/Unsuspend + Remove. Never on self.
     let adminActions = '';
     if(isAdmin() && !isMe){
@@ -8591,7 +8597,7 @@ async function renderTeam(){
         <div class="tm-name">${u.name}${isMe?' (you)':''}${suspendBadge}</div>
         <div class="tm-email">${u.email||''}</div>
       </div>
-      <div class="tm-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${selectHtml}${adminActions}</div>
+      <div class="tm-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${selectHtml}${telegramBtn}${adminActions}</div>
     </div>`;
   }).join('');
   updateInviteRoleDropdown();
@@ -8805,6 +8811,72 @@ async function sendUserPasswordReset(uid, email, name){
   }catch(e){
     console.error('sendUserPasswordReset', e);
     toast('Failed: ' + (e.message || 'unknown error'));
+  }
+}
+
+// Admin tool: manage a user's Telegram Chat ID + send a test message.
+async function openTelegramModal(uid){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  const users = await getUsers();
+  const u = users.find(x => x.uid === uid);
+  if(!u){ toast('User not found'); return; }
+  const currId = u.telegramChatId || '';
+  const existing = document.getElementById('telegramModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'telegramModal';
+  modal.dataset.uid = uid;
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:500px;max-width:95vw">
+    <div class="modal-title">
+      <span>📨 Telegram — ${escapeHtml(u.name || u.email || '')}</span>
+      <button class="modal-close" onclick="document.getElementById('telegramModal').remove()">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+      Have the user open Telegram, search for <strong style="color:var(--text)">@PilotPropertyBot</strong>, tap Start. The bot replies with their Chat ID. Paste it below and Save.
+    </div>
+    <div class="fg">
+      <label>Telegram Chat ID</label>
+      <input type="text" id="tgChatIdInput" placeholder="e.g. 8735676487" value="${escapeAttr(currId)}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--mono);outline:none;width:100%">
+    </div>
+    <div class="modal-foot" style="gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('telegramModal').remove()">Cancel</button>
+      <button class="btn btn-ghost btn-sm" style="color:#0088cc;border-color:rgba(0,136,204,0.45)" onclick="sendTelegramTestFromModal()">📨 Send Test</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTelegramChatId()">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('tgChatIdInput')?.focus(), 60);
+}
+
+async function saveTelegramChatId(){
+  const modal = document.getElementById('telegramModal');
+  if(!modal) return;
+  const uid = modal.dataset.uid;
+  const chatId = document.getElementById('tgChatIdInput').value.trim();
+  try{
+    await db.collection('users').doc(uid).update({telegramChatId: chatId || null});
+    toast(chatId ? 'Telegram Chat ID saved' : 'Telegram Chat ID cleared');
+    modal.remove();
+    renderTeam();
+  }catch(e){
+    toast('Failed: ' + (e.message || 'error'));
+  }
+}
+
+async function sendTelegramTestFromModal(){
+  const chatId = document.getElementById('tgChatIdInput').value.trim();
+  if(!chatId){ toast('Enter a Chat ID first'); return; }
+  try{
+    const fn = firebase.functions().httpsCallable('sendTelegramMessage');
+    const who = (currentUser && (currentUser.name || currentUser.email)) || 'admin';
+    const message = '✅ *PilotManager Telegram test*\n\nIf you can read this, the connection works!\n\nSent by: ' + who + '\nTime: ' + new Date().toLocaleString();
+    await fn({chatId: chatId, message: message});
+    toast('Test message sent — check Telegram');
+  }catch(e){
+    console.error('telegram test', e);
+    toast('Failed: ' + (e.message || 'error'));
   }
 }
 
@@ -10627,7 +10699,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-14-03';
+const APP_VERSION='2026-06-14-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;

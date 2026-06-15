@@ -1,7 +1,7 @@
 const { setGlobalOptions } = require("firebase-functions");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const twilio = require("twilio");
@@ -11,6 +11,115 @@ const { initializeApp } = require("firebase-admin/app");
 
 initializeApp();
 setGlobalOptions({ maxInstances: 10 });
+
+const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
+
+// Internal helper: call Telegram Bot API sendMessage.
+async function _telegramSend(token, chatId, text, opts) {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const payload = Object.assign(
+    { chat_id: chatId, text: text, parse_mode: "Markdown" },
+    opts || {}
+  );
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(data.description || ("Telegram API error " + res.status));
+  }
+  return data.result;
+}
+
+// Webhook: Telegram POSTs every message a user sends our bot here. We reply
+// to `/start` with the user's Chat ID so they can copy it into PilotManager.
+exports.telegramWebhook = onRequest({ secrets: [TELEGRAM_BOT_TOKEN] }, async (req, res) => {
+  if (req.method !== "POST") { res.status(200).send("ok"); return; }
+  const update = req.body || {};
+  const msg = update.message || update.edited_message;
+  if (!msg || !msg.chat) { res.status(200).send("ok"); return; }
+
+  const chatId = msg.chat.id;
+  const text = (msg.text || "").trim();
+  const firstName = (msg.from && msg.from.first_name) || "there";
+  const token = TELEGRAM_BOT_TOKEN.value();
+
+  let reply;
+  if (text.startsWith("/start") || text === "/id" || text === "/myid") {
+    reply = "👋 Hi " + firstName + "!\n\nYour PilotManager Telegram Chat ID is:\n\n`" + chatId + "`\n\nCopy that number and ask your PilotManager admin to add it to your profile so you start getting alerts.";
+  } else {
+    reply = "Send /start to get your Chat ID for PilotManager.";
+  }
+
+  try {
+    await _telegramSend(token, chatId, reply);
+  } catch (e) {
+    logger.error("telegram reply failed", e);
+  }
+  res.status(200).send("ok");
+});
+
+// One-time setup: admin calls this to point Telegram's bot webhook at the
+// deployed telegramWebhook function. Reads the stored secret so we never
+// need the literal token in client code or terminal.
+exports.setupTelegramWebhook = onCall({ secrets: [TELEGRAM_BOT_TOKEN] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+  const firestore = getFirestore();
+  const callerDoc = await firestore.collection("users").doc(request.auth.uid).get();
+  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin only");
+  }
+  const token = TELEGRAM_BOT_TOKEN.value();
+  const webhookUrl = "https://us-central1-pilotmanager-b61e9.cloudfunctions.net/telegramWebhook";
+  try {
+    // Verify token first
+    const meRes = await fetch("https://api.telegram.org/bot" + token + "/getMe");
+    const me = await meRes.json();
+    if (!me.ok) {
+      throw new HttpsError("failed-precondition", "Stored token is invalid: " + (me.description || "unknown"));
+    }
+    // Set webhook
+    const setRes = await fetch("https://api.telegram.org/bot" + token + "/setWebhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: webhookUrl }),
+    });
+    const setData = await setRes.json();
+    if (!setData.ok) {
+      throw new HttpsError("internal", setData.description || "setWebhook failed");
+    }
+    return { ok: true, botUsername: me.result.username, webhookUrl: webhookUrl };
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    throw new HttpsError("internal", e.message || "setup failed");
+  }
+});
+
+// Callable: send a Telegram message to a specific chat ID. Used by the
+// PilotManager UI (Team page "Test Telegram" button, future notification
+// triggers, etc.). Requires signed-in user.
+exports.sendTelegramMessage = onCall({ secrets: [TELEGRAM_BOT_TOKEN] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+  const data = request.data || {};
+  const chatId = data.chatId;
+  const message = data.message;
+  if (!chatId || !message) {
+    throw new HttpsError("invalid-argument", "chatId and message required");
+  }
+  const token = TELEGRAM_BOT_TOKEN.value();
+  try {
+    const result = await _telegramSend(token, chatId, message);
+    return { ok: true, messageId: result.message_id };
+  } catch (e) {
+    throw new HttpsError("internal", e.message || "Telegram send failed");
+  }
+});
 
 // Admin-only: mint a Firebase custom token for another user so an admin can
 // sign in as them and see exactly what they see. Logged for audit.
