@@ -6711,7 +6711,12 @@ function renderPropertiesList(){
     return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+bedroom+' '+tenant).toLowerCase()}">
       <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
       <td style="font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
-      <td style="font-size:12px;color:var(--muted)">${editable?`<span class="editable" onclick="inlineEditBedroom('${p.id}',this)" style="cursor:pointer">${bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">— click —</span>'}</span>`:(bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">—</span>')}</td>
+      <td style="font-size:12px">${(()=>{
+        const BR_COLORS={'1BR':'#60a5fa','2BR':'#4ade80','3BR':'#f59e0b','4BR':'#a78bfa','5BR':'#ec4899','6BR':'#ef4444','UP+':'#c9f563'};
+        const c=BR_COLORS[bedroom]||'#9ca3af';
+        const pill=bedroom?`<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${c}1F;border:1px solid ${c}55;color:${c};font-weight:700;font-size:11px;letter-spacing:.02em">${escapeHtml(bedroom)}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>';
+        return editable?`<span class="editable" onclick="inlineEditBedroom('${p.id}',this)" style="cursor:pointer">${pill}</span>`:(bedroom?pill:'<span style="color:var(--muted2)">—</span>');
+      })()}</td>
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px;color:var(--text)">${escapeHtml(tenant)}</td>
@@ -10765,7 +10770,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-03';
+const APP_VERSION='2026-06-23-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
