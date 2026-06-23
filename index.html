@@ -1266,9 +1266,21 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
     </div>
     <div class="frow">
       <div class="fg"><label>Address</label><input id="f_addr" placeholder="123 Main St Cleveland, OH"></div>
-      <div class="fg"><label>Unit</label><input id="f_unit" placeholder="Apt 1A"></div>
+      <div class="fg"><label>Bedroom</label>
+        <select id="f_bedroom">
+          <option value=""></option>
+          <option value="1BR">1BR</option>
+          <option value="2BR">2BR</option>
+          <option value="3BR">3BR</option>
+          <option value="4BR">4BR</option>
+          <option value="5BR">5BR</option>
+          <option value="6BR">6BR</option>
+          <option value="UP+">UP+</option>
+        </select>
+      </div>
     </div>
     <div class="frow">
+      <div class="fg"><label>Unit</label><input id="f_unit" placeholder="Apt 1A"></div>
       <div class="fg"><label>Status</label>
         <select id="f_status">
           <option value="RENTED">Rented</option>
@@ -1278,18 +1290,20 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <option value="CONSTRUCTION">Construction</option>
         </select>
       </div>
+    </div>
+    <div class="frow">
       <div class="fg"><label>Tenant name</label><input id="f_tenant" placeholder="First Last"></div>
-    </div>
-    <div class="frow">
       <div class="fg"><label>Total rent ($)</label><input type="number" id="f_rent" placeholder="1500"></div>
+    </div>
+    <div class="frow">
       <div class="fg"><label>CMHA portion ($)</label><input type="number" id="f_cmha" placeholder="0"></div>
-    </div>
-    <div class="frow">
       <div class="fg"><label>Tenant portion ($)</label><input type="number" id="f_tenantR" placeholder="1500"></div>
-      <div class="fg"><label>Deposit ($)</label><input type="number" id="f_deposit" placeholder="0"></div>
     </div>
     <div class="frow">
+      <div class="fg"><label>Deposit ($)</label><input type="number" id="f_deposit" placeholder="0"></div>
       <div class="fg"><label>CMHA paid ($)</label><input type="number" id="f_cmhaPaid" placeholder="0"></div>
+    </div>
+    <div class="frow">
       <div class="fg"><label>Tenant paid ($)</label><input type="number" id="f_tenantPaid" placeholder="0"></div>
     </div>
     <div class="modal-foot">
@@ -6690,12 +6704,14 @@ function renderPropertiesList(){
   const rows=sorted.map((p,i)=>{
     const addr=p.addr||'(no address)';
     const unit=p.unit||'';
+    const bedroom=p.bedroom||'';
     const status=p.status||'';
     const tenant=p.tenant||'';
     const statusBadge=status?`<span class="badge ${BC[status]||'b-unknown'}">${BL[status]||status}</span>`:'<span style="color:var(--muted2)">—</span>';
-    return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+tenant).toLowerCase()}">
+    return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+bedroom+' '+tenant).toLowerCase()}">
       <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
       <td style="font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
+      <td style="font-size:12px;color:var(--muted)">${bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">—</span>'}</td>
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px;color:var(--text)">${escapeHtml(tenant)}</td>
@@ -6718,6 +6734,7 @@ function renderPropertiesList(){
           <thead><tr>
             <th>#</th>
             <th>Address</th>
+            <th>Bedroom</th>
             <th>Unit</th>
             <th>Status</th>
             <th>Tenant</th>
@@ -9255,6 +9272,7 @@ function openAdd(){
   document.getElementById('addModalTitle').textContent='Add property';
   document.getElementById('deletePropBtn').style.display='none';
   ['f_addr','f_unit','f_tenant','f_rent','f_cmha','f_tenantR','f_deposit','f_cmhaPaid','f_tenantPaid'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('f_bedroom').value='';
   document.getElementById('f_status').value='RENTED';
   document.getElementById('addModal').classList.add('open');
 }
@@ -9268,6 +9286,7 @@ function openEdit(id){
   document.getElementById('deletePropBtn').style.display=currentUser.role==='admin'?'':'none';
   document.getElementById('f_addr').value=p.addr||'';
   document.getElementById('f_unit').value=p.unit||'';
+  document.getElementById('f_bedroom').value=p.bedroom||'';
   document.getElementById('f_tenant').value=p.tenant||'';
   document.getElementById('f_status').value=p.status||'RENTED';
   document.getElementById('f_rent').value=p.rent||'';
@@ -9285,6 +9304,7 @@ async function saveProp(){
   const pData={
     addr,
     unit:document.getElementById('f_unit').value.trim(),
+    bedroom:document.getElementById('f_bedroom').value,
     tenant:document.getElementById('f_tenant').value.trim(),
     status:document.getElementById('f_status').value,
     rent:parseFloat(document.getElementById('f_rent').value)||0,
@@ -9299,7 +9319,7 @@ async function saveProp(){
   if(editPropId){
     const oldP=properties.find(x=>x.id===editPropId);
     if(oldP){
-      const logFields=['addr','unit','tenant','status','rent','cmha','tenantPortion','deposit','cmhaPaid','tenantPaid'];
+      const logFields=['addr','unit','bedroom','tenant','status','rent','cmha','tenantPortion','deposit','cmhaPaid','tenantPaid'];
       logFields.forEach(f=>{
         const ov=oldP[f]!==undefined?oldP[f]:'';
         const nv=pData[f]!==undefined?pData[f]:'';
@@ -10699,7 +10719,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-14-04';
+const APP_VERSION='2026-06-23-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
