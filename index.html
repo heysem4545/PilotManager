@@ -10765,7 +10765,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-02';
+const APP_VERSION='2026-06-23-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12717,6 +12717,12 @@ async function renderLeasingDashboardView(opts){
     .filter(x => (x.mp.status||'') === 'EVICTION')
     .sort((a,b) => (b.mp.balance||0) - (a.mp.balance||0));
 
+  // Properties currently VACANT this month.
+  const vacantProps = props
+    .map(p => ({p, mp: (typeof getMonthProp==='function') ? getMonthProp(p) : p}))
+    .filter(x => (x.mp.status||'') === 'VACANT')
+    .sort((a,b) => (a.p.addr||'').localeCompare(b.p.addr||''));
+
   // Donut geometry
   const radius = 52, stroke = 14;
   const cxy = radius + stroke/2 + 4;
@@ -12813,6 +12819,28 @@ async function renderLeasingDashboardView(opts){
     ? evictionProps.map(evictionRow).join('')
     : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">No active evictions this month.</div>';
 
+  // Vacant row: address + bedroom/unit + rent, click navigates to Available Units.
+  const vacantRow = (x) => {
+    const bedroom = x.p.bedroom || '';
+    const unit = x.p.unit || '';
+    const meta = [bedroom, unit].filter(Boolean).join(' · ') || '—';
+    const rent = x.p.rent || x.mp.rent || 0;
+    const rentStr = rent > 0 ? '$' + rent.toLocaleString(undefined,{maximumFractionDigits:0}) : '—';
+    return `<div onclick="showView('available')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-left:3px solid #f59e0b;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(x.p.addr || 'Unknown')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🛏 ${escapeHtml(meta)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:13px;font-weight:700;color:${rent>0?'#f59e0b':'var(--muted)'};font-family:var(--mono)">${rentStr}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Rent</div>
+      </div>
+    </div>`;
+  };
+  const vacantHtml = vacantProps.length
+    ? vacantProps.map(vacantRow).join('')
+    : '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">No vacant houses this month.</div>';
+
   const sectionsHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -12820,6 +12848,13 @@ async function renderLeasingDashboardView(opts){
         <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="currentFilter='EVICTION';filterSetByNav=true;showView('properties')">Open →</button>
       </div>
       ${evictionHtml}
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">🏚 Vacant Houses <span style="color:var(--muted);font-weight:500;font-size:12px">(${vacantProps.length})</span></div>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('available')">Open →</button>
+      </div>
+      ${vacantHtml}
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
