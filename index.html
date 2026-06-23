@@ -6711,7 +6711,7 @@ function renderPropertiesList(){
     return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+bedroom+' '+tenant).toLowerCase()}">
       <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
       <td style="font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
-      <td style="font-size:12px;color:var(--muted)">${bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">—</span>'}</td>
+      <td style="font-size:12px;color:var(--muted)">${editable?`<span class="editable" onclick="inlineEditBedroom('${p.id}',this)" style="cursor:pointer">${bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">— click —</span>'}</span>`:(bedroom?escapeHtml(bedroom):'<span style="color:var(--muted2)">—</span>')}</td>
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px;color:var(--text)">${escapeHtml(tenant)}</td>
@@ -8494,6 +8494,52 @@ function inlineEditStatus(propId, cell){
   document.body.appendChild(popup);
   
   // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', function handler(e){
+      if(!popup.contains(e.target)){
+        popup.remove();
+        document.removeEventListener('click',handler);
+      }
+    });
+  },100);
+}
+
+function inlineEditBedroom(propId, cell){
+  if(!canEdit())return;
+  const existing=document.getElementById('bedroomPopup');
+  if(existing)existing.remove();
+
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  const options=['','1BR','2BR','3BR','4BR','5BR','6BR','UP+'];
+
+  const popup=document.createElement('div');
+  popup.id='bedroomPopup';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px';
+
+  const rect=cell.getBoundingClientRect();
+  popup.style.top=(rect.bottom+4)+'px';
+  popup.style.left=rect.left+'px';
+
+  options.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.textContent=opt||'— Clear —';
+    btn.style.cssText=`padding:8px 12px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:var(--font);text-align:left;background:${(p.bedroom||'')===opt?'var(--surface3)':'transparent'};color:${opt?'var(--text)':'var(--muted2)'};transition:background .1s`;
+    btn.onmouseover=()=>btn.style.background='var(--surface3)';
+    btn.onmouseout=()=>btn.style.background=(p.bedroom||'')===opt?'var(--surface3)':'transparent';
+    btn.onclick=async()=>{
+      popup.remove();
+      const oldVal=p.bedroom||'';
+      await updatePropertyField(propId,'bedroom',opt);
+      try{ logPropertyChange(propId, p.addr||'', 'bedroom', oldVal, opt); }catch(e){}
+      renderPropertiesList();
+      toast('Bedroom saved');
+    };
+    popup.appendChild(btn);
+  });
+
+  document.body.appendChild(popup);
+
   setTimeout(()=>{
     document.addEventListener('click', function handler(e){
       if(!popup.contains(e.target)){
@@ -10719,7 +10765,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-01';
+const APP_VERSION='2026-06-23-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
