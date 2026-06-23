@@ -10770,7 +10770,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-04';
+const APP_VERSION='2026-06-23-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12848,31 +12848,19 @@ async function renderLeasingDashboardView(opts){
 
   const sectionsHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">⚖ Active Evictions <span style="color:var(--muted);font-weight:500;font-size:12px">(${evictionProps.length})</span></div>
-        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="currentFilter='EVICTION';filterSetByNav=true;showView('properties')">Open →</button>
-      </div>
+      <div style="margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text)">⚖ Active Evictions <span style="color:var(--muted);font-weight:500;font-size:12px">(${evictionProps.length})</span></div>
       ${evictionHtml}
     </div>
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">🏚 Vacant Houses <span style="color:var(--muted);font-weight:500;font-size:12px">(${vacantProps.length})</span></div>
-        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('available')">Open →</button>
-      </div>
+      <div style="margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text)">🏚 Vacant Houses <span style="color:var(--muted);font-weight:500;font-size:12px">(${vacantProps.length})</span></div>
       ${vacantHtml}
     </div>
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">🔧 Turnover Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeTurnover.length} active)</span></div>
-        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('turnover')">Open →</button>
-      </div>
+      <div style="margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text)">🔧 Turnover Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeTurnover.length} active)</span></div>
       ${turnoverHtml}
     </div>
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">🚧 Construction Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeConst.length} active)</span></div>
-        <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="showView('constProjects')">Open →</button>
-      </div>
+      <div style="margin-bottom:10px;font-size:14px;font-weight:700;color:var(--text)">🚧 Construction Projects <span style="color:var(--muted);font-weight:500;font-size:12px">(${activeConst.length} active)</span></div>
       ${constHtml}
     </div>
   </div>`;
