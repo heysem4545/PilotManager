@@ -3733,7 +3733,7 @@ function renderCollectionPage(){
   if(tabsEl){
     tabsEl.innerHTML=`
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')" style="${collectionViewMode==='monthly'?'background:var(--accent);color:#0d0d10;border-color:var(--accent)':'background:var(--accent-dim);color:var(--accent);border-color:var(--accent)'};font-weight:700">⭐ Monthly Balance</button>
-      <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Balances</button>
+      <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Month Balance</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
@@ -10770,7 +10770,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-06';
+const APP_VERSION='2026-06-23-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
