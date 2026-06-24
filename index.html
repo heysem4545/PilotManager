@@ -1145,6 +1145,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="propsView" style="display:none">
         <div class="ftabs" id="propsViewTabs" style="margin-bottom:12px"></div>
         <div id="propertyHistoryView" style="display:none"></div>
+        <div id="depositTrackingView" style="display:none"></div>
         <div id="propsListView" style="display:none"></div>
         <div class="table-card" id="propsTableCard">
           <div class="month-bar" id="monthBar"></div>
@@ -6668,8 +6669,9 @@ function goPage(p){const pages=Math.ceil(filteredData().length/PER);if(p<1||p>pa
 function renderPropsViewTabs(){
   const el=document.getElementById('propsViewTabs');
   if(!el)return;
-  if(propsViewTab==='table'||propsViewTab==='history'){
+  if(propsViewTab==='table'||propsViewTab==='history'||propsViewTab==='deposits'){
     let html=`<button class="ftab ${propsViewTab==='table'?'active':''}" onclick="switchPropsTab('table')">📊 Rent Tracking</button>`;
+    html+=`<button class="ftab ${propsViewTab==='deposits'?'active':''}" onclick="switchPropsTab('deposits')">💰 Deposit Tracking</button>`;
     if(isAdmin()){
       html+=`<button class="ftab ${propsViewTab==='history'?'active':''}" onclick="switchPropsTab('history')">📜 History Log</button>`;
     }
@@ -6685,23 +6687,30 @@ function switchPropsTab(tab){
   const tableCard=document.getElementById('propsTableCard');
   const histView=document.getElementById('propertyHistoryView');
   const listView=document.getElementById('propsListView');
+  const depView=document.getElementById('depositTrackingView');
   const monthBar=document.getElementById('monthBar');
-  if(tab==='list'){
+  const hideAll=()=>{
     if(tableCard)tableCard.style.display='none';
     if(histView)histView.style.display='none';
+    if(listView)listView.style.display='none';
+    if(depView)depView.style.display='none';
     if(monthBar)monthBar.style.display='none';
+  };
+  if(tab==='list'){
+    hideAll();
     if(listView)listView.style.display='';
     renderPropertiesList();
   } else if(tab==='history'){
-    if(tableCard)tableCard.style.display='none';
-    if(listView)listView.style.display='none';
-    if(monthBar)monthBar.style.display='none';
+    hideAll();
     if(histView)histView.style.display='';
     renderPropertyHistory();
+  } else if(tab==='deposits'){
+    hideAll();
+    if(depView)depView.style.display='';
+    renderDepositTracking();
   } else {
+    hideAll();
     if(tableCard)tableCard.style.display='';
-    if(histView)histView.style.display='none';
-    if(listView)listView.style.display='none';
     if(monthBar)monthBar.style.display='';
     renderMonthBar();
     renderFilterTabs();
@@ -8439,6 +8448,125 @@ function deleteProp(id){
     renderPropertiesList();
     toast('Property deleted');
   }).catch(e=>toast('Error: '+e.message));
+}
+
+let depositSearchTerm='';
+function renderDepositTracking(){
+  const el=document.getElementById('depositTrackingView');
+  if(!el)return;
+  const editable=canEdit();
+  const sorted=[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const term=depositSearchTerm.toLowerCase();
+  const list=term?sorted.filter(p=>(p.addr||'').toLowerCase().includes(term)):sorted;
+
+  const fmtCell=(propId,field,val)=>{
+    if(!editable) return val>0?fmt(val):'<span style="color:var(--muted2)">—</span>';
+    return `<span class="editable" style="cursor:pointer;font-family:var(--mono)" onclick="inlineEditDeposit('${propId}','${field}','number',this)">${val>0?fmt(val):'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`;
+  };
+  const noteCell=(propId,field,val)=>{
+    const display=val?escapeHtml(val):'<span style="color:var(--muted2);font-size:11px">'+(editable?'— click —':'—')+'</span>';
+    if(!editable) return `<span style="font-size:11px;color:var(--text)" title="${escapeAttr(val||'')}">${display}</span>`;
+    return `<span class="editable" style="cursor:pointer;font-size:11px;display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom" title="${escapeAttr(val||'')}" onclick="inlineEditDeposit('${propId}','${field}','text',this)">${display}</span>`;
+  };
+  const dateCell=(propId,field,val)=>{
+    const display=val?escapeHtml(val):'<span style="color:var(--muted2);font-size:11px">'+(editable?'— click —':'—')+'</span>';
+    if(!editable) return `<span style="font-size:11px;color:var(--muted)">${display}</span>`;
+    return `<span class="editable" style="cursor:pointer;font-size:11px;color:var(--muted)" onclick="inlineEditDeposit('${propId}','${field}','date',this)">${display}</span>`;
+  };
+
+  const rows=list.map((p,i)=>{
+    const a1=parseFloat(p.deposit1Amount)||0;
+    const a2=parseFloat(p.deposit2Amount)||0;
+    const a3=parseFloat(p.deposit3Amount)||0;
+    const a4=parseFloat(p.deposit4Amount)||0;
+    const total=a1+a2+a3+a4;
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
+      <td style="font-weight:500;color:var(--text);min-width:180px">${escapeHtml(p.addr||'')}</td>
+      <td class="money">${fmtCell(p.id,'deposit1Amount',a1)}</td>
+      <td>${noteCell(p.id,'deposit1Note',p.deposit1Note||'')}</td>
+      <td>${dateCell(p.id,'deposit1Date',p.deposit1Date||'')}</td>
+      <td class="money">${fmtCell(p.id,'deposit2Amount',a2)}</td>
+      <td>${noteCell(p.id,'deposit2Note',p.deposit2Note||'')}</td>
+      <td>${dateCell(p.id,'deposit2Date',p.deposit2Date||'')}</td>
+      <td class="money">${fmtCell(p.id,'deposit3Amount',a3)}</td>
+      <td>${noteCell(p.id,'deposit3Note',p.deposit3Note||'')}</td>
+      <td>${dateCell(p.id,'deposit3Date',p.deposit3Date||'')}</td>
+      <td class="money">${fmtCell(p.id,'deposit4Amount',a4)}</td>
+      <td>${noteCell(p.id,'deposit4Note',p.deposit4Note||'')}</td>
+      <td>${dateCell(p.id,'deposit4Date',p.deposit4Date||'')}</td>
+      <td class="money" style="color:${total>0?'var(--accent)':'var(--muted)'};font-weight:700">${total>0?fmt(total):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left">
+          <strong style="color:var(--text)">${list.length}</strong> properties ·
+          <input type="text" id="depositSearchInput" placeholder="🔍 Search address…" value="${escapeAttr(depositSearchTerm)}" oninput="depositSearchTerm=this.value;renderDepositTracking();setTimeout(()=>{const e=document.getElementById('depositSearchInput');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:250px">
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>#</th>
+            <th>Address</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Amount 1</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Note 1</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Date 1</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Amount 2</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Note 2</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Date 2</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Amount 3</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Note 3</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Date 3</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Amount 4</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Note 4</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Date 4</th>
+            <th style="background:rgba(201,245,99,0.18);color:var(--accent)">Total Deposit</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function inlineEditDeposit(propId, field, type, cell){
+  if(!canEdit())return;
+  const p=properties.find(x=>x.id===propId);
+  if(!p)return;
+  const cur=p[field]!==undefined&&p[field]!==null?p[field]:'';
+  const inp=document.createElement('input');
+  inp.type=type;
+  inp.value=cur;
+  const widthByType={number:'90px',text:'140px',date:'130px'};
+  inp.style=`font-size:11px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;background:var(--surface2);color:var(--text);outline:none;width:${widthByType[type]||'100px'};font-family:var(--font)`;
+  cell.innerHTML='';
+  cell.appendChild(inp);
+  inp.focus();
+  if(type==='text') inp.select();
+  let saved=false;
+  const save=async()=>{
+    if(saved)return;
+    saved=true;
+    let val=inp.value;
+    if(type==='number') val=parseFloat(val)||0;
+    else if(type==='text') val=val.trim();
+    const oldVal=p[field]!==undefined?p[field]:'';
+    try{
+      await updatePropertyField(propId,field,val);
+      try{ logPropertyChange(propId, p.addr||'', field, oldVal, val); }catch(e){}
+    }catch(e){
+      toast('Error: '+e.message);
+    }
+    renderDepositTracking();
+  };
+  inp.onblur=save;
+  inp.onkeydown=e=>{
+    if(e.key==='Enter') inp.blur();
+    if(e.key==='Escape'){ saved=true; renderDepositTracking(); }
+  };
 }
 
 async function renderPropertyHistory(){
@@ -10840,7 +10968,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-14';
+const APP_VERSION='2026-06-23-15';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
