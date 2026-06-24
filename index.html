@@ -1280,6 +1280,22 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       </div>
     </div>
     <div class="frow">
+      <div class="fg"><label>Bath</label>
+        <select id="f_bath">
+          <option value=""></option>
+          <option value="1">1</option>
+          <option value="1.5">1.5</option>
+          <option value="2">2</option>
+          <option value="2.5">2.5</option>
+          <option value="3">3</option>
+          <option value="3.5">3.5</option>
+          <option value="4">4</option>
+          <option value="4.5">4.5</option>
+          <option value="5+">5+</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
       <div class="fg"><label>Unit</label><input id="f_unit" placeholder="Apt 1A"></div>
       <div class="fg"><label>Status</label>
         <select id="f_status">
@@ -6705,10 +6721,10 @@ function renderPropertiesList(){
     const addr=p.addr||'(no address)';
     const unit=p.unit||'';
     const bedroom=p.bedroom||'';
+    const bath=p.bath||'';
     const status=p.status||'';
-    const tenant=p.tenant||'';
     const statusBadge=status?`<span class="badge ${BC[status]||'b-unknown'}">${BL[status]||status}</span>`:'<span style="color:var(--muted2)">—</span>';
-    return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+bedroom+' '+tenant).toLowerCase()}">
+    return `<tr class="prop-list-row" data-search="${escapeAttr(addr+' '+unit+' '+bedroom+' '+bath).toLowerCase()}">
       <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
       <td style="font-weight:500;color:var(--text)">${escapeHtml(addr)}</td>
       <td style="font-size:12px">${(()=>{
@@ -6717,9 +6733,14 @@ function renderPropertiesList(){
         const pill=bedroom?`<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${c}1F;border:1px solid ${c}55;color:${c};font-weight:700;font-size:11px;letter-spacing:.02em">${escapeHtml(bedroom)}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>';
         return editable?`<span class="editable" onclick="inlineEditBedroom('${p.id}',this)" style="cursor:pointer">${pill}</span>`:(bedroom?pill:'<span style="color:var(--muted2)">—</span>');
       })()}</td>
+      <td style="font-size:12px">${(()=>{
+        const BA_COLORS={'1':'#22d3ee','1.5':'#06b6d4','2':'#0ea5e9','2.5':'#3b82f6','3':'#8b5cf6','3.5':'#a855f7','4':'#d946ef','4.5':'#ec4899','5+':'#f43f5e'};
+        const c=BA_COLORS[bath]||'#9ca3af';
+        const pill=bath?`<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${c}1F;border:1px solid ${c}55;color:${c};font-weight:700;font-size:11px;letter-spacing:.02em">${escapeHtml(bath)} BA</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>';
+        return editable?`<span class="editable" onclick="inlineEditBath('${p.id}',this)" style="cursor:pointer">${pill}</span>`:(bath?pill:'<span style="color:var(--muted2)">—</span>');
+      })()}</td>
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
       <td>${statusBadge}</td>
-      <td style="font-size:12px;color:var(--text)">${escapeHtml(tenant)}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${p.rent?fmt(p.rent):'—'}</td>
       ${editable?`<td style="text-align:right">
         <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" onclick="openEdit('${p.id}')">Edit</button>
@@ -6740,9 +6761,9 @@ function renderPropertiesList(){
             <th>#</th>
             <th>Address</th>
             <th>Bedroom</th>
+            <th>Bath</th>
             <th>Unit</th>
             <th>Status</th>
-            <th>Tenant</th>
             <th>Rent</th>
             <th style="text-align:right">Actions</th>
           </tr></thead>
@@ -8555,6 +8576,52 @@ function inlineEditBedroom(propId, cell){
   },100);
 }
 
+function inlineEditBath(propId, cell){
+  if(!canEdit())return;
+  const existing=document.getElementById('bathPopup');
+  if(existing)existing.remove();
+
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  const options=['','1','1.5','2','2.5','3','3.5','4','4.5','5+'];
+
+  const popup=document.createElement('div');
+  popup.id='bathPopup';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px';
+
+  const rect=cell.getBoundingClientRect();
+  popup.style.top=(rect.bottom+4)+'px';
+  popup.style.left=rect.left+'px';
+
+  options.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.textContent=opt?opt+' BA':'— Clear —';
+    btn.style.cssText=`padding:8px 12px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:var(--font);text-align:left;background:${(p.bath||'')===opt?'var(--surface3)':'transparent'};color:${opt?'var(--text)':'var(--muted2)'};transition:background .1s`;
+    btn.onmouseover=()=>btn.style.background='var(--surface3)';
+    btn.onmouseout=()=>btn.style.background=(p.bath||'')===opt?'var(--surface3)':'transparent';
+    btn.onclick=async()=>{
+      popup.remove();
+      const oldVal=p.bath||'';
+      await updatePropertyField(propId,'bath',opt);
+      try{ logPropertyChange(propId, p.addr||'', 'bath', oldVal, opt); }catch(e){}
+      renderPropertiesList();
+      toast('Bath saved');
+    };
+    popup.appendChild(btn);
+  });
+
+  document.body.appendChild(popup);
+
+  setTimeout(()=>{
+    document.addEventListener('click', function handler(e){
+      if(!popup.contains(e.target)){
+        popup.remove();
+        document.removeEventListener('click',handler);
+      }
+    });
+  },100);
+}
+
 function inlineEditNote(propId, cell){
   if(!canEdit())return;
   const p=properties.find(x=>x.id===propId);
@@ -9324,6 +9391,7 @@ function openAdd(){
   document.getElementById('deletePropBtn').style.display='none';
   ['f_addr','f_unit','f_tenant','f_rent','f_cmha','f_tenantR','f_deposit','f_cmhaPaid','f_tenantPaid'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('f_bedroom').value='';
+  document.getElementById('f_bath').value='';
   document.getElementById('f_status').value='RENTED';
   document.getElementById('addModal').classList.add('open');
 }
@@ -9338,6 +9406,7 @@ function openEdit(id){
   document.getElementById('f_addr').value=p.addr||'';
   document.getElementById('f_unit').value=p.unit||'';
   document.getElementById('f_bedroom').value=p.bedroom||'';
+  document.getElementById('f_bath').value=p.bath||'';
   document.getElementById('f_tenant').value=p.tenant||'';
   document.getElementById('f_status').value=p.status||'RENTED';
   document.getElementById('f_rent').value=p.rent||'';
@@ -9356,6 +9425,7 @@ async function saveProp(){
     addr,
     unit:document.getElementById('f_unit').value.trim(),
     bedroom:document.getElementById('f_bedroom').value,
+    bath:document.getElementById('f_bath').value,
     tenant:document.getElementById('f_tenant').value.trim(),
     status:document.getElementById('f_status').value,
     rent:parseFloat(document.getElementById('f_rent').value)||0,
@@ -9370,7 +9440,7 @@ async function saveProp(){
   if(editPropId){
     const oldP=properties.find(x=>x.id===editPropId);
     if(oldP){
-      const logFields=['addr','unit','bedroom','tenant','status','rent','cmha','tenantPortion','deposit','cmhaPaid','tenantPaid'];
+      const logFields=['addr','unit','bedroom','bath','tenant','status','rent','cmha','tenantPortion','deposit','cmhaPaid','tenantPaid'];
       logFields.forEach(f=>{
         const ov=oldP[f]!==undefined?oldP[f]:'';
         const nv=pData[f]!==undefined?pData[f]:'';
@@ -10770,7 +10840,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-11';
+const APP_VERSION='2026-06-23-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
