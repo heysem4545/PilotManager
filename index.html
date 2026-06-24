@@ -8455,10 +8455,25 @@ function deleteProp(id){
 }
 
 let depositSearchTerm='';
+let dtTab='active'; // 'active' or 'archived'
 function renderDepositTracking(){
   const el=document.getElementById('depositTrackingView');
   if(!el)return;
   const editable=canEdit();
+
+  // Count archived entries across all properties
+  const archivedCount=properties.reduce((s,p)=>s+((p.depositArchive||[]).length),0);
+
+  const tabsHtml=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
+    <button onclick="dtTab='active';renderDepositTracking()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${dtTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${dtTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">💰 Active Deposits</button>
+    <button onclick="dtTab='archived';renderDepositTracking()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${dtTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${dtTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📦 Deposit Archived (${archivedCount})</button>
+  </div>`;
+
+  if(dtTab==='archived'){
+    renderDepositArchived(el, tabsHtml);
+    return;
+  }
+
   const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const term=depositSearchTerm.toLowerCase();
   const list=term?sorted.filter(p=>(p.addr||'').toLowerCase().includes(term)):sorted;
@@ -8500,10 +8515,11 @@ function renderDepositTracking(){
       <td>${noteCell(p.id,'deposit4Note',p.deposit4Note||'')}</td>
       <td>${dateCell(p.id,'deposit4Date',p.deposit4Date||'')}</td>
       <td class="money" style="color:${total>0?'var(--accent)':'var(--muted)'};font-weight:700">${total>0?fmt(total):'—'}</td>
+      <td style="text-align:center">${editable?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveDeposit('${p.id}')" ${total>0?'':'disabled style=\"opacity:.4;cursor:not-allowed;padding:3px 10px;font-size:10px\"'} title="${total>0?'Archive deposits and clear':'Nothing to archive'}">📦 Archive</button>`:''}</td>
     </tr>`;
   }).join('');
 
-  el.innerHTML=`
+  el.innerHTML=tabsHtml+`
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left">
@@ -8529,11 +8545,134 @@ function renderDepositTracking(){
             <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Note 4</th>
             <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Date 4</th>
             <th style="background:rgba(201,245,99,0.18);color:var(--accent)">Total Deposit</th>
+            <th style="text-align:center">📦</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
     </div>`;
+}
+
+async function archiveDeposit(propId){
+  const p=properties.find(x=>x.id===propId);
+  if(!p) return;
+  const a1=parseFloat(p.deposit1Amount)||0;
+  const a2=parseFloat(p.deposit2Amount)||0;
+  const a3=parseFloat(p.deposit3Amount)||0;
+  const a4=parseFloat(p.deposit4Amount)||0;
+  const total=a1+a2+a3+a4;
+  if(total<=0){toast('No deposits to archive');return;}
+  if(!confirm(`Archive deposits (${fmt(total)} total) for ${p.addr}? This snapshots the four entries and clears the active fields for a new cycle.`)) return;
+  const archive=Array.isArray(p.depositArchive)?[...p.depositArchive]:[];
+  archive.push({
+    deposit1Amount:a1, deposit1Note:p.deposit1Note||'', deposit1Date:p.deposit1Date||'',
+    deposit2Amount:a2, deposit2Note:p.deposit2Note||'', deposit2Date:p.deposit2Date||'',
+    deposit3Amount:a3, deposit3Note:p.deposit3Note||'', deposit3Date:p.deposit3Date||'',
+    deposit4Amount:a4, deposit4Note:p.deposit4Note||'', deposit4Date:p.deposit4Date||'',
+    total,
+    archivedDate:new Date().toISOString().slice(0,10)
+  });
+  try{
+    await db.collection('properties').doc(propId).update({
+      depositArchive:archive,
+      deposit1Amount:0, deposit1Note:'', deposit1Date:'',
+      deposit2Amount:0, deposit2Note:'', deposit2Date:'',
+      deposit3Amount:0, deposit3Note:'', deposit3Date:'',
+      deposit4Amount:0, deposit4Note:'', deposit4Date:''
+    });
+    p.depositArchive=archive;
+    p.deposit1Amount=0;p.deposit1Note='';p.deposit1Date='';
+    p.deposit2Amount=0;p.deposit2Note='';p.deposit2Date='';
+    p.deposit3Amount=0;p.deposit3Note='';p.deposit3Date='';
+    p.deposit4Amount=0;p.deposit4Note='';p.deposit4Date='';
+    try{ logPropertyChange(propId, p.addr||'', 'depositArchive', '', `Archived ${fmt(total)}`); }catch(e){}
+    toast('Deposits archived');
+    renderDepositTracking();
+  }catch(e){toast('Error: '+e.message);}
+}
+
+function renderDepositArchived(el, tabsHtml){
+  const allArchived=[];
+  properties.forEach(p=>{
+    (p.depositArchive||[]).forEach((d,idx)=>{
+      allArchived.push({...d, addr:p.addr, propId:p.id, idx});
+    });
+  });
+  allArchived.sort((a,b)=>(b.archivedDate||'').localeCompare(a.archivedDate||''));
+
+  let html=tabsHtml;
+  if(allArchived.length===0){
+    html+=`<div style="padding:40px;text-align:center;color:var(--muted)">No archived deposits yet. Archive a property from the Active Deposits tab.</div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  const isAdminUser=isAdmin();
+  const rows=allArchived.map((d,i)=>{
+    const cell=(amt,note,date)=>{
+      if(!amt&&!note&&!date) return '<td colspan="3" style="text-align:center;color:var(--muted2);font-size:11px">—</td>';
+      return `<td class="money">${amt>0?fmt(amt):'<span class="m-muted">—</span>'}</td>
+        <td style="font-size:11px;color:var(--text);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(note||'')}">${note?escapeHtml(note):'<span style="color:var(--muted2)">—</span>'}</td>
+        <td style="font-size:11px;color:var(--muted)">${date?escapeHtml(date):'<span style="color:var(--muted2)">—</span>'}</td>`;
+    };
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
+      <td style="font-weight:500;color:var(--text);min-width:180px">${escapeHtml(d.addr||'')}</td>
+      <td style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(d.archivedDate||'')}</td>
+      ${cell(d.deposit1Amount||0, d.deposit1Note||'', d.deposit1Date||'')}
+      ${cell(d.deposit2Amount||0, d.deposit2Note||'', d.deposit2Date||'')}
+      ${cell(d.deposit3Amount||0, d.deposit3Note||'', d.deposit3Date||'')}
+      ${cell(d.deposit4Amount||0, d.deposit4Note||'', d.deposit4Date||'')}
+      <td class="money" style="color:var(--accent);font-weight:700">${fmt(d.total||0)}</td>
+      <td style="text-align:center">${isAdminUser?`<button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="deleteArchivedDeposit('${d.propId}',${d.idx})" title="Delete archive entry">✕</button>`:''}</td>
+    </tr>`;
+  }).join('');
+
+  html+=`
+    <div class="table-card">
+      <div class="call-log-toolbar">
+        <div class="call-log-toolbar-left"><strong style="color:var(--text)">${allArchived.length}</strong> archived deposit cycle${allArchived.length===1?'':'s'}</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th>#</th>
+            <th>Address</th>
+            <th>Archived</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Amount 1</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Note 1</th>
+            <th style="background:rgba(96,165,250,0.15);color:#60a5fa">Date 1</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Amount 2</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Note 2</th>
+            <th style="background:rgba(74,222,128,0.15);color:#4ade80">Date 2</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Amount 3</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Note 3</th>
+            <th style="background:rgba(245,158,11,0.15);color:#f59e0b">Date 3</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Amount 4</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Note 4</th>
+            <th style="background:rgba(167,139,250,0.15);color:#a78bfa">Date 4</th>
+            <th style="background:rgba(201,245,99,0.18);color:var(--accent)">Total</th>
+            <th style="text-align:center">✕</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  el.innerHTML=html;
+}
+
+async function deleteArchivedDeposit(propId, idx){
+  const p=properties.find(x=>x.id===propId);
+  if(!p||!Array.isArray(p.depositArchive)) return;
+  if(!confirm('Delete this archived deposit entry? This cannot be undone.')) return;
+  const archive=[...p.depositArchive];
+  archive.splice(idx,1);
+  try{
+    await db.collection('properties').doc(propId).update({depositArchive:archive});
+    p.depositArchive=archive;
+    toast('Archive entry deleted');
+    renderDepositTracking();
+  }catch(e){toast('Error: '+e.message);}
 }
 
 function inlineEditDeposit(propId, field, type, cell){
@@ -10972,7 +11111,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-18';
+const APP_VERSION='2026-06-23-19';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
