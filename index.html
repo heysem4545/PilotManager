@@ -1162,6 +1162,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
                 <tr>
                   <th onclick="sortBy('addr')">Address</th>
                   <th>Status</th>
+                  <th style="background:rgba(201,245,99,0.18);color:var(--accent)">Deposit</th>
                   <th style="background:rgba(245,158,11,0.30);color:#b45309">CMHA Rent</th>
                   <th style="background:rgba(245,158,11,0.30);color:#b45309">Tenant Rent</th>
                   <th style="background:rgba(34,197,94,0.30);color:#15803d">CMHA Paid</th>
@@ -6646,6 +6647,7 @@ function renderTable(){
     return `<tr id="row-${p.id}">
       <td style="position:relative">${mp.cmha>0?`<span title="Section 8 / CMHA rent on file" style="position:absolute;top:4px;right:6px;min-width:18px;height:14px;border-radius:7px;background:#60a5fa;color:#0d0d10;font-size:9px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;pointer-events:none">S8</span>`:''}<div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
       <td id="cell-status-${p.id}">${statusCell}</td>
+      <td class="money" style="background:rgba(201,245,99,0.08);color:${(((p.deposit1Amount||0)+(p.deposit2Amount||0)+(p.deposit3Amount||0)+(p.deposit4Amount||0))>0)?'var(--accent)':'var(--muted2)'};font-weight:600" title="Total Deposit (from Deposit Tracking)">${(()=>{const t=(parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0);return t>0?fmt(t):'<span class="m-muted">—</span>';})()}</td>
       <td id="cell-cmha-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.18)'}">${cmhaRentCell}</td>
       <td id="cell-tenantPortion-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.18)'}">${tRentCell}</td>
       <td id="cell-cmhaPaid-${p.id}" class="money" style="background:rgba(34,197,94,0.18)">${cmhaPaidCell}</td>
@@ -10968,7 +10970,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-16';
+const APP_VERSION='2026-06-23-17';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
