@@ -1161,10 +1161,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
                 <tr>
                   <th onclick="sortBy('addr')">Address</th>
                   <th>Status</th>
-                  <th style="background:rgba(96,165,250,0.10);color:#60a5fa">CMHA Rent</th>
-                  <th style="background:rgba(74,222,128,0.10);color:#4ade80">Tenant Rent</th>
-                  <th style="background:rgba(96,165,250,0.10);color:#60a5fa">CMHA Paid</th>
-                  <th style="background:rgba(74,222,128,0.10);color:#4ade80">Tenant Paid</th>
+                  <th style="background:rgba(245,158,11,0.12);color:#f59e0b">CMHA Rent</th>
+                  <th style="background:rgba(245,158,11,0.12);color:#f59e0b">Tenant Rent</th>
+                  <th style="background:rgba(74,222,128,0.12);color:#4ade80">CMHA Paid</th>
+                  <th style="background:rgba(74,222,128,0.12);color:#4ade80">Tenant Paid</th>
                   <th onclick="sortBy('collected')">Collected (CMHA/Tenant)</th>
                   <th>Balance (CMHA/Tenant)</th>
                   <th>Notes</th>
@@ -6645,10 +6645,10 @@ function renderTable(){
     return `<tr id="row-${p.id}">
       <td style="position:relative">${mp.cmha>0?`<span title="Section 8 / CMHA rent on file" style="position:absolute;top:4px;right:6px;min-width:18px;height:14px;border-radius:7px;background:#60a5fa;color:#0d0d10;font-size:9px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;pointer-events:none">S8</span>`:''}<div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
       <td id="cell-status-${p.id}">${statusCell}</td>
-      <td id="cell-cmha-${p.id}" class="money" style="${warnStyle||'background:rgba(96,165,250,0.06)'}">${cmhaRentCell}</td>
-      <td id="cell-tenantPortion-${p.id}" class="money" style="${warnStyle||'background:rgba(74,222,128,0.06)'}">${tRentCell}</td>
-      <td id="cell-cmhaPaid-${p.id}" class="money" style="background:rgba(96,165,250,0.06)">${cmhaPaidCell}</td>
-      <td id="cell-tenantPaid-${p.id}" class="money" style="background:rgba(74,222,128,0.06)">${tPaidCell}</td>
+      <td id="cell-cmha-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.07)'}">${cmhaRentCell}</td>
+      <td id="cell-tenantPortion-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.07)'}">${tRentCell}</td>
+      <td id="cell-cmhaPaid-${p.id}" class="money" style="background:rgba(74,222,128,0.07)">${cmhaPaidCell}</td>
+      <td id="cell-tenantPaid-${p.id}" class="money" style="background:rgba(74,222,128,0.07)">${tPaidCell}</td>
       <td class="money ${mp.collected>0?'m-pos':''}">${fmtD(mp.collected)}</td>
       <td>${balCell}</td>
       <td>${edit?`<span class="editable" onclick="inlineEditNote('${p.id}',this)" style="font-size:11px;color:${mp.monthNote?'var(--text)':'var(--muted2)'};max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="${escapeAttr(mp.monthNote||'')}">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`:`<span style="font-size:11px;color:var(--muted)">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`}</td>
@@ -10840,7 +10840,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-12';
+const APP_VERSION='2026-06-23-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
