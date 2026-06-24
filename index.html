@@ -6627,7 +6627,7 @@ function renderTable(){
     const cmhaPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','cmhaPaid',this,'monthCmhaPaid')">${mp.cmhaPaid>0?fmt(mp.cmhaPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.cmhaPaid);
     const tPaidCell=edit?`<span class="editable" onclick="inlineEditNum('${p.id}','tenantPaid',this,'monthTenantPaid')">${mp.tenantPaid>0?fmt(mp.tenantPaid):'<span class="m-muted">—</span>'}</span>`:fmtD(mp.tenantPaid);
     return `<tr id="row-${p.id}">
-      <td>${mp.cmha>0?`<div style="margin-bottom:2px"><span title="Section 8 / CMHA rent on file" style="display:inline-block;padding:1px 6px;border-radius:8px;background:#60a5fa;color:#0d0d10;font-size:9px;font-weight:800;letter-spacing:.04em;line-height:1.3">S8</span></div>`:''}<div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
+      <td style="position:relative">${mp.cmha>0?`<span title="Section 8 / CMHA rent on file" style="position:absolute;top:4px;right:6px;min-width:18px;height:14px;border-radius:7px;background:#60a5fa;color:#0d0d10;font-size:9px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;pointer-events:none">S8</span>`:''}<div class="addr-main" title="${p.addr}">${p.addr}</div>${p.tenant?`<div class="addr-note">${p.tenant}</div>`:''}</td>
       <td id="cell-status-${p.id}">${statusCell}</td>
       <td id="cell-cmha-${p.id}" class="money" ${warnStyle?`style="${warnStyle}"`:''}>${cmhaRentCell}</td>
       <td id="cell-tenantPortion-${p.id}" class="money" ${warnStyle?`style="${warnStyle}"`:''}>${tRentCell}</td>
@@ -10770,7 +10770,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-09';
+const APP_VERSION='2026-06-23-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
