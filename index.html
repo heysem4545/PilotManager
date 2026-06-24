@@ -8285,6 +8285,7 @@ function renderTenantLeaseView(){
       <td><input type="text" value="${escapeAttr(tName)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','tenantName2',this.value)"></td>
       <td><input type="tel" value="${escapeAttr(tNum)}" placeholder="📞" style="${ism};width:110px" ${dis} onblur="updatePropertyField('${p.id}','tenantNumber2',this.value)"></td>
       <td><input type="email" value="${escapeAttr(p.tenantEmail||'')}" placeholder="✉" style="${is};width:130px" ${dis} onblur="updatePropertyField('${p.id}','tenantEmail',this.value)"></td>
+      <td class="money" style="background:rgba(201,245,99,0.08);color:${(((parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0))>0)?'var(--accent)':'var(--muted2)'};font-weight:600;font-family:var(--mono);font-size:11px" title="Total Deposit (from Deposit Tracking)">${(()=>{const t=(parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0);return t>0?fmt(t):'—';})()}</td>
       <td>${(()=>{
         const methods=['Zelle','Doorloop','Turbotenant','Money Order','Cash'];
         const saved=(p.payMethods||[]);
@@ -8313,6 +8314,7 @@ function renderTenantLeaseView(){
             <th>👤 Tenant Name</th>
             <th>📞 Tenant Number</th>
             <th>✉ Email</th>
+            <th style="background:rgba(201,245,99,0.18);color:var(--accent)">💰 Deposit</th>
             <th>💳 Pay Method With</th>
             <th>📋 Secondary Info</th>
             <th>📝 Notes</th>
@@ -10970,7 +10972,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-17';
+const APP_VERSION='2026-06-23-18';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
