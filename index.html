@@ -8455,7 +8455,7 @@ function renderDepositTracking(){
   const el=document.getElementById('depositTrackingView');
   if(!el)return;
   const editable=canEdit();
-  const sorted=[...properties].sort((a,b)=>(a.addr||'').localeCompare(b.addr||''));
+  const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
   const term=depositSearchTerm.toLowerCase();
   const list=term?sorted.filter(p=>(p.addr||'').toLowerCase().includes(term)):sorted;
 
@@ -10968,7 +10968,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-15';
+const APP_VERSION='2026-06-23-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
