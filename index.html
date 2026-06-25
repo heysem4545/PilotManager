@@ -8756,6 +8756,30 @@ function filterHistoryLog(){
 // ─────────────────────────────────────────────
 // INLINE EDITING
 // ─────────────────────────────────────────────
+// Position a fixed-position popup near a cell, flipping above when
+// there isn't enough room below it (so dropdowns on the last few
+// rows of long tables don't get clipped by the viewport).
+function positionPopup(popup, cell, gap=4){
+  const rect=cell.getBoundingClientRect();
+  const popupH=popup.offsetHeight || 0;
+  const popupW=popup.offsetWidth || 0;
+  const vh=window.innerHeight||document.documentElement.clientHeight;
+  const vw=window.innerWidth||document.documentElement.clientWidth;
+  const spaceBelow=vh-rect.bottom;
+  const spaceAbove=rect.top;
+  let top;
+  if(spaceBelow>=popupH+gap+8 || spaceBelow>=spaceAbove){
+    top=Math.min(rect.bottom+gap, vh-popupH-8);
+  } else {
+    top=Math.max(8, rect.top-popupH-gap);
+  }
+  let left=rect.left;
+  if(left+popupW>vw-8) left=Math.max(8, vw-popupW-8);
+  popup.style.top=top+'px';
+  popup.style.left=left+'px';
+  popup.style.visibility='visible';
+}
+
 function inlineEditStatus(propId, cell){
   if(!canEdit())return;
   // Remove any existing popup
@@ -8768,12 +8792,8 @@ function inlineEditStatus(propId, cell){
   
   const popup=document.createElement('div');
   popup.id='statusPopup';
-  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:160px';
-  
-  const rect=cell.getBoundingClientRect();
-  popup.style.top=(rect.bottom+4)+'px';
-  popup.style.left=rect.left+'px';
-  
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:160px;visibility:hidden';
+
   statuses.forEach(s=>{
     const btn=document.createElement('button');
     btn.textContent=BL[s]||s;
@@ -8790,8 +8810,9 @@ function inlineEditStatus(propId, cell){
     };
     popup.appendChild(btn);
   });
-  
+
   document.body.appendChild(popup);
+  positionPopup(popup, cell);
   
   // Close on outside click
   setTimeout(()=>{
@@ -8815,11 +8836,7 @@ function inlineEditBedroom(propId, cell){
 
   const popup=document.createElement('div');
   popup.id='bedroomPopup';
-  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px';
-
-  const rect=cell.getBoundingClientRect();
-  popup.style.top=(rect.bottom+4)+'px';
-  popup.style.left=rect.left+'px';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px;visibility:hidden';
 
   options.forEach(opt=>{
     const btn=document.createElement('button');
@@ -8839,6 +8856,7 @@ function inlineEditBedroom(propId, cell){
   });
 
   document.body.appendChild(popup);
+  positionPopup(popup, cell);
 
   setTimeout(()=>{
     document.addEventListener('click', function handler(e){
@@ -8861,11 +8879,7 @@ function inlineEditBath(propId, cell){
 
   const popup=document.createElement('div');
   popup.id='bathPopup';
-  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px';
-
-  const rect=cell.getBoundingClientRect();
-  popup.style.top=(rect.bottom+4)+'px';
-  popup.style.left=rect.left+'px';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:8px;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:4px;min-width:120px;visibility:hidden';
 
   options.forEach(opt=>{
     const btn=document.createElement('button');
@@ -8885,6 +8899,7 @@ function inlineEditBath(propId, cell){
   });
 
   document.body.appendChild(popup);
+  positionPopup(popup, cell);
 
   setTimeout(()=>{
     document.addEventListener('click', function handler(e){
@@ -11114,7 +11129,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-01';
+const APP_VERSION='2026-06-25-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
