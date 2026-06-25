@@ -1301,6 +1301,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div class="fg"><label>Unit</label><input id="f_unit" placeholder="Apt 1A"></div>
       <div class="fg"><label>Status</label>
         <select id="f_status">
+          <option value="">— None —</option>
           <option value="RENTED">Rented</option>
           <option value="VACANT">Vacant</option>
           <option value="EVICTION">Eviction</option>
@@ -11129,7 +11130,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-02';
+const APP_VERSION='2026-06-25-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
