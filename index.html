@@ -7290,12 +7290,12 @@ async function renderNotificationsView(){
     </div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>Event Trigger</th><th>Recipient</th><th>Phone/Email</th><th>Status</th><th>Created</th><th></th>
+        <th>Event Trigger</th><th>Recipient</th><th>${notifTab==='telegram'?'Chat ID':'Phone/Email'}</th><th>Status</th><th>Created</th><th></th>
       </tr></thead>
       <tbody>${channelRules.length?channelRules.map(r=>`<tr>
         <td style="font-size:12px;font-weight:500">${escapeHtml(r.trigger||'—')}</td>
         <td style="font-size:11px">${escapeHtml(r.recipientName||'—')}</td>
-        <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(r.recipientContact||'—')}</td>
+        <td style="font-size:11px;font-family:var(--mono)" title="${r.channel==='telegram'?'Telegram Chat ID':'Phone or email'}">${escapeHtml(r.recipientContact||'—')}</td>
         <td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${r.active?'var(--accent-dim)':'var(--surface3)'};color:${r.active?'var(--accent)':'var(--muted)'};font-weight:600">${r.active?'Active':'Paused'}</span></td>
         <td style="font-size:10px;font-family:var(--mono);color:var(--muted)">${r.createdDate||'—'}</td>
         <td style="display:flex;gap:4px">
@@ -11183,7 +11183,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-04';
+const APP_VERSION='2026-06-25-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
