@@ -216,16 +216,12 @@ async function logNotification(channel, trigger, recipientName, recipientContact
   }
 }
 
-// Send WhatsApp when a new Innovation item is submitted
+// Send a Telegram alert when a new Innovation item is submitted.
 exports.onNewInnovation = onDocumentCreated(
-  { document: "innovation/{docId}", secrets: [TWILIO_SID, TWILIO_AUTH, TWILIO_WA_FROM, ADMIN_WA_TO, TELEGRAM_BOT_TOKEN] },
+  { document: "innovation/{docId}", secrets: [TELEGRAM_BOT_TOKEN] },
   async (event) => {
     const data = event.data.data();
     if (!data) return;
-
-    const client = twilio(TWILIO_SID.value(), TWILIO_AUTH.value());
-    const fromWA = `whatsapp:${TWILIO_WA_FROM.value()}`;
-    const adminWA = `whatsapp:${ADMIN_WA_TO.value()}`;
 
     const type = data.type || "Unknown";
     const urgent = data.urgentLevel || "Medium";
@@ -234,23 +230,13 @@ exports.onNewInnovation = onDocumentCreated(
     const emoji = type === "Bug" ? "🐛" : "💡";
     const urgentEmoji = { Low: "🟢", Medium: "🟡", High: "🔴", Critical: "🚨" }[urgent] || "🟡";
 
-    const message = `${emoji} *New ${type}* — PilotManager\n\n` +
+    const message = `${emoji} New ${type} — PilotManager\n\n` +
       `👤 From: ${user}\n` +
       `${urgentEmoji} Urgent: ${urgent}\n` +
       `📅 Date: ${data.date || "N/A"}\n\n` +
       `📝 ${desc}`;
 
-    // Send to admin
-    try {
-      await client.messages.create({ from: fromWA, to: adminWA, body: message });
-      await logNotification("whatsapp", "New Innovation Submitted", "Admin", ADMIN_WA_TO.value(), message, "delivered");
-      logger.info("WhatsApp sent for innovation:", event.params.docId);
-    } catch (err) {
-      await logNotification("whatsapp", "New Innovation Submitted", "Admin", ADMIN_WA_TO.value(), message, "failed");
-      logger.error("WhatsApp send failed:", err.message);
-    }
-
-    // Check notification rules for additional recipients
+    // Telegram rules only — WhatsApp/SMS/Email rules are ignored for now.
     try {
       const rulesSnap = await firestore.collection("notificationRules")
         .where("trigger", "==", "New Innovation Submitted")
@@ -260,29 +246,13 @@ exports.onNewInnovation = onDocumentCreated(
       const tgToken = TELEGRAM_BOT_TOKEN.value();
       for (const ruleDoc of rulesSnap.docs) {
         const rule = ruleDoc.data();
-        if (rule.channel === "whatsapp" && rule.recipientContact) {
-          try {
-            await client.messages.create({
-              from: fromWA,
-              to: `whatsapp:${rule.recipientContact}`,
-              body: message,
-            });
-            await logNotification("whatsapp", "New Innovation Submitted", rule.recipientName, rule.recipientContact, message, "delivered");
-          } catch (err) {
-            await logNotification("whatsapp", "New Innovation Submitted", rule.recipientName, rule.recipientContact, message, "failed");
-            logger.error(`WhatsApp to ${rule.recipientContact} failed:`, err.message);
-          }
-        } else if (rule.channel === "telegram" && rule.recipientContact) {
-          // Telegram uses Markdown for emphasis — strip the WhatsApp-style
-          // asterisks around the title so it renders cleanly.
-          const tgMessage = message.replace(/\*([^*]+)\*/g, "$1");
-          try {
-            await _telegramSend(tgToken, rule.recipientContact, tgMessage);
-            await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, tgMessage, "delivered");
-          } catch (err) {
-            await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, tgMessage, "failed");
-            logger.error(`Telegram to ${rule.recipientContact} failed:`, err.message);
-          }
+        if (rule.channel !== "telegram" || !rule.recipientContact) continue;
+        try {
+          await _telegramSend(tgToken, rule.recipientContact, message);
+          await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, message, "delivered");
+        } catch (err) {
+          await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, message, "failed");
+          logger.error(`Telegram to ${rule.recipientContact} failed:`, err.message);
         }
       }
     } catch (e) {
