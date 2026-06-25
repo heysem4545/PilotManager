@@ -8293,7 +8293,8 @@ function renderTenantLeaseView(){
         const opts=methods.map(m=>`<option value="${m}">${saved.includes(m)?'✓ ':''} ${m}</option>`).join('');
         return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap">${display}<select ${dis} style="font-size:9px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;background:var(--surface2);color:var(--muted);cursor:pointer;width:18px" onchange="togglePayMethod('${p.id}',this.value,true);this.selectedIndex=0"><option value="">+</option>${opts}</select></div>`;
       })()}</td>
-      <td><input type="text" value="${escapeAttr(secInfo)}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
+      <td><input type="tel" value="${escapeAttr(secInfo)}" placeholder="📞" style="${ism};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(p.emergencyName||'')}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','emergencyName',this.value)"></td>
       <td><input type="text" value="${escapeAttr(notes)}" placeholder="📝" style="${is};width:140px" ${dis} onblur="updatePropertyField('${p.id}','tenantNotes',this.value)"></td>
       <td style="text-align:center">${editable?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--purple);border-color:var(--purple-dim,var(--border2))" onclick="archiveTenant('${p.id}')">📦 Archive</button>`:''}</td>
     </tr>`;
@@ -8316,7 +8317,8 @@ function renderTenantLeaseView(){
             <th>✉ Email</th>
             <th style="background:rgba(201,245,99,0.18);color:var(--accent)">💰 Deposit</th>
             <th>💳 Pay Method With</th>
-            <th>📋 Secondary Info</th>
+            <th>🚨 Emergency #</th>
+            <th>🚨 Emergency Name</th>
             <th>📝 Notes</th>
             <th>📦</th>
           </tr></thead>
@@ -8351,6 +8353,7 @@ async function archiveTenant(propId){
     leaseEffective:p.leaseEffective2||'',
     leaseExpire:p.leaseExpire2||'',
     secondaryInfo:p.secondaryInfo||'',
+    emergencyName:p.emergencyName||'',
     tenantNotes:p.tenantNotes||'',
     payMethods:p.payMethods||[],
     archivedDate:new Date().toISOString().slice(0,10)
@@ -8360,12 +8363,12 @@ async function archiveTenant(propId){
       tenantArchive:archive,
       tenantName2:'',tenantNumber2:'',tenantEmail:'',
       leaseEffective2:'',leaseExpire2:'',
-      secondaryInfo:'',tenantNotes:'',payMethods:[]
+      secondaryInfo:'',emergencyName:'',tenantNotes:'',payMethods:[]
     });
     p.tenantArchive=archive;
     p.tenantName2='';p.tenantNumber2='';p.tenantEmail='';
     p.leaseEffective2='';p.leaseExpire2='';
-    p.secondaryInfo='';p.tenantNotes='';p.payMethods=[];
+    p.secondaryInfo='';p.emergencyName='';p.tenantNotes='';p.payMethods=[];
     toast('Tenant archived');
     renderTenantLeaseView();
   }catch(e){toast('Error: '+e.message);}
@@ -11111,7 +11114,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-23-19';
+const APP_VERSION='2026-06-25-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
