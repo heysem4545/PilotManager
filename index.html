@@ -7247,6 +7247,7 @@ async function renderNotificationsView(){
   }
 
   const tabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
+    <button class="maint-vtab${notifTab==='telegram'?' active':''}" onclick="notifTab='telegram';renderNotificationsView()">📨 Telegram</button>
     <button class="maint-vtab${notifTab==='whatsapp'?' active':''}" onclick="notifTab='whatsapp';renderNotificationsView()">📱 WhatsApp</button>
     <button class="maint-vtab${notifTab==='sms'?' active':''}" onclick="notifTab='sms';renderNotificationsView()">💬 SMS</button>
     <button class="maint-vtab${notifTab==='email'?' active':''}" onclick="notifTab='email';renderNotificationsView()">✉ Email</button>
@@ -7327,17 +7328,30 @@ async function renderNotificationsView(){
   el.innerHTML=html;
 }
 
-function openAddNotifRule(){
+async function openAddNotifRule(){
   const modal=document.createElement('div');
   modal.className='overlay open';
   modal.id='notifRuleModal';
   modal.onclick=e=>{if(e.target===modal) modal.remove();};
   const triggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
   const triggerOpts=triggers.map(t=>`<option value="${t}">${t}</option>`).join('');
+
+  // Preload users for the Telegram recipient picker.
+  let users=[];
+  try{
+    const snap=await db.collection('users').get();
+    users=snap.docs.map(d=>({uid:d.id,...d.data()}));
+  }catch(e){}
+  const linkedUsers=users.filter(u=>u.telegramChatId);
+  const userOpts=linkedUsers.length
+    ? linkedUsers.map(u=>`<option value="${u.uid}" data-name="${escapeAttr(u.name||u.email||'')}" data-chat="${escapeAttr(u.telegramChatId)}">${escapeHtml(u.name||u.email||u.uid)}</option>`).join('')
+    : '<option value="" disabled>No team members have a Telegram Chat ID linked — set it on the Team page first.</option>';
+
   modal.innerHTML=`<div class="modal" style="width:480px">
     <div class="modal-title"><span>+ Add Notification Rule</span><button class="modal-close" onclick="document.getElementById('notifRuleModal').remove()">×</button></div>
     <div class="fg"><label>Channel</label>
-      <select id="nrChannel" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      <select id="nrChannel" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%" onchange="onNotifChannelChange()">
+        <option value="telegram" ${notifTab==='telegram'?'selected':''}>📨 Telegram</option>
         <option value="whatsapp" ${notifTab==='whatsapp'?'selected':''}>📱 WhatsApp</option>
         <option value="sms" ${notifTab==='sms'?'selected':''}>💬 SMS</option>
         <option value="email" ${notifTab==='email'?'selected':''}>✉ Email</option>
@@ -7346,11 +7360,20 @@ function openAddNotifRule(){
     <div class="fg"><label>Event Trigger</label>
       <select id="nrTrigger" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${triggerOpts}</select>
     </div>
-    <div class="fg"><label>Recipient Name</label>
-      <input type="text" id="nrName" placeholder="e.g. Sami, Mark, Office" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+    <div id="nrTelegramBlock" class="fg" style="display:none">
+      <label>Telegram Recipient (Team Member)</label>
+      <select id="nrTelegramUser" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        ${userOpts}
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Recipient list is pulled from team members with a linked Telegram Chat ID.</div>
     </div>
-    <div class="fg"><label>Phone Number or Email</label>
-      <input type="text" id="nrContact" placeholder="+1234567890 or email@example.com" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+    <div id="nrManualBlock">
+      <div class="fg"><label>Recipient Name</label>
+        <input type="text" id="nrName" placeholder="e.g. Sami, Mark, Office" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <div class="fg"><label>Phone Number or Email</label>
+        <input type="text" id="nrContact" placeholder="+1234567890 or email@example.com" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('notifRuleModal').remove()">Cancel</button>
@@ -7358,20 +7381,50 @@ function openAddNotifRule(){
     </div>
   </div>`;
   document.body.appendChild(modal);
+  onNotifChannelChange();
+}
+
+function onNotifChannelChange(){
+  const ch=document.getElementById('nrChannel');
+  const tg=document.getElementById('nrTelegramBlock');
+  const man=document.getElementById('nrManualBlock');
+  if(!ch||!tg||!man) return;
+  if(ch.value==='telegram'){
+    tg.style.display='';
+    man.style.display='none';
+  } else {
+    tg.style.display='none';
+    man.style.display='';
+  }
 }
 
 async function saveNotifRule(){
   const channel=document.getElementById('nrChannel').value;
   const trigger=document.getElementById('nrTrigger').value;
-  const recipientName=document.getElementById('nrName').value.trim();
-  const recipientContact=document.getElementById('nrContact').value.trim();
-  if(!recipientName||!recipientContact){toast('Fill in all fields');return;}
+  let recipientName='';
+  let recipientContact='';
+  let recipientUid=null;
+  if(channel==='telegram'){
+    const sel=document.getElementById('nrTelegramUser');
+    if(!sel||!sel.value){toast('Pick a team member with a linked Telegram Chat ID');return;}
+    const opt=sel.options[sel.selectedIndex];
+    recipientUid=sel.value;
+    recipientName=opt.getAttribute('data-name')||'';
+    recipientContact=opt.getAttribute('data-chat')||'';
+    if(!recipientContact){toast('Selected member has no Telegram Chat ID');return;}
+  } else {
+    recipientName=(document.getElementById('nrName').value||'').trim();
+    recipientContact=(document.getElementById('nrContact').value||'').trim();
+    if(!recipientName||!recipientContact){toast('Fill in all fields');return;}
+  }
   try{
-    await db.collection('notificationRules').add({
+    const doc={
       channel, trigger, recipientName, recipientContact,
       active:true, createdDate:new Date().toISOString().slice(0,10),
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if(recipientUid) doc.recipientUid=recipientUid;
+    await db.collection('notificationRules').add(doc);
     document.getElementById('notifRuleModal').remove();
     toast('Rule created');
     renderNotificationsView();
@@ -11130,7 +11183,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-03';
+const APP_VERSION='2026-06-25-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;

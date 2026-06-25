@@ -218,7 +218,7 @@ async function logNotification(channel, trigger, recipientName, recipientContact
 
 // Send WhatsApp when a new Innovation item is submitted
 exports.onNewInnovation = onDocumentCreated(
-  { document: "innovation/{docId}", secrets: [TWILIO_SID, TWILIO_AUTH, TWILIO_WA_FROM, ADMIN_WA_TO] },
+  { document: "innovation/{docId}", secrets: [TWILIO_SID, TWILIO_AUTH, TWILIO_WA_FROM, ADMIN_WA_TO, TELEGRAM_BOT_TOKEN] },
   async (event) => {
     const data = event.data.data();
     if (!data) return;
@@ -257,6 +257,7 @@ exports.onNewInnovation = onDocumentCreated(
         .where("active", "==", true)
         .get();
 
+      const tgToken = TELEGRAM_BOT_TOKEN.value();
       for (const ruleDoc of rulesSnap.docs) {
         const rule = ruleDoc.data();
         if (rule.channel === "whatsapp" && rule.recipientContact) {
@@ -270,6 +271,17 @@ exports.onNewInnovation = onDocumentCreated(
           } catch (err) {
             await logNotification("whatsapp", "New Innovation Submitted", rule.recipientName, rule.recipientContact, message, "failed");
             logger.error(`WhatsApp to ${rule.recipientContact} failed:`, err.message);
+          }
+        } else if (rule.channel === "telegram" && rule.recipientContact) {
+          // Telegram uses Markdown for emphasis — strip the WhatsApp-style
+          // asterisks around the title so it renders cleanly.
+          const tgMessage = message.replace(/\*([^*]+)\*/g, "$1");
+          try {
+            await _telegramSend(tgToken, rule.recipientContact, tgMessage);
+            await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, tgMessage, "delivered");
+          } catch (err) {
+            await logNotification("telegram", "New Innovation Submitted", rule.recipientName, rule.recipientContact, tgMessage, "failed");
+            logger.error(`Telegram to ${rule.recipientContact} failed:`, err.message);
           }
         }
       }
