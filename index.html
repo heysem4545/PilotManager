@@ -7359,13 +7359,26 @@ async function openAddNotifRule(existing){
   const reportOpts=scheduledReports.map(r=>`<option value="${r.value}" ${exSched.reportType===r.value?'selected':''}>${r.label}</option>`).join('');
   const defaultDow=exSched.dayOfWeek!=null?Number(exSched.dayOfWeek):5;
   const defaultHour=exSched.hour!=null?Number(exSched.hour):8;
+  const defaultMinute=exSched.minute!=null?Number(exSched.minute):0;
   const defaultDom=exSched.dayOfMonth!=null?Number(exSched.dayOfMonth):1;
   const dowOpts=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
     .map((d,i)=>`<option value="${i}" ${i===defaultDow?'selected':''}>${d}</option>`).join('');
-  const hourOpts=Array.from({length:24},(_,h)=>{
-    const label=h===0?'12:00 AM':h<12?`${h}:00 AM`:h===12?'12:00 PM':`${h-12}:00 PM`;
-    return `<option value="${h}" ${h===defaultHour?'selected':''}>${label}</option>`;
-  }).join('');
+  const fmtHM=(h,m)=>{
+    const hh=h===0?12:h>12?h-12:h;
+    const mm=String(m).padStart(2,'0');
+    const ampm=h<12?'AM':'PM';
+    return `${hh}:${mm} ${ampm}`;
+  };
+  const hourOpts=(()=>{
+    const opts=[];
+    for(let h=0;h<24;h++){
+      for(const m of [0,15,30,45]){
+        const sel=(h===defaultHour && m===defaultMinute)?'selected':'';
+        opts.push(`<option value="${h}:${m}" ${sel}>${fmtHM(h,m)}</option>`);
+      }
+    }
+    return opts.join('');
+  })();
   const channels=[['telegram','📨 Telegram'],['whatsapp','📱 WhatsApp'],['sms','💬 SMS'],['email','✉ Email']];
   const channelDefault=existing?existing.channel:notifTab;
   const channelOpts=channels.map(([v,l])=>`<option value="${v}" ${v===channelDefault?'selected':''}>${l}</option>`).join('');
@@ -7509,11 +7522,14 @@ async function saveNotifRule(){
   if(triggerType==='scheduled'){
     const reportType=document.getElementById('nrReportType').value;
     const frequency=document.getElementById('nrFrequency').value;
-    const hour=parseInt(document.getElementById('nrHour').value,10)||8;
+    const hmRaw=document.getElementById('nrHour').value;
+    const [hStr,mStr]=hmRaw.split(':');
+    const hour=parseInt(hStr,10)||0;
+    const minute=parseInt(mStr,10)||0;
     schedule.reportType=reportType;
     schedule.frequency=frequency;
     schedule.hour=hour;
-    schedule.minute=0;
+    schedule.minute=minute;
     schedule.timezone='America/New_York';
     if(frequency==='weekly') schedule.dayOfWeek=parseInt(document.getElementById('nrDow').value,10);
     if(frequency==='monthly') schedule.dayOfMonth=Math.max(1,Math.min(31,parseInt(document.getElementById('nrDom').value,10)||1));
@@ -7524,8 +7540,10 @@ async function saveNotifRule(){
       pilotTechDaily:'Pilot Technician Daily Log'
     };
     const dayLabel=frequency==='weekly'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][schedule.dayOfWeek])+' ':frequency==='monthly'?`day ${schedule.dayOfMonth} `:'';
-    const hourLabel=hour===0?'12AM':hour<12?`${hour}AM`:hour===12?'12PM':`${hour-12}PM`;
-    trigger=`${reportLabels[reportType]||reportType} · ${frequency} ${dayLabel}${hourLabel}`;
+    const hh=hour===0?12:hour>12?hour-12:hour;
+    const ampm=hour<12?'AM':'PM';
+    const timeLabel=minute===0?`${hh}${ampm}`:`${hh}:${String(minute).padStart(2,'0')}${ampm}`;
+    trigger=`${reportLabels[reportType]||reportType} · ${frequency} ${dayLabel}${timeLabel}`;
   } else {
     trigger=document.getElementById('nrTrigger').value;
   }
@@ -11320,7 +11338,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-09';
+const APP_VERSION='2026-06-25-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
