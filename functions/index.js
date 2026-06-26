@@ -261,28 +261,6 @@ exports.onNewInnovation = onDocumentCreated(
   }
 );
 
-// Daily SMS reminder at 6 PM EST
-exports.dailyTechLogReminder = onSchedule(
-  {
-    schedule: "0 19 * * *",
-    timeZone: "America/New_York",
-    secrets: [TWILIO_SID, TWILIO_AUTH, SMS_FROM, SMS_TO],
-  },
-  async () => {
-    const client = twilio(TWILIO_SID.value(), TWILIO_AUTH.value());
-    const message = "Pilot Technician Daily Log";
-
-    try {
-      await client.messages.create({
-        from: SMS_FROM.value(),
-        to: SMS_TO.value(),
-        body: message,
-      });
-      await logNotification("sms", "Daily Tech Log Reminder", "Owner", SMS_TO.value(), message, "delivered");
-      logger.info("Daily SMS reminder sent");
-    } catch (err) {
-      await logNotification("sms", "Daily Tech Log Reminder", "Owner", SMS_TO.value(), message, "failed");
-      logger.error("Daily SMS send failed:", err.message);
-    }
-  }
-);
+// Daily SMS reminder disabled — kept as a no-op so an existing
+// deployment doesn't keep firing. Run `firebase functions:delete
+// dailyTechLogReminder` after deploy to remove it from the cloud.
