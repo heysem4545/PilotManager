@@ -7300,6 +7300,7 @@ async function renderNotificationsView(){
         <td style="font-size:10px;font-family:var(--mono);color:var(--muted)">${r.createdDate||'—'}</td>
         <td style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" onclick="toggleNotifRule('${r.id}',${!r.active})">${r.active?'Pause':'Resume'}</button>
+          <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--blue);border-color:rgba(96,165,250,0.35)" onclick="openEditNotifRule('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" style="padding:2px 6px;font-size:9px" onclick="deleteNotifRule('${r.id}')">×</button>
         </td>
       </tr>`).join(''):'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">No rules yet — click "+ Add Rule"</td></tr>'}</tbody>
@@ -7328,25 +7329,49 @@ async function renderNotificationsView(){
   el.innerHTML=html;
 }
 
-async function openAddNotifRule(){
+let editingRuleId=null;
+
+async function openEditNotifRule(id){
+  let existing=null;
+  try{
+    const snap=await db.collection('notificationRules').doc(id).get();
+    if(snap.exists) existing={id:snap.id,...snap.data()};
+  }catch(e){toast('Error loading rule: '+e.message);return;}
+  if(!existing){toast('Rule not found');return;}
+  await openAddNotifRule(existing);
+}
+
+async function openAddNotifRule(existing){
+  editingRuleId=existing?existing.id:null;
   const modal=document.createElement('div');
   modal.className='overlay open';
   modal.id='notifRuleModal';
   modal.onclick=e=>{if(e.target===modal) modal.remove();};
   const eventTriggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
-  const eventTriggerOpts=eventTriggers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const eventTriggerOpts=eventTriggers.map(t=>`<option value="${t}" ${existing&&existing.trigger===t?'selected':''}>${t}</option>`).join('');
   const scheduledReports=[
     {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'},
     {value:'callLog', label:'📞 Dashboard Call Log Report (Total + by reason)'},
     {value:'utilityBills', label:'💧 Utility Bills Report (Water / Sewer)'}
   ];
-  const reportOpts=scheduledReports.map(r=>`<option value="${r.value}">${r.label}</option>`).join('');
+  const exSched=(existing&&existing.schedule)||{};
+  const reportOpts=scheduledReports.map(r=>`<option value="${r.value}" ${exSched.reportType===r.value?'selected':''}>${r.label}</option>`).join('');
+  const defaultDow=exSched.dayOfWeek!=null?Number(exSched.dayOfWeek):5;
+  const defaultHour=exSched.hour!=null?Number(exSched.hour):8;
+  const defaultDom=exSched.dayOfMonth!=null?Number(exSched.dayOfMonth):1;
   const dowOpts=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-    .map((d,i)=>`<option value="${i}" ${i===5?'selected':''}>${d}</option>`).join('');
+    .map((d,i)=>`<option value="${i}" ${i===defaultDow?'selected':''}>${d}</option>`).join('');
   const hourOpts=Array.from({length:24},(_,h)=>{
     const label=h===0?'12:00 AM':h<12?`${h}:00 AM`:h===12?'12:00 PM':`${h-12}:00 PM`;
-    return `<option value="${h}" ${h===8?'selected':''}>${label}</option>`;
+    return `<option value="${h}" ${h===defaultHour?'selected':''}>${label}</option>`;
   }).join('');
+  const channels=[['telegram','📨 Telegram'],['whatsapp','📱 WhatsApp'],['sms','💬 SMS'],['email','✉ Email']];
+  const channelDefault=existing?existing.channel:notifTab;
+  const channelOpts=channels.map(([v,l])=>`<option value="${v}" ${v===channelDefault?'selected':''}>${l}</option>`).join('');
+  const freqDefault=exSched.frequency||'weekly';
+  const freqOpts=[['weekly','Weekly'],['daily','Daily'],['monthly','Monthly']]
+    .map(([v,l])=>`<option value="${v}" ${v===freqDefault?'selected':''}>${l}</option>`).join('');
+  const initialTriggerType=existing?(existing.triggerType||'event'):'event';
 
   // Preload users for the Telegram recipient picker.
   let users=[];
@@ -7355,19 +7380,20 @@ async function openAddNotifRule(){
     users=snap.docs.map(d=>({uid:d.id,...d.data()}));
   }catch(e){}
   const linkedUsers=users.filter(u=>u.telegramChatId);
+  const exUid=existing?existing.recipientUid:null;
   const userOpts=linkedUsers.length
-    ? linkedUsers.map(u=>`<option value="${u.uid}" data-name="${escapeAttr(u.name||u.email||'')}" data-chat="${escapeAttr(u.telegramChatId)}">${escapeHtml(u.name||u.email||u.uid)}</option>`).join('')
+    ? linkedUsers.map(u=>`<option value="${u.uid}" data-name="${escapeAttr(u.name||u.email||'')}" data-chat="${escapeAttr(u.telegramChatId)}" ${u.uid===exUid?'selected':''}>${escapeHtml(u.name||u.email||u.uid)}</option>`).join('')
     : '<option value="" disabled>No team members have a Telegram Chat ID linked — set it on the Team page first.</option>';
 
+  const titleText=existing?'✏ Edit Notification Rule':'+ Add Notification Rule';
+  const saveBtnText=existing?'Save Changes':'Save Rule';
+
   modal.innerHTML=`<div class="modal" style="width:520px;max-height:90vh;overflow-y:auto">
-    <div class="modal-title"><span>+ Add Notification Rule</span><button class="modal-close" onclick="document.getElementById('notifRuleModal').remove()">×</button></div>
+    <div class="modal-title"><span>${titleText}</span><button class="modal-close" onclick="document.getElementById('notifRuleModal').remove()">×</button></div>
 
     <div class="fg"><label>Channel</label>
       <select id="nrChannel" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%" onchange="onNotifChannelChange()">
-        <option value="telegram" ${notifTab==='telegram'?'selected':''}>📨 Telegram</option>
-        <option value="whatsapp" ${notifTab==='whatsapp'?'selected':''}>📱 WhatsApp</option>
-        <option value="sms" ${notifTab==='sms'?'selected':''}>💬 SMS</option>
-        <option value="email" ${notifTab==='email'?'selected':''}>✉ Email</option>
+        ${channelOpts}
       </select>
     </div>
 
@@ -7390,17 +7416,13 @@ async function openAddNotifRule(){
         <select id="nrReportType" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${reportOpts}</select>
       </div>
       <div class="fg"><label>Frequency</label>
-        <select id="nrFrequency" onchange="onNotifFrequencyChange()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-          <option value="weekly" selected>Weekly</option>
-          <option value="daily">Daily</option>
-          <option value="monthly">Monthly</option>
-        </select>
+        <select id="nrFrequency" onchange="onNotifFrequencyChange()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${freqOpts}</select>
       </div>
       <div id="nrDowRow" class="fg"><label>Day of Week</label>
         <select id="nrDow" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${dowOpts}</select>
       </div>
       <div id="nrDomRow" class="fg" style="display:none"><label>Day of Month</label>
-        <input type="number" id="nrDom" min="1" max="31" value="1" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="number" id="nrDom" min="1" max="31" value="${defaultDom}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
       </div>
       <div class="fg"><label>Time of Day (America/New_York)</label>
         <select id="nrHour" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${hourOpts}</select>
@@ -7416,20 +7438,20 @@ async function openAddNotifRule(){
     </div>
     <div id="nrManualBlock">
       <div class="fg"><label>Recipient Name</label>
-        <input type="text" id="nrName" placeholder="e.g. Sami, Mark, Office" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="text" id="nrName" placeholder="e.g. Sami, Mark, Office" value="${existing&&existing.channel!=='telegram'?escapeAttr(existing.recipientName||''):''}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
       </div>
       <div class="fg"><label>Phone Number or Email</label>
-        <input type="text" id="nrContact" placeholder="+1234567890 or email@example.com" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <input type="text" id="nrContact" placeholder="+1234567890 or email@example.com" value="${existing&&existing.channel!=='telegram'?escapeAttr(existing.recipientContact||''):''}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('notifRuleModal').remove()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveNotifRule()">Save Rule</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNotifRule()">${saveBtnText}</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
   onNotifChannelChange();
-  onNotifTriggerTypeChange('event');
+  onNotifTriggerTypeChange(initialTriggerType);
 }
 
 function onNotifChannelChange(){
@@ -7522,16 +7544,24 @@ async function saveNotifRule(){
     if(!recipientName||!recipientContact){toast('Fill in all fields');return;}
   }
   try{
-    const doc={
-      channel, trigger, triggerType, recipientName, recipientContact,
-      active:true, createdDate:new Date().toISOString().slice(0,10),
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
-    };
+    const doc={channel, trigger, triggerType, recipientName, recipientContact};
     if(triggerType==='scheduled') doc.schedule=schedule;
-    if(recipientUid) doc.recipientUid=recipientUid;
-    await db.collection('notificationRules').add(doc);
+    else doc.schedule=firebase.firestore.FieldValue.delete();
+    doc.recipientUid=recipientUid||firebase.firestore.FieldValue.delete();
+    if(editingRuleId){
+      // Clear lastFiredKey so a freshly-edited schedule can fire today.
+      doc.lastFiredKey=firebase.firestore.FieldValue.delete();
+      await db.collection('notificationRules').doc(editingRuleId).update(doc);
+      toast('Rule updated');
+    } else {
+      doc.active=true;
+      doc.createdDate=new Date().toISOString().slice(0,10);
+      doc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('notificationRules').add(doc);
+      toast('Rule created');
+    }
+    editingRuleId=null;
     document.getElementById('notifRuleModal').remove();
-    toast('Rule created');
     renderNotificationsView();
   }catch(e){toast('Error: '+e.message);}
 }
@@ -11288,7 +11318,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-07';
+const APP_VERSION='2026-06-25-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
