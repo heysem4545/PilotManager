@@ -307,6 +307,72 @@ async function buildDashboardCollectionReport() {
     `✅ Total collection: ${fmt(totalPaid)} / ${fmt(totalPortion)}`;
 }
 
+// Count calls in callLog for the active NY month, broken down by reason.
+async function buildCallLogReport() {
+  const now = new Date();
+  const ny = nyParts(now);
+  const monthPrefix = `${ny.year}-${String(ny.month).padStart(2, "0")}`;
+  const MNAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  const snap = await firestore.collection("callLog").get();
+  const reasonEmoji = {
+    "Maintenance": "🛠",
+    "Maintenance Follow Up": "🔁",
+    "Payments": "💰",
+    "For Rent": "🏠",
+    "Paperwork": "📄",
+    "Appointment": "📅",
+  };
+  const counts = {};
+  let total = 0;
+  snap.docs.forEach((d) => {
+    const c = d.data();
+    if (!c.date || !String(c.date).startsWith(monthPrefix)) return;
+    total++;
+    const reason = c.reason || "Unspecified";
+    counts[reason] = (counts[reason] || 0) + 1;
+  });
+
+  const sortedReasons = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  let body = sortedReasons.length
+    ? sortedReasons.map((r) => `${reasonEmoji[r] || "•"} ${r}: ${counts[r]}`).join("\n")
+    : "No calls logged this month.";
+
+  return `📞 Call Log Report\n` +
+    `🗓 ${MNAMES[ny.month - 1]} ${ny.year}\n` +
+    `📊 Total calls: ${total}\n\n${body}`;
+}
+
+// Sum water + sewer payments in utilityTracking for the active NY month.
+async function buildUtilityBillsReport() {
+  const now = new Date();
+  const ny = nyParts(now);
+  const monthKey = `${ny.year}-${String(ny.month).padStart(2, "0")}`;
+  const MNAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  const snap = await firestore.collection("utilityTracking").get();
+  let water = 0, sewer = 0, propsWithPay = 0;
+  snap.docs.forEach((d) => {
+    const u = d.data();
+    const pay = (u.payments || {})[monthKey];
+    if (!pay) return;
+    const w = Number(pay.water) || 0;
+    const s = Number(pay.sewer) || 0;
+    if (w || s) propsWithPay++;
+    water += w;
+    sewer += s;
+  });
+  const fmt = (n) => "$" + Math.round(n).toLocaleString();
+  return `💧 Utility Bills Report\n` +
+    `🗓 ${MNAMES[ny.month - 1]} ${ny.year}\n` +
+    `🏠 Properties billed: ${propsWithPay}\n\n` +
+    `💧 Water: ${fmt(water)}\n` +
+    `🚿 Sewer: ${fmt(sewer)}\n` +
+    `✅ Total: ${fmt(water + sewer)}`;
+}
+
 // Get current wall-clock parts in America/New_York. Avoids pulling in
 // a tz library by leaning on Intl.DateTimeFormat.
 function nyParts(date) {
@@ -347,9 +413,14 @@ exports.runScheduledNotifications = onSchedule(
       if (reportCache[type]) return reportCache[type];
       if (type === "dashboardCollection") {
         reportCache[type] = await buildDashboardCollectionReport();
-        return reportCache[type];
+      } else if (type === "callLog") {
+        reportCache[type] = await buildCallLogReport();
+      } else if (type === "utilityBills") {
+        reportCache[type] = await buildUtilityBillsReport();
+      } else {
+        return null;
       }
-      return null;
+      return reportCache[type];
     };
 
     const rulesSnap = await firestore.collection("notificationRules")

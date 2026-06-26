@@ -7336,7 +7336,9 @@ async function openAddNotifRule(){
   const eventTriggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
   const eventTriggerOpts=eventTriggers.map(t=>`<option value="${t}">${t}</option>`).join('');
   const scheduledReports=[
-    {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'}
+    {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'},
+    {value:'callLog', label:'📞 Dashboard Call Log Report (Total + by reason)'},
+    {value:'utilityBills', label:'💧 Utility Bills Report (Water / Sewer)'}
   ];
   const reportOpts=scheduledReports.map(r=>`<option value="${r.value}">${r.label}</option>`).join('');
   const dowOpts=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -7492,7 +7494,11 @@ async function saveNotifRule(){
     schedule.timezone='America/New_York';
     if(frequency==='weekly') schedule.dayOfWeek=parseInt(document.getElementById('nrDow').value,10);
     if(frequency==='monthly') schedule.dayOfMonth=Math.max(1,Math.min(31,parseInt(document.getElementById('nrDom').value,10)||1));
-    const reportLabels={dashboardCollection:'Dashboard Collection Report'};
+    const reportLabels={
+      dashboardCollection:'Dashboard Collection Report',
+      callLog:'Call Log Report',
+      utilityBills:'Utility Bills Report'
+    };
     const dayLabel=frequency==='weekly'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][schedule.dayOfWeek])+' ':frequency==='monthly'?`day ${schedule.dayOfMonth} `:'';
     const hourLabel=hour===0?'12AM':hour<12?`${hour}AM`:hour===12?'12PM':`${hour-12}PM`;
     trigger=`${reportLabels[reportType]||reportType} · ${frequency} ${dayLabel}${hourLabel}`;
@@ -11282,7 +11288,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-06';
+const APP_VERSION='2026-06-25-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
