@@ -264,3 +264,135 @@ exports.onNewInnovation = onDocumentCreated(
 // Daily SMS reminder disabled — kept as a no-op so an existing
 // deployment doesn't keep firing. Run `firebase functions:delete
 // dailyTechLogReminder` after deploy to remove it from the cloud.
+
+// ─────────────────────────────────────────────────────────────────────
+// Scheduled report dispatcher
+// Fires every 15 minutes, finds active scheduled notification rules
+// whose schedule matches "now" in their declared timezone, builds the
+// requested report, and ships it via the rule's channel (Telegram
+// today). Rules carry a `lastFiredKey` so the same hour-slot isn't
+// fired twice within a 15-min run.
+// ─────────────────────────────────────────────────────────────────────
+
+// Compute current dashboard collection totals for the active month.
+async function buildDashboardCollectionReport() {
+  const now = new Date();
+  const ny = nyParts(now);
+  const monthKey = `${ny.year}-${String(ny.month).padStart(2, "0")}`;
+  const MNAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  // Pull only properties currently RENTED for the active month.
+  const monthSnap = await firestore.collection("monthlyData")
+    .where("monthKey", "==", monthKey)
+    .get();
+  let tenantPortion = 0, tenantPaid = 0, cmha = 0, cmhaPaid = 0, rentedCount = 0;
+  monthSnap.docs.forEach((d) => {
+    const m = d.data();
+    if ((m.status || "") !== "RENTED") return;
+    rentedCount++;
+    tenantPortion += Number(m.tenantPortion) || 0;
+    tenantPaid += Number(m.tenantPaid) || 0;
+    cmha += Number(m.cmha) || 0;
+    cmhaPaid += Number(m.cmhaPaid) || 0;
+  });
+  const totalPortion = tenantPortion + cmha;
+  const totalPaid = tenantPaid + cmhaPaid;
+  const fmt = (n) => Math.round(n).toLocaleString();
+  return `📊 Dashboard Collection Report\n` +
+    `🗓 ${MNAMES[ny.month - 1]} ${ny.year}\n` +
+    `🏠 Rented units: ${rentedCount}\n\n` +
+    `👤 Tenant collection: ${fmt(tenantPaid)} / ${fmt(tenantPortion)}\n` +
+    `🏛 CMHA collection: ${fmt(cmhaPaid)} / ${fmt(cmha)}\n` +
+    `✅ Total collection: ${fmt(totalPaid)} / ${fmt(totalPortion)}`;
+}
+
+// Get current wall-clock parts in America/New_York. Avoids pulling in
+// a tz library by leaning on Intl.DateTimeFormat.
+function nyParts(date) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    weekday: "short",
+  });
+  const parts = fmt.formatToParts(date).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const dowMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour === "24" ? "0" : parts.hour),
+    minute: Number(parts.minute),
+    dayOfWeek: dowMap[parts.weekday],
+  };
+}
+
+exports.runScheduledNotifications = onSchedule(
+  {
+    schedule: "*/15 * * * *",
+    timeZone: "America/New_York",
+    secrets: [TELEGRAM_BOT_TOKEN],
+  },
+  async () => {
+    const tgToken = TELEGRAM_BOT_TOKEN.value();
+    const now = new Date();
+    const ny = nyParts(now);
+    // Cache reports so the same report isn't rebuilt for multiple rules.
+    const reportCache = {};
+    const getReport = async (type) => {
+      if (reportCache[type]) return reportCache[type];
+      if (type === "dashboardCollection") {
+        reportCache[type] = await buildDashboardCollectionReport();
+        return reportCache[type];
+      }
+      return null;
+    };
+
+    const rulesSnap = await firestore.collection("notificationRules")
+      .where("triggerType", "==", "scheduled")
+      .where("active", "==", true)
+      .get();
+
+    for (const ruleDoc of rulesSnap.docs) {
+      const rule = ruleDoc.data();
+      const sch = rule.schedule || {};
+      // Only fire if rule's wall-clock hour matches "now".
+      if (Number(sch.hour) !== ny.hour) continue;
+      // The 15-min job ticks at :00, :15, :30, :45. We treat any
+      // configured minute within the current quarter-hour window as
+      // a match so users don't have to know the cron granularity.
+      const ruleMin = Number(sch.minute) || 0;
+      const slot = Math.floor(ny.minute / 15) * 15;
+      if (ruleMin < slot || ruleMin >= slot + 15) continue;
+
+      if (sch.frequency === "weekly" && Number(sch.dayOfWeek) !== ny.dayOfWeek) continue;
+      if (sch.frequency === "monthly" && Number(sch.dayOfMonth) !== ny.day) continue;
+
+      // Dedupe by hour-slot per day so a rule can't double-fire if
+      // a deploy re-triggers the schedule within the same window.
+      const fireKey = `${ny.year}-${ny.month}-${ny.day}-${ny.hour}`;
+      if (rule.lastFiredKey === fireKey) continue;
+
+      const message = await getReport(sch.reportType);
+      if (!message) {
+        logger.warn("Unknown reportType for scheduled rule", ruleDoc.id, sch.reportType);
+        continue;
+      }
+
+      if (rule.channel === "telegram" && rule.recipientContact) {
+        try {
+          await _telegramSend(tgToken, rule.recipientContact, message);
+          await logNotification("telegram", rule.trigger || "Scheduled Report", rule.recipientName, rule.recipientContact, message, "delivered");
+          await ruleDoc.ref.update({ lastFiredKey: fireKey, lastFiredAt: new Date() });
+        } catch (err) {
+          await logNotification("telegram", rule.trigger || "Scheduled Report", rule.recipientName, rule.recipientContact, message, "failed");
+          logger.error(`Scheduled Telegram to ${rule.recipientContact} failed:`, err.message);
+        }
+      }
+    }
+  }
+);

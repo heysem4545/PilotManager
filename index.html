@@ -7333,8 +7333,18 @@ async function openAddNotifRule(){
   modal.className='overlay open';
   modal.id='notifRuleModal';
   modal.onclick=e=>{if(e.target===modal) modal.remove();};
-  const triggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
-  const triggerOpts=triggers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const eventTriggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
+  const eventTriggerOpts=eventTriggers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const scheduledReports=[
+    {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'}
+  ];
+  const reportOpts=scheduledReports.map(r=>`<option value="${r.value}">${r.label}</option>`).join('');
+  const dowOpts=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    .map((d,i)=>`<option value="${i}" ${i===5?'selected':''}>${d}</option>`).join('');
+  const hourOpts=Array.from({length:24},(_,h)=>{
+    const label=h===0?'12:00 AM':h<12?`${h}:00 AM`:h===12?'12:00 PM':`${h-12}:00 PM`;
+    return `<option value="${h}" ${h===8?'selected':''}>${label}</option>`;
+  }).join('');
 
   // Preload users for the Telegram recipient picker.
   let users=[];
@@ -7347,8 +7357,9 @@ async function openAddNotifRule(){
     ? linkedUsers.map(u=>`<option value="${u.uid}" data-name="${escapeAttr(u.name||u.email||'')}" data-chat="${escapeAttr(u.telegramChatId)}">${escapeHtml(u.name||u.email||u.uid)}</option>`).join('')
     : '<option value="" disabled>No team members have a Telegram Chat ID linked — set it on the Team page first.</option>';
 
-  modal.innerHTML=`<div class="modal" style="width:480px">
+  modal.innerHTML=`<div class="modal" style="width:520px;max-height:90vh;overflow-y:auto">
     <div class="modal-title"><span>+ Add Notification Rule</span><button class="modal-close" onclick="document.getElementById('notifRuleModal').remove()">×</button></div>
+
     <div class="fg"><label>Channel</label>
       <select id="nrChannel" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%" onchange="onNotifChannelChange()">
         <option value="telegram" ${notifTab==='telegram'?'selected':''}>📨 Telegram</option>
@@ -7357,9 +7368,43 @@ async function openAddNotifRule(){
         <option value="email" ${notifTab==='email'?'selected':''}>✉ Email</option>
       </select>
     </div>
-    <div class="fg"><label>Event Trigger</label>
-      <select id="nrTrigger" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${triggerOpts}</select>
+
+    <div class="fg"><label>Trigger Type</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="nrTypeEvent" class="btn btn-ghost btn-sm" style="flex:1;padding:8px;font-size:12px" onclick="onNotifTriggerTypeChange('event')">⚡ Event-based</button>
+        <button type="button" id="nrTypeScheduled" class="btn btn-ghost btn-sm" style="flex:1;padding:8px;font-size:12px" onclick="onNotifTriggerTypeChange('scheduled')">📅 Scheduled report</button>
+      </div>
+      <input type="hidden" id="nrTriggerType" value="event">
     </div>
+
+    <div id="nrEventBlock">
+      <div class="fg"><label>Event Trigger</label>
+        <select id="nrTrigger" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${eventTriggerOpts}</select>
+      </div>
+    </div>
+
+    <div id="nrScheduleBlock" style="display:none">
+      <div class="fg"><label>Report</label>
+        <select id="nrReportType" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${reportOpts}</select>
+      </div>
+      <div class="fg"><label>Frequency</label>
+        <select id="nrFrequency" onchange="onNotifFrequencyChange()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="weekly" selected>Weekly</option>
+          <option value="daily">Daily</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div id="nrDowRow" class="fg"><label>Day of Week</label>
+        <select id="nrDow" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${dowOpts}</select>
+      </div>
+      <div id="nrDomRow" class="fg" style="display:none"><label>Day of Month</label>
+        <input type="number" id="nrDom" min="1" max="31" value="1" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <div class="fg"><label>Time of Day (America/New_York)</label>
+        <select id="nrHour" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">${hourOpts}</select>
+      </div>
+    </div>
+
     <div id="nrTelegramBlock" class="fg" style="display:none">
       <label>Telegram Recipient (Team Member)</label>
       <select id="nrTelegramUser" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
@@ -7382,6 +7427,7 @@ async function openAddNotifRule(){
   </div>`;
   document.body.appendChild(modal);
   onNotifChannelChange();
+  onNotifTriggerTypeChange('event');
 }
 
 function onNotifChannelChange(){
@@ -7398,9 +7444,61 @@ function onNotifChannelChange(){
   }
 }
 
+function onNotifTriggerTypeChange(type){
+  const hidden=document.getElementById('nrTriggerType');
+  const eventBlock=document.getElementById('nrEventBlock');
+  const schedBlock=document.getElementById('nrScheduleBlock');
+  const btnE=document.getElementById('nrTypeEvent');
+  const btnS=document.getElementById('nrTypeScheduled');
+  if(!hidden) return;
+  hidden.value=type;
+  if(type==='scheduled'){
+    eventBlock.style.display='none';
+    schedBlock.style.display='';
+    if(btnE){btnE.style.background='';btnE.style.color='';}
+    if(btnS){btnS.style.background='var(--accent)';btnS.style.color='#0d0d10';}
+    onNotifFrequencyChange();
+  } else {
+    eventBlock.style.display='';
+    schedBlock.style.display='none';
+    if(btnE){btnE.style.background='var(--accent)';btnE.style.color='#0d0d10';}
+    if(btnS){btnS.style.background='';btnS.style.color='';}
+  }
+}
+
+function onNotifFrequencyChange(){
+  const f=document.getElementById('nrFrequency');
+  const dow=document.getElementById('nrDowRow');
+  const dom=document.getElementById('nrDomRow');
+  if(!f||!dow||!dom) return;
+  if(f.value==='weekly'){dow.style.display='';dom.style.display='none';}
+  else if(f.value==='monthly'){dow.style.display='none';dom.style.display='';}
+  else {dow.style.display='none';dom.style.display='none';}
+}
+
 async function saveNotifRule(){
   const channel=document.getElementById('nrChannel').value;
-  const trigger=document.getElementById('nrTrigger').value;
+  const triggerType=(document.getElementById('nrTriggerType')||{value:'event'}).value;
+  let trigger='';
+  const schedule={};
+  if(triggerType==='scheduled'){
+    const reportType=document.getElementById('nrReportType').value;
+    const frequency=document.getElementById('nrFrequency').value;
+    const hour=parseInt(document.getElementById('nrHour').value,10)||8;
+    schedule.reportType=reportType;
+    schedule.frequency=frequency;
+    schedule.hour=hour;
+    schedule.minute=0;
+    schedule.timezone='America/New_York';
+    if(frequency==='weekly') schedule.dayOfWeek=parseInt(document.getElementById('nrDow').value,10);
+    if(frequency==='monthly') schedule.dayOfMonth=Math.max(1,Math.min(31,parseInt(document.getElementById('nrDom').value,10)||1));
+    const reportLabels={dashboardCollection:'Dashboard Collection Report'};
+    const dayLabel=frequency==='weekly'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][schedule.dayOfWeek])+' ':frequency==='monthly'?`day ${schedule.dayOfMonth} `:'';
+    const hourLabel=hour===0?'12AM':hour<12?`${hour}AM`:hour===12?'12PM':`${hour-12}PM`;
+    trigger=`${reportLabels[reportType]||reportType} · ${frequency} ${dayLabel}${hourLabel}`;
+  } else {
+    trigger=document.getElementById('nrTrigger').value;
+  }
   let recipientName='';
   let recipientContact='';
   let recipientUid=null;
@@ -7419,10 +7517,11 @@ async function saveNotifRule(){
   }
   try{
     const doc={
-      channel, trigger, recipientName, recipientContact,
+      channel, trigger, triggerType, recipientName, recipientContact,
       active:true, createdDate:new Date().toISOString().slice(0,10),
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     };
+    if(triggerType==='scheduled') doc.schedule=schedule;
     if(recipientUid) doc.recipientUid=recipientUid;
     await db.collection('notificationRules').add(doc);
     document.getElementById('notifRuleModal').remove();
@@ -11183,7 +11282,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-05';
+const APP_VERSION='2026-06-25-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
