@@ -373,6 +373,68 @@ async function buildUtilityBillsReport() {
     `✅ Total: ${fmt(water + sewer)}`;
 }
 
+// Summarize the Pilot Technician's work for today in America/New_York.
+// Reports total jobs, total hours, properties visited, plus a per-job
+// breakdown — and any logged day status (Sick, Day Off, etc.).
+async function buildPilotTechDailyReport() {
+  const now = new Date();
+  const ny = nyParts(now);
+  const monthKey = `${ny.year}-${String(ny.month).padStart(2, "0")}`;
+  const day = ny.day;
+  const MNAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  // Pull only this month, then filter to today's day in memory.
+  const snap = await firestore.collection("pilotTechWork")
+    .where("monthKey", "==", monthKey)
+    .get();
+  const todays = snap.docs.map((d) => d.data()).filter((j) => (j.day || 1) === day);
+  const workJobs = todays.filter((j) => j.jobType !== "excuse");
+  const excuseJobs = todays.filter((j) => j.jobType === "excuse");
+
+  const totalMins = workJobs.reduce((s, j) => s + (Number(j.duration) || 0), 0);
+  const excuseMins = excuseJobs.reduce((s, j) => s + (Number(j.duration) || 0), 0);
+  const props = Array.from(new Set(workJobs.map((j) => j.propertyAddress).filter(Boolean)));
+  const fmtH = (m) => {
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (h === 0) return `${r}m`;
+    if (r === 0) return `${h}h`;
+    return `${h}h ${r}m`;
+  };
+
+  // Day status (Sick / Day Off / Holiday / etc.)
+  let dayStatus = "";
+  try {
+    const statusSnap = await firestore.collection("pilotDayStatus")
+      .where("monthKey", "==", monthKey)
+      .get();
+    const match = statusSnap.docs.map((d) => d.data())
+      .find((s) => (s.day || 1) === day);
+    if (match && match.status) dayStatus = match.status;
+  } catch (e) { /* non-fatal */ }
+
+  const header = `🔧 Pilot Technician Daily Log\n` +
+    `🗓 ${MNAMES[ny.month - 1]} ${day}, ${ny.year}` +
+    (dayStatus ? `\n📍 Day status: ${dayStatus}` : "");
+
+  if (workJobs.length === 0 && excuseJobs.length === 0) {
+    return `${header}\n\nNo entries logged today.`;
+  }
+
+  const lines = workJobs
+    .sort((a, b) => (a.propertyAddress || "").localeCompare(b.propertyAddress || ""))
+    .map((j) => `• ${j.propertyAddress || "Unknown"} — ${fmtH(Number(j.duration) || 0)}` +
+      (j.jobType ? ` (${j.jobType})` : ""));
+
+  return `${header}\n\n` +
+    `📊 Total jobs: ${workJobs.length}\n` +
+    `⏱ Total time: ${fmtH(totalMins)}\n` +
+    `🏠 Properties: ${props.length}` +
+    (excuseMins > 0 ? `\n⏸ Excuse time: ${fmtH(excuseMins)}` : "") +
+    (lines.length ? `\n\n${lines.join("\n")}` : "");
+}
+
 // Get current wall-clock parts in America/New_York. Avoids pulling in
 // a tz library by leaning on Intl.DateTimeFormat.
 function nyParts(date) {
@@ -417,6 +479,8 @@ exports.runScheduledNotifications = onSchedule(
         reportCache[type] = await buildCallLogReport();
       } else if (type === "utilityBills") {
         reportCache[type] = await buildUtilityBillsReport();
+      } else if (type === "pilotTechDaily") {
+        reportCache[type] = await buildPilotTechDailyReport();
       } else {
         return null;
       }

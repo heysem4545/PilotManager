@@ -7352,7 +7352,8 @@ async function openAddNotifRule(existing){
   const scheduledReports=[
     {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'},
     {value:'callLog', label:'📞 Dashboard Call Log Report (Total + by reason)'},
-    {value:'utilityBills', label:'💧 Utility Bills Report (Water / Sewer)'}
+    {value:'utilityBills', label:'💧 Utility Bills Report (Water / Sewer)'},
+    {value:'pilotTechDaily', label:'🔧 Pilot Technician Daily Log (Jobs / hours / properties)'}
   ];
   const exSched=(existing&&existing.schedule)||{};
   const reportOpts=scheduledReports.map(r=>`<option value="${r.value}" ${exSched.reportType===r.value?'selected':''}>${r.label}</option>`).join('');
@@ -7519,7 +7520,8 @@ async function saveNotifRule(){
     const reportLabels={
       dashboardCollection:'Dashboard Collection Report',
       callLog:'Call Log Report',
-      utilityBills:'Utility Bills Report'
+      utilityBills:'Utility Bills Report',
+      pilotTechDaily:'Pilot Technician Daily Log'
     };
     const dayLabel=frequency==='weekly'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][schedule.dayOfWeek])+' ':frequency==='monthly'?`day ${schedule.dayOfMonth} `:'';
     const hourLabel=hour===0?'12AM':hour<12?`${hour}AM`:hour===12?'12PM':`${hour-12}PM`;
@@ -11318,7 +11320,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-06-25-08';
+const APP_VERSION='2026-06-25-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
