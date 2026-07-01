@@ -3933,10 +3933,16 @@ async function renderCollectionLegalCases(){
     const returnBtn=editable
       ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="returnLegalCaseToCollection('${c.propertyId}')" title="Uncheck To Legal and remove this case">↩ Return to Collection</button>`
       : '';
+    const notice30PicUrl=(p&&p.notice30PicUrl)||'';
+    const notice30PicName=(p&&p.notice30PicName)||'';
+    const notice3PicUrl=(p&&p.notice3PicUrl)||'';
+    const notice3PicName=(p&&p.notice3PicName)||'';
     return `<tr id="lc-row-${safeId}">
       <td><span class="lc-chevron" id="lc-chev-${safeId}" onclick="toggleLegalDetail('${safeId}')" style="cursor:pointer;margin-right:6px"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><strong style="font-size:12px">${escapeHtml(c.addr||'')}</strong></td>
       <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice30Date||'—')}</td>
+      <td style="text-align:center">${renderNoticePicCellLegal(c.propertyId,'notice30',notice30PicUrl,notice30PicName,editable)}</td>
       <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice3Date||'—')}</td>
+      <td style="text-align:center">${renderNoticePicCellLegal(c.propertyId,'notice3',notice3PicUrl,notice3PicName,editable)}</td>
       <td style="text-align:center">${c.vawa?'<span style="color:var(--accent);font-weight:600">Yes</span>':'<span style="color:var(--muted)">No</span>'}</td>
       <td><input type="text" value="${escapeAttr(lawyerName)}" placeholder="Lawyer name" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:130px" onblur="updatePropertyField('${c.propertyId}','lawyerName',this.value)"></td>
       <td><input type="text" value="${escapeAttr(lawyerInfo)}" placeholder="Lawyer info" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:150px" onblur="updatePropertyField('${c.propertyId}','lawyerInfo',this.value)"></td>
@@ -3948,7 +3954,7 @@ async function renderCollectionLegalCases(){
       <td style="text-align:right">${returnBtn}</td>
     </tr>
     <tr class="lc-detail-row" id="lc-detail-${safeId}" style="display:none">
-      <td colspan="12" style="background:var(--surface2);padding:0">${detailInner}</td>
+      <td colspan="14" style="background:var(--surface2);padding:0">${detailInner}</td>
     </tr>`;
   }).join('');
 
@@ -3964,7 +3970,9 @@ async function renderCollectionLegalCases(){
           <thead><tr>
             <th>Address</th>
             <th>30 Day</th>
+            <th style="text-align:center" title="30 day notice pic">📷</th>
             <th>3 Day</th>
+            <th style="text-align:center" title="3 day notice pic">📷</th>
             <th style="text-align:center">VAWA</th>
             <th>Lawyer Name</th>
             <th>Lawyer Info</th>
@@ -3979,6 +3987,76 @@ async function renderCollectionLegalCases(){
         </table>
       </div>
     </div>`;
+}
+
+// Same UI as renderNoticePicCell but the input hooks the legal-cases
+// re-renderer so uploading/deleting from this tab refreshes here.
+function renderNoticePicCellLegal(propId, kind, url, name, editable){
+  if(url){
+    const preview = `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" title="${escapeAttr(name||'View pic')}" style="display:inline-block;vertical-align:middle"><img src="${escapeAttr(url)}" alt="pic" style="width:26px;height:26px;object-fit:cover;border-radius:4px;border:1px solid var(--accent)"></a>`;
+    const rm = editable ? `<button title="Delete pic" onclick="deleteNoticePicLegal('${propId}','${kind}')" style="margin-left:3px;background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0">×</button>` : '';
+    return `<div style="display:flex;align-items:center;justify-content:center;gap:2px">${preview}${rm}</div>`;
+  }
+  if(!editable) return '<span style="color:var(--muted2);font-size:11px">—</span>';
+  const inputId = `noticePicInputLegal_${kind}_${propId}`;
+  return `<button title="Upload pic" onclick="document.getElementById('${inputId}').click()" style="background:none;border:1px dashed var(--border2);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">📷</button><input type="file" id="${inputId}" accept="image/*" style="display:none" onchange="uploadNoticePicLegal('${propId}','${kind}',this)">`;
+}
+
+async function uploadNoticePicLegal(propId, kind, input){
+  if(!canEdit()){ toast('You don’t have edit access'); input.value=''; return; }
+  const file = input.files && input.files[0];
+  if(!file){ return; }
+  if(file.size > 15*1024*1024){ toast('File too large (max 15 MB)'); input.value=''; return; }
+  toast('Uploading pic…');
+  try{
+    const safeName = (file.name||'notice.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `collectionNotices/${propId}/${kind}/${Date.now()}_${safeName}`;
+    const ref = firebase.storage().ref(path);
+    await ref.put(file, {contentType:file.type});
+    const url = await ref.getDownloadURL();
+    const update = {
+      [`${kind}PicUrl`]: url,
+      [`${kind}PicPath`]: path,
+      [`${kind}PicName`]: file.name || safeName,
+      [`${kind}PicUploadedAt`]: new Date().toISOString(),
+      [`${kind}Pic`]: true,
+      updatedAt: new Date()
+    };
+    await db.collection('properties').doc(propId).update(update);
+    const p = properties.find(x=>x.id===propId);
+    if(p) Object.assign(p, update);
+    toast('Pic saved');
+    renderCollectionLegalCases();
+  }catch(e){
+    console.error('uploadNoticePicLegal', e);
+    toast('Upload failed: '+(e.message||'unknown'));
+  }finally{
+    input.value='';
+  }
+}
+
+async function deleteNoticePicLegal(propId, kind){
+  if(!canEdit()){ toast('You don’t have edit access'); return; }
+  if(!confirm('Delete this pic?')) return;
+  const p = properties.find(x=>x.id===propId);
+  const path = p ? p[`${kind}PicPath`] : '';
+  if(path){
+    try{ await firebase.storage().ref(path).delete(); }
+    catch(err){ console.warn('storage delete', err); }
+  }
+  const update = {
+    [`${kind}PicUrl`]: firebase.firestore.FieldValue.delete(),
+    [`${kind}PicPath`]: firebase.firestore.FieldValue.delete(),
+    [`${kind}PicName`]: firebase.firestore.FieldValue.delete(),
+    [`${kind}PicUploadedAt`]: firebase.firestore.FieldValue.delete(),
+    updatedAt: new Date()
+  };
+  try{
+    await db.collection('properties').doc(propId).update(update);
+    if(p){ delete p[`${kind}PicUrl`]; delete p[`${kind}PicPath`]; delete p[`${kind}PicName`]; delete p[`${kind}PicUploadedAt`]; }
+    toast('Pic deleted');
+    renderCollectionLegalCases();
+  }catch(e){ toast('Delete failed: '+(e.message||'unknown')); }
 }
 
 async function returnLegalCaseToCollection(propertyId){
@@ -11569,7 +11647,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-01-02';
+const APP_VERSION='2026-07-01-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
