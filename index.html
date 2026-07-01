@@ -3754,6 +3754,7 @@ function renderCollectionPage(){
       <button class="ftab ${collectionViewMode==='monthly'?'active':''}" onclick="switchCollectionView('monthly')" style="${collectionViewMode==='monthly'?'background:var(--accent);color:#0d0d10;border-color:var(--accent)':'background:var(--accent-dim);color:var(--accent);border-color:var(--accent)'};font-weight:700">⭐ Monthly Balance</button>
       <button class="ftab ${collectionViewMode==='balancesOnly'?'active':''}" onclick="switchCollectionView('balancesOnly')">All Month Balance</button>
       <button class="ftab ${collectionViewMode==='allBalances'?'active':''}" onclick="switchCollectionView('allBalances')">Collection Houses</button>
+      <button class="ftab ${collectionViewMode==='legal'?'active':''}" onclick="switchCollectionView('legal')" style="${collectionViewMode==='legal'?'background:var(--red);color:#fff;border-color:var(--red)':''}">⚖ Legal Cases</button>
       <button class="ftab ${collectionViewMode==='history'?'active':''}" onclick="switchCollectionView('history')">Collection History</button>
     `;
   }
@@ -3776,6 +3777,8 @@ function renderCollectionPage(){
   } else if(collectionViewMode==='history'){
     if(histView) histView.style.display='block';
     renderCollectionHistory();
+  } else if(collectionViewMode==='legal'){
+    renderCollectionLegalCases();
   } else {
     // Monthly Balance — show balance-filtered properties table with month bar inside collectionContent
     renderCollectionMonthlyView();
@@ -3844,6 +3847,149 @@ function renderCollectionMonthlyView(){
         </table>
       </div>
     </div>`;
+}
+
+// Legal Cases tab — lives inside the Collection section. Reads the
+// same legalCases snapshots that moveToLegalCase() writes and lets
+// the user follow up (update notes, court date, lawyer info) or
+// return the property back to Collection Houses.
+async function renderCollectionLegalCases(){
+  const contentEl=document.getElementById('collectionContent');
+  if(!contentEl) return;
+  contentEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">Loading legal cases…</div>';
+
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const editable=canEdit();
+  let cases=[];
+  try{
+    const snap=await db.collection('legalCases').get();
+    cases=snap.docs.map(d=>({id:d.id,...d.data()}));
+    cases.sort((a,b)=>{
+      const ta=a.createdAt?.toMillis?a.createdAt.toMillis():0;
+      const tb=b.createdAt?.toMillis?b.createdAt.toMillis():0;
+      return tb-ta;
+    });
+  }catch(e){
+    contentEl.innerHTML=`<div class="table-card" style="padding:24px;color:var(--red)">Couldn't load legal cases: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  if(cases.length===0){
+    contentEl.innerHTML=`
+      <div class="table-card" style="padding:40px;text-align:center;color:var(--muted)">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">⚖ No Legal Cases yet</div>
+        Check the <strong>To Legal</strong> box on any row in <em>Collection Houses</em> to move it here.
+      </div>`;
+    return;
+  }
+
+  const totalOwed=cases.reduce((s,c)=>s+(c.totalBalance!=null?c.totalBalance:((c.totalCmhaBal||0)+(c.totalTenantBal||0))),0);
+  const withCourt=cases.filter(c=>c.courtDate||c.followUpCourtDate).length;
+
+  const rows=cases.map(c=>{
+    // Prefer live property values for editable follow-up fields so we don't
+    // have to re-snapshot the case doc every keystroke. Fall back to the
+    // snapshot for read-only detail rows.
+    const p=properties.find(x=>x.id===c.propertyId);
+    const lawyerName=(p&&p.lawyerName)||c.lawyerName||'';
+    const lawyerInfo=(p&&p.lawyerInfo)||c.lawyerInfo||'';
+    const courtDate=(p&&p.courtDate)||c.courtDate||'';
+    const courtResult=(p&&p.courtResult)||c.courtResult||'';
+    const update=(p&&p.collectionUpdate)||c.collectionUpdate||'';
+    const notes=(p&&p.collectionNotes)||c.notes||'';
+    const total=c.totalBalance!=null?c.totalBalance:((c.totalCmhaBal||0)+(c.totalTenantBal||0));
+    const dis=editable?'':'disabled';
+    const safeId=(c.id||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const balances=Array.isArray(c.balances)?c.balances:[];
+    const detailInner=balances.length===0
+      ? `<div style="padding:14px;color:var(--muted);font-size:12px">No outstanding monthly balances were captured for this case.</div>`
+      : `<div style="padding:10px 14px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Unpaid months snapshot${c.snapshotYear?' — '+c.snapshotYear:''}</div>
+          <table class="lc-detail-table" style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-size:10px;color:var(--muted)">Month</th>
+              <th style="text-align:right;font-size:10px;color:var(--blue)">CMHA balance</th>
+              <th style="text-align:right;font-size:10px;color:var(--amber)">Tenant balance</th>
+              <th style="text-align:right;font-size:10px;color:var(--text)">Total</th>
+            </tr></thead>
+            <tbody>${balances.map(b=>{
+              const label=`${MNAMES[b.month]||''} ${b.year||''}`.trim();
+              const rt=(b.cmhaBal||0)+(b.tenantBal||0);
+              return `<tr>
+                <td style="font-size:11px">${escapeHtml(label)}</td>
+                <td style="text-align:right;font-size:11px;color:var(--blue)">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td>
+                <td style="text-align:right;font-size:11px;color:var(--amber)">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>
+                <td style="text-align:right;font-size:11px;font-weight:600">${fmt(rt)}</td>
+              </tr>`;
+            }).join('')}</tbody>
+            <tfoot><tr style="border-top:1px solid var(--border)">
+              <td style="font-size:11px;font-weight:700">Total</td>
+              <td style="text-align:right;font-size:11px;font-weight:700;color:var(--blue)">${fmt(c.totalCmhaBal||0)}</td>
+              <td style="text-align:right;font-size:11px;font-weight:700;color:var(--amber)">${fmt(c.totalTenantBal||0)}</td>
+              <td style="text-align:right;font-size:11px;font-weight:700">${fmt(total)}</td>
+            </tr></tfoot>
+          </table>
+        </div>`;
+    const returnBtn=editable
+      ? `<button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;color:var(--accent);border-color:var(--accent-dim)" onclick="returnLegalCaseToCollection('${c.propertyId}')" title="Uncheck To Legal and remove this case">↩ Return to Collection</button>`
+      : '';
+    return `<tr id="lc-row-${safeId}">
+      <td><span class="lc-chevron" id="lc-chev-${safeId}" onclick="toggleLegalDetail('${safeId}')" style="cursor:pointer;margin-right:6px"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><strong style="font-size:12px">${escapeHtml(c.addr||'')}</strong></td>
+      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice30Date||'—')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice3Date||'—')}</td>
+      <td style="text-align:center">${c.vawa?'<span style="color:var(--accent);font-weight:600">Yes</span>':'<span style="color:var(--muted)">No</span>'}</td>
+      <td><input type="text" value="${escapeAttr(lawyerName)}" placeholder="Lawyer name" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:130px" onblur="updatePropertyField('${c.propertyId}','lawyerName',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(lawyerInfo)}" placeholder="Lawyer info" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:150px" onblur="updatePropertyField('${c.propertyId}','lawyerInfo',this.value)"></td>
+      <td><input type="date" value="${escapeAttr(courtDate)}" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:130px" onchange="updatePropertyField('${c.propertyId}','courtDate',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(courtResult)}" placeholder="Court result" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:140px" onblur="updatePropertyField('${c.propertyId}','courtResult',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(update)}" placeholder="Update" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:140px" onblur="updatePropertyField('${c.propertyId}','collectionUpdate',this.value)"></td>
+      <td><input type="text" value="${escapeAttr(notes)}" placeholder="Notes" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:140px" onblur="updatePropertyField('${c.propertyId}','collectionNotes',this.value)"></td>
+      <td class="money" style="text-align:right;font-weight:700;color:${total>0?'var(--red)':'var(--muted)'}">${total>0?fmt(total):'—'}</td>
+      <td style="text-align:right">${returnBtn}</td>
+    </tr>
+    <tr class="lc-detail-row" id="lc-detail-${safeId}" style="display:none">
+      <td colspan="12" style="background:var(--surface2);padding:0">${detailInner}</td>
+    </tr>`;
+  }).join('');
+
+  contentEl.innerHTML=`
+    <div class="table-card">
+      <div style="display:flex;gap:16px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <div style="font-size:12px;color:var(--muted)"><strong style="color:var(--text)">${cases.length}</strong> legal case${cases.length===1?'':'s'}</div>
+        <div style="font-size:12px;color:var(--muted)">Total owed: <strong style="color:var(--red)">${fmt(totalOwed)}</strong></div>
+        <div style="font-size:12px;color:var(--muted)">Court scheduled: <strong style="color:var(--text)">${withCourt}</strong></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Address</th>
+            <th>30 Day</th>
+            <th>3 Day</th>
+            <th style="text-align:center">VAWA</th>
+            <th>Lawyer Name</th>
+            <th>Lawyer Info</th>
+            <th>Court Date</th>
+            <th>Court Result</th>
+            <th>Update</th>
+            <th>Notes</th>
+            <th style="text-align:right">Owed</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function returnLegalCaseToCollection(propertyId){
+  if(!canEdit()){ toast('You don’t have edit access'); return; }
+  if(!confirm('Return this property to Collection Houses? The Legal Case entry will be deleted.')) return;
+  try{
+    await updatePropertyField(propertyId,'toLegal',false);
+    await removeFromLegalCase(propertyId);
+    toast('Returned to Collection Houses');
+    renderCollectionLegalCases();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function renderAllBalances(){
@@ -4177,8 +4323,17 @@ async function abSaveField(id, field, value){
     if(field==='toLegal'){
       const row = document.getElementById('ab-row-'+id);
       if(row) row.classList.toggle('to-legal', !!value);
+      // Snapshot into legalCases when checked, remove it when unchecked.
+      if(value){
+        try{ await moveToLegalCase(id); toast('Sent to Legal Cases'); }
+        catch(e){ console.error('moveToLegalCase', e); toast('Error creating legal case: '+e.message); }
+      } else {
+        try{ await removeFromLegalCase(id); toast('Removed from Legal Cases'); }
+        catch(e){ console.error('removeFromLegalCase', e); }
+      }
+      return;
     }
-    toast(field==='toLegal' ? (value?'Marked for legal':'Unmarked') : 'Saved');
+    toast('Saved');
   }catch(e){ toast('Error: '+e.message); }
 }
 
@@ -11414,7 +11569,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-01-01';
+const APP_VERSION='2026-07-01-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
