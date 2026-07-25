@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-08';
+const APP_VERSION='2026-07-25-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13323,10 +13323,6 @@ function exportWhatsApp(){
           <div><div style="font-weight:600;color:var(--text)">📋 Full report</div><div style="font-size:10px;color:var(--muted)">Every row on this tab (respects status filter)</div></div>
         </label>
         <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
-          <input type="radio" name="waPreset" value="actionOnly" style="margin-top:2px">
-          <div><div style="font-weight:600;color:var(--text)">📝 Only rows with an Action Note</div><div style="font-size:10px;color:var(--muted)">Skip properties without an action note logged</div></div>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
           <input type="radio" name="waPreset" value="anyNote" style="margin-top:2px">
           <div><div style="font-weight:600;color:var(--text)">🗒 Only rows with any note</div><div style="font-size:10px;color:var(--muted)">Action Notes or Rent Tracking notes</div></div>
         </label>
@@ -13419,14 +13415,11 @@ function buildWhatsAppReport(opts){
 
   // Apply the preset filter.
   const presetLabels={
-    actionOnly:'Action Notes only',
     anyNote:'Notes only',
     balanceOnly:'Balances only',
     balanceAndAction:'Balance + Action Note'
   };
-  if(opts.preset==='actionOnly'){
-    rowsForReport=rowsForReport.filter(r=>r.note && r.note.trim());
-  } else if(opts.preset==='anyNote'){
+  if(opts.preset==='anyNote'){
     rowsForReport=rowsForReport.filter(r=>(r.note&&r.note.trim())||(r.rentNote&&r.rentNote.trim()));
   } else if(opts.preset==='balanceOnly'){
     rowsForReport=rowsForReport.filter(r=>r.cmhaBal>0||r.tenBal>0);
