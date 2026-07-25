@@ -1121,8 +1121,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <div class="page-sub" id="viewSub">Cleveland, OH</div>
         </div>
         <div class="head-actions" id="headActions">
-          <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportWhatsApp()" style="color:#25d366;border-color:rgba(37,211,102,0.35)">📱 WhatsApp</button>
+          <button class="btn btn-ghost btn-sm" id="exportCsvBtn" onclick="exportCSV()">Export CSV</button>
+          <button class="btn btn-ghost btn-sm" id="exportWhatsAppBtn" onclick="exportWhatsApp()" style="color:#25d366;border-color:rgba(37,211,102,0.35)">📱 WhatsApp</button>
           <button class="btn btn-primary btn-sm" id="addPropBtn" onclick="openAdd()">+ Add Property</button>
           <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
             <svg id="themeIconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-15';
+const APP_VERSION='2026-07-25-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13251,15 +13251,42 @@ function exportCSV(){
     return;
   }
 
-  // === Fallback: full property list, current active month ===
-  const header=['Address','Unit','Bedroom','Bath','Tenant','Status','CMHA Rent','Tenant Rent','CMHA Paid','Tenant Paid','Collected','Balance'];
-  const rows=properties.map(p=>{
-    const mp=getMonthProp(p);
-    const collected=(mp.cmhaPaid||0)+(mp.tenantPaid||0);
-    return [p.addr||'', p.unit||'', p.bedroom||'', p.bath||'', p.tenant||'', mp.status||'', mp.cmha||0, mp.tenantPortion||0, mp.cmhaPaid||0, mp.tenantPaid||0, collected, mp.balance||0];
-  });
-  download(toCsv(header, rows), `PilotManager_${monthLabel}.csv`);
-  toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+  // === Tenant & Lease ===
+  if(currentView==='tenantLease'){
+    const sorted=[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+    const header=['Address','Lease Effective','Lease Expire','Tenant Name','Tenant Number','Email','Deposit Total','Pay Methods','Emergency #','Emergency Name','Notes'];
+    const rows=sorted.map(p=>{
+      const depTotal=(parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0);
+      return [
+        p.addr||'', p.leaseEffective2||'', p.leaseExpire2||'',
+        p.tenantName2||p.tenant||'', p.tenantNumber2||'', p.tenantEmail||'',
+        depTotal, (p.payMethods||[]).join('; '),
+        p.secondaryInfo||'', p.emergencyName||'', p.tenantNotes||''
+      ];
+    });
+    download(toCsv(header, rows), `TenantLease_${monthLabel}.csv`);
+    toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+    return;
+  }
+
+  // === Call Log ===
+  if(currentView==='callLog'){
+    const list=(typeof callLogData!=='undefined' && Array.isArray(callLogData)) ? callLogData : [];
+    const header=['Date','Address','Tenant Name','Phone','Reason','Assigned To','Follow-Up Date','Status','Notes'];
+    const rows=list.map(c=>[
+      c.date||'', c.propertyAddress||c.addr||'', c.tenantName||c.name||'',
+      c.phone||c.number||'', c.reason||'', c.assignedName||c.assignedTo||'',
+      c.followUpDate||'', c.status||'', c.notes||''
+    ]);
+    download(toCsv(header, rows), `CallLog_${monthLabel}.csv`);
+    toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+    return;
+  }
+
+  // No handler for this view — should not be reachable because the
+  // header button is hidden on unsupported sections, but toast just
+  // in case someone forces it programmatically.
+  toast('Export not available for this section');
 }
 
 // Keyword → icon mapping used by the WhatsApp report so a note that
@@ -13302,11 +13329,14 @@ function pickNoteIcon(text){
   return '📝';
 }
 
-// Entry point for the WhatsApp button — pops a filter chooser so
-// the user can decide what slice of rows to include (full picture
-// vs action-notes-only vs balances-only). Runs buildWhatsAppReport()
-// with the picked options.
+// Entry point for the WhatsApp button. For Collection / Rent
+// Tracking we open the balance-focused filter chooser; for other
+// supported sections (Tenant & Lease, Call Log) the preset filters
+// don't apply, so we shortcut straight to a section-specific
+// formatter.
 function exportWhatsApp(){
+  if(currentView==='tenantLease'){ buildTenantLeaseWhatsApp(); return; }
+  if(currentView==='callLog'){ buildCallLogWhatsApp(); return; }
   const existing=document.getElementById('whatsAppFilterModal');
   if(existing) existing.remove();
   const modal=document.createElement('div');
@@ -13360,6 +13390,92 @@ function runWhatsAppReport(){
   buildWhatsAppReport({preset, includeRentNote});
 }
 
+// Shared header line builder for section-specific WhatsApp reports.
+function _waHeaderDate(){
+  const MNAMES_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const now=new Date();
+  const ordinal=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+  return `${MNAMES_LONG[now.getMonth()]} ${ordinal(now.getDate())} ${now.getFullYear()}`;
+}
+
+// Tenant & Lease — leases sorted by days-left (expired first, then
+// soonest expiring). Includes tenant name/phone and highlights any
+// lease expiring within 60 days.
+function buildTenantLeaseWhatsApp(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const list=properties.map(p=>{
+    const exp=p.leaseExpire2||'';
+    let daysLeft=null;
+    if(exp){
+      const d=new Date(exp+'T00:00:00');
+      if(!isNaN(d)) daysLeft=Math.ceil((d-today)/86400000);
+    }
+    return {
+      addr:p.addr||'', tName:p.tenantName2||p.tenant||'',
+      tNum:p.tenantNumber2||'', email:p.tenantEmail||'',
+      leaseEff:p.leaseEffective2||'', leaseExp:exp, daysLeft
+    };
+  }).filter(r=>r.tName || r.leaseExp);
+  // Expired first, then soonest expiring, then no-date at the bottom.
+  list.sort((a,b)=>{
+    if(a.daysLeft==null && b.daysLeft==null) return (a.addr||'').localeCompare(b.addr||'');
+    if(a.daysLeft==null) return 1;
+    if(b.daysLeft==null) return -1;
+    return a.daysLeft-b.daysLeft;
+  });
+  if(list.length===0){ toast('No tenants to export'); return; }
+  const sep='______________';
+  const lines=[`📄 Tenant & Lease Report – ${_waHeaderDate()}`, ''];
+  list.forEach((r,i)=>{
+    lines.push(`🏠 ${r.addr}`);
+    if(r.tName) lines.push(`👤 ${r.tName}${r.tNum?` · 📞 ${r.tNum}`:''}`);
+    if(r.email) lines.push(`✉ ${r.email}`);
+    if(r.leaseExp){
+      if(r.daysLeft<0) lines.push(`⚠ Lease EXPIRED ${Math.abs(r.daysLeft)} day${Math.abs(r.daysLeft)===1?'':'s'} ago (${r.leaseExp})`);
+      else if(r.daysLeft<=60) lines.push(`⚠ Lease expires in ${r.daysLeft} day${r.daysLeft===1?'':'s'} (${r.leaseExp})`);
+      else lines.push(`📅 Lease expires ${r.leaseExp}`);
+    } else {
+      lines.push(`📅 No lease dates on file`);
+    }
+    if(i<list.length-1) lines.push(sep);
+  });
+  openWhatsAppPreview(lines.join('\n'), list.length);
+}
+
+// Call Log — current month's calls grouped by property address so
+// the team sees who was contacted and why.
+function buildCallLogWhatsApp(){
+  const list=(typeof callLogData!=='undefined' && Array.isArray(callLogData)) ? callLogData : [];
+  const now=new Date();
+  const monthPrefix=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthCalls=list.filter(c=>c.date && String(c.date).startsWith(monthPrefix));
+  if(monthCalls.length===0){ toast('No calls logged this month'); return; }
+  // Group by property address.
+  const byProp={};
+  monthCalls.forEach(c=>{
+    const key=c.propertyAddress||c.addr||'(No address)';
+    (byProp[key]=byProp[key]||[]).push(c);
+  });
+  const addrs=Object.keys(byProp).sort();
+  const sep='______________';
+  const lines=[`📞 Call Log Report – ${_waHeaderDate()}`, `🗓 ${monthCalls.length} call${monthCalls.length===1?'':'s'} this month`, ''];
+  addrs.forEach((addr,i)=>{
+    lines.push(`🏠 ${addr}`);
+    byProp[addr].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(c=>{
+      const reasonIcon={
+        'Maintenance':'🛠','Maintenance Follow Up':'🔁','Payments':'💰',
+        'For Rent':'🏠','Paperwork':'📄','Appointment':'📅'
+      }[c.reason]||'📞';
+      const parts=[`${reasonIcon} ${c.date||''}${c.reason?' · '+c.reason:''}`];
+      if(c.tenantName||c.name) parts.push(`— ${c.tenantName||c.name}`);
+      lines.push(parts.join(' '));
+      if(c.notes) lines.push(`   ${pickNoteIcon(c.notes)} ${c.notes}`);
+    });
+    if(i<addrs.length-1) lines.push(sep);
+  });
+  openWhatsAppPreview(lines.join('\n'), monthCalls.length);
+}
+
 // Build the actual message text and open the preview modal. Takes
 // the same context (view / tab / status filter) as exportCSV, then
 // trims the row list by the chosen preset filter.
@@ -13401,12 +13517,12 @@ function buildWhatsAppReport(opts){
     });
     scopeLabel='Rent Tracking Report';
   } else {
-    rowsForReport=properties.map(p=>{
-      const mp=getMonthProp(p);
-      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
-      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
-      return {addr:p.addr||'', cmhaBal, tenBal, note:mp.collActionNote||'', rentNote:mp.monthNote||''};
-    });
+    // Should not be reachable — the header button is hidden on
+    // unsupported views, and tenantLease / callLog have their own
+    // formatter above. Bail with a toast rather than dumping a
+    // Collection-flavored report onto the wrong section.
+    toast('WhatsApp export not available for this section');
+    return;
   }
 
   // Apply the preset filter.
@@ -13672,6 +13788,20 @@ function showView(v){
     salaryPool:'Salary & Pool'
   };
   document.getElementById('viewTitle').textContent=titles[v]||'';
+
+  // Toggle header action buttons per section so a click never dumps
+  // out data from the wrong view (e.g. WhatsApp on Tenant & Lease
+  // used to fall through to the Collection-flavored fallback).
+  const exportSupported = {
+    properties:true, collection:true, tenantLease:true, callLog:true
+  };
+  const showExport = !!exportSupported[v];
+  const csvBtn = document.getElementById('exportCsvBtn');
+  const waBtn = document.getElementById('exportWhatsAppBtn');
+  if(csvBtn) csvBtn.style.display = showExport ? '' : 'none';
+  if(waBtn) waBtn.style.display = showExport ? '' : 'none';
+  const addBtn = document.getElementById('addPropBtn');
+  if(addBtn && canEdit()) addBtn.style.display = (v==='properties') ? '' : 'none';
 
   // Render coming soon for new modules
   const comingSoon = ['notices','tenants'];
