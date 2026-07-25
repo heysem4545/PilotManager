@@ -10371,14 +10371,17 @@ async function loadTasksForKey(key, uid=null){
   try{
     let q = db.collection('tasks').where('monthKey','==',key);
     if(uid) q = q.where('uid','==',uid);
-    else if(tmTab==='own') q = q.where('uid','==',currentUser.uid);
+    // 'own' and 'recurring' tabs both display current-user stats in the
+    // header; without this filter the header on Recurring pulls every
+    // team task and shows misleading totals.
+    else if(tmTab==='own' || tmTab==='recurring') q = q.where('uid','==',currentUser.uid);
     // group: no uid filter
     const snap = await q.get();
     const data = {};
     snap.docs.forEach(d=>{
       const t=d.data();
-      // Filter: own tab shows non-group tasks, group tab shows group tasks
-      if(tmTab==='own' && t.isGroup) return;
+      // Filter: own/recurring show non-group personal tasks, group shows group tasks
+      if((tmTab==='own' || tmTab==='recurring') && t.isGroup) return;
       if(tmTab==='group' && !t.isGroup) return;
       const dk=t.day;
       if(!data[dk])data[dk]=[];
@@ -11686,7 +11689,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-24-03';
+const APP_VERSION='2026-07-24-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
