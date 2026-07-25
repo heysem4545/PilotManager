@@ -997,9 +997,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         Task Management
         <span class="nav-badge" id="assignedTaskBadge" style="display:none">0</span>
       </button>
-      <button class="nav-item" id="nav-sosRequests" onclick="showView('sosRequests')">
+      <button class="nav-item" id="nav-sosRequests" onclick="showView('sosRequests')" style="position:relative">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4M8 11v.5"/></svg>
         SOS Request
+        <span class="nav-badge" id="sosRequestBadge" style="display:none">0</span>
       </button>
       <button class="nav-item" id="nav-meetings" onclick="showView('meetings')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
@@ -2729,6 +2730,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startTurnoverListener();
   startInnovationBadge();
   startAssignedTaskBadge();
+  startSosRequestBadge();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -8062,6 +8064,24 @@ function startAssignedTaskBadge(){
   });
 }
 
+function startSosRequestBadge(){
+  // Red-dot badge on the SOS Request nav item — counts open requests
+  // assigned to the signed-in user (Not Started or Pending). Uses the
+  // same nav-badge pattern as innovation + assigned tasks.
+  if(!currentUser || !currentUser.uid) return;
+  db.collection('sosRequests').where('assignedToUid','==',currentUser.uid).onSnapshot(snap=>{
+    const open = snap.docs.filter(d=>{
+      const s = d.data().requestStatus || 'Not Started';
+      return s !== 'Done';
+    }).length;
+    const badge = document.getElementById('sosRequestBadge');
+    if(badge){
+      badge.textContent = open;
+      badge.style.display = open>0 ? '' : 'none';
+    }
+  }, err=>console.warn('sosRequestBadge', err && err.message));
+}
+
 function startInnovationBadge(){
   if(!isAdmin()) return;
   db.collection('innovation').where('status','==','Open').onSnapshot(snap=>{
@@ -11695,7 +11715,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-24-05';
+const APP_VERSION='2026-07-24-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12241,7 +12261,9 @@ async function renderSosRequestsView(){
   const editable = canEdit() || isAdmin();
   const inputCss = 'font-size:11px;padding:5px 7px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%';
 
-  const userOpts = users.map(u => `<option value="${u.uid}">${escapeHtml(u.name || u.email || '')}</option>`).join('');
+  const currentUid = (currentUser && currentUser.uid) || '';
+  const currentName = (currentUser && (currentUser.name || currentUser.email)) || '';
+  const admin = isAdmin();
 
   const statRow = (() => {
     const counts = {'Not Started':0, 'Pending':0, 'Done':0};
@@ -12260,14 +12282,30 @@ async function renderSosRequestsView(){
 
   const rowsHtml = sosRequestsCache.length ? sosRequestsCache.map(r => {
     const fromUid = r.requestFromUid || '';
-    const fromOpts = users.map(u => `<option value="${u.uid}" ${u.uid===fromUid?'selected':''}>${escapeHtml(u.name || u.email || '')}</option>`).join('');
-    const fromSelect = `<select ${editable?'':'disabled'} onchange="updateSosField('${r.id}','requestFromUid',this.value)" style="${inputCss};cursor:${editable?'pointer':'default'}">
-      <option value="">— select user —</option>${fromOpts}
-    </select>`;
+    const fromName = r.requestFromName || ((users.find(u=>u.uid===fromUid)||{}).name) || ((users.find(u=>u.uid===fromUid)||{}).email) || (fromUid?'(unknown)':'(unset)');
+    // Non-admins see the requester as a read-only label. Admins can
+    // reassign it (with the change captured in fromHistory) via a
+    // dropdown, in case the wrong person was recorded originally.
+    const fromCell = admin
+      ? `<select onchange="updateSosField('${r.id}','requestFromUid',this.value)" style="${inputCss};cursor:pointer">
+          <option value="">— select user —</option>
+          ${users.map(u=>`<option value="${u.uid}" ${u.uid===fromUid?'selected':''}>${escapeHtml(u.name||u.email||'')}</option>`).join('')}
+        </select>`
+      : `<div style="${inputCss};background:var(--surface3);color:var(--text);cursor:default">${escapeHtml(fromName)}</div>`;
     const histCount = (r.fromHistory || []).length;
     const histBadge = histCount > 0
       ? `<button onclick="openSosHistory('${r.id}')" title="View change history" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;font-size:9px;font-weight:700;padding:2px 6px;margin-top:4px;cursor:pointer">✎ ${histCount} change${histCount===1?'':'s'}</button>`
       : '';
+
+    // Assigned-to picker — anyone with edit rights can (re)assign,
+    // since a requester needs to be able to route to a teammate.
+    const assignUid = r.assignedToUid || '';
+    const assignCell = editable
+      ? `<select onchange="updateSosField('${r.id}','assignedToUid',this.value)" style="${inputCss};cursor:pointer">
+          <option value="">— unassigned —</option>
+          ${users.map(u=>`<option value="${u.uid}" ${u.uid===assignUid?'selected':''}>${escapeHtml(u.name||u.email||'')}</option>`).join('')}
+        </select>`
+      : `<div style="${inputCss};background:var(--surface3);color:var(--text);cursor:default">${escapeHtml(r.assignedToName||'—')}</div>`;
 
     const noteInput = `<textarea rows="2" ${editable?'':'readonly'} placeholder="What's needed…" title="${escapeAttr(r.requestNote||'')}" onblur="updateSosField('${r.id}','requestNote',this.value)" style="${inputCss};resize:vertical;min-height:38px">${escapeHtml(r.requestNote||'')}</textarea>`;
 
@@ -12277,33 +12315,35 @@ async function renderSosRequestsView(){
       ${SOS_STATUSES.map(s => `<option value="${s.value}" ${s.value===currStatus?'selected':''}>${s.value}</option>`).join('')}
     </select>`;
 
-    const delBtn = (editable && isAdmin()) ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteSosRequest('${r.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
+    const delBtn = (editable && admin) ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteSosRequest('${r.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
 
     return `<tr>
       <td style="vertical-align:top">
-        ${fromSelect}
+        ${fromCell}
         ${histBadge}
       </td>
+      <td style="vertical-align:top">${assignCell}</td>
       <td style="vertical-align:top">${noteInput}</td>
       <td style="vertical-align:top">${statusSelect}</td>
       <td style="vertical-align:top;text-align:center">${delBtn}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted)">No SOS requests yet${editable?'. Click <strong>+ Add Request</strong> to log one.':'.'}</td></tr>`;
+  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No SOS requests yet${editable?'. Click <strong>+ Add Request</strong> to log one.':'.'}</td></tr>`;
 
   const addBtn = editable ? `<button class="btn btn-primary btn-sm" onclick="addSosRequest()" style="font-size:12px;padding:6px 14px">+ Add Request</button>` : '';
 
   el.innerHTML = `<div class="table-card" style="padding:16px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <div style="font-size:12px;color:var(--muted)">Track urgent requests across the team</div>
+      <div style="font-size:12px;color:var(--muted)">Track urgent requests across the team · <strong style="color:var(--text)">Requests you log are stamped with your name</strong></div>
       <div style="flex:1"></div>
       ${addBtn}
     </div>
     ${statRow}
     <div class="tbl-wrap"><table style="width:100%">
       <thead><tr>
-        <th style="width:22%">Request From</th>
-        <th style="width:52%">Request Note</th>
-        <th style="width:18%">Status</th>
+        <th style="width:18%">Request From</th>
+        <th style="width:18%">Assigned To</th>
+        <th style="width:44%">Request Note</th>
+        <th style="width:14%">Status</th>
         <th style="width:50px"></th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
@@ -12314,14 +12354,20 @@ async function renderSosRequestsView(){
 async function addSosRequest(){
   try{
     const now = new Date();
+    const uid = (currentUser && currentUser.uid) || '';
+    const name = (currentUser && (currentUser.name || currentUser.email)) || 'unknown';
     const data = {
-      requestFromUid: '',
-      requestFromName: '',
+      // Auto-stamp the requester with the signed-in user — non-admins
+      // can't reassign it themselves, so requests can't be forged.
+      requestFromUid: uid,
+      requestFromName: name,
+      assignedToUid: '',
+      assignedToName: '',
       requestNote: '',
       requestStatus: 'Not Started',
       createdAt: now,
-      createdByUid: (currentUser && currentUser.uid) || null,
-      createdByName: (currentUser && (currentUser.name || currentUser.email)) || 'unknown',
+      createdByUid: uid || null,
+      createdByName: name,
       fromHistory: []
     };
     const ref = await db.collection('sosRequests').add(data);
@@ -12333,6 +12379,12 @@ async function addSosRequest(){
 async function updateSosField(id, field, value){
   const r = sosRequestsCache.find(x => x.id === id);
   if(!r) return;
+  // Guard: only admins can reassign 'requestFromUid' on an existing row.
+  if(field === 'requestFromUid' && !isAdmin()){
+    toast('Only admins can change who a request is from');
+    renderSosRequestsView();
+    return;
+  }
   const users = await ensureUsersCache();
   try{
     const updates = {[field]: value, updatedAt: new Date(), updatedByUid: (currentUser && currentUser.uid) || null, updatedByName: (currentUser && (currentUser.name || currentUser.email)) || ''};
@@ -12358,10 +12410,16 @@ async function updateSosField(id, field, value){
       }
       r.requestFromName = newName;
     }
+    if(field === 'assignedToUid'){
+      const newUser = users.find(u => u.uid === value);
+      const newName = newUser ? (newUser.name || newUser.email || '') : '';
+      updates.assignedToName = newName;
+      r.assignedToName = newName;
+    }
     r[field] = value;
     await db.collection('sosRequests').doc(id).update(updates);
-    if(field === 'requestFromUid' || field === 'requestStatus'){
-      renderSosRequestsView(); // re-render so status color + history badge update
+    if(field === 'requestFromUid' || field === 'requestStatus' || field === 'assignedToUid'){
+      renderSosRequestsView(); // re-render so labels/badges refresh
     }
   }catch(e){ toast('Failed: ' + (e.message || 'error')); }
 }
