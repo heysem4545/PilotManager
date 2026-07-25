@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-12';
+const APP_VERSION='2026-07-25-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13338,10 +13338,6 @@ function exportWhatsApp(){
           <input type="radio" name="waPreset" value="cmhaBalance" style="margin-top:2px">
           <div><div style="font-weight:600;color:var(--text)">🏛 Only rows with a CMHA balance</div><div style="font-size:10px;color:var(--muted)">CMHA balance greater than 0; notes still included</div></div>
         </label>
-        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
-          <input type="radio" name="waPreset" value="balanceAndAction" style="margin-top:2px">
-          <div><div style="font-weight:600;color:var(--text)">🎯 Balance AND Action Note</div><div style="font-size:10px;color:var(--muted)">Tightest slice — actively worked accounts with money owed</div></div>
-        </label>
       </div>
     </div>
     <div class="fg" style="margin-top:8px">
@@ -13421,8 +13417,7 @@ function buildWhatsAppReport(opts){
     anyNoteBalance:'Notes + Balance',
     anyNoteCleared:'Notes + Balance cleared',
     balanceOnly:'Balances only',
-    cmhaBalance:'CMHA Balance only',
-    balanceAndAction:'Balance + Action Note'
+    cmhaBalance:'CMHA Balance only'
   };
   const hasAnyNote=r=>(r.note&&r.note.trim())||(r.rentNote&&r.rentNote.trim());
   if(opts.preset==='anyNoteBalance'){
@@ -13433,8 +13428,6 @@ function buildWhatsAppReport(opts){
     rowsForReport=rowsForReport.filter(r=>r.cmhaBal>0||r.tenBal>0);
   } else if(opts.preset==='cmhaBalance'){
     rowsForReport=rowsForReport.filter(r=>r.cmhaBal>0);
-  } else if(opts.preset==='balanceAndAction'){
-    rowsForReport=rowsForReport.filter(r=>(r.cmhaBal>0||r.tenBal>0) && r.note && r.note.trim());
   }
   if(presetLabels[opts.preset]) scopeLabel += ' — '+presetLabels[opts.preset];
 
