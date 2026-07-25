@@ -1122,6 +1122,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         </div>
         <div class="head-actions" id="headActions">
           <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportWhatsApp()" style="color:#25d366;border-color:rgba(37,211,102,0.35)">📱 WhatsApp</button>
           <button class="btn btn-primary btn-sm" id="addPropBtn" onclick="openAdd()">+ Add Property</button>
           <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
             <svg id="themeIconSun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
@@ -11661,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-04';
+const APP_VERSION='2026-07-25-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13259,6 +13260,115 @@ function exportCSV(){
   });
   download(toCsv(header, rows), `PilotManager_${monthLabel}.csv`);
   toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+}
+
+// Build a WhatsApp-friendly Property Follow-Up report from the rows
+// the user is currently looking at. Same context-awareness as CSV:
+// active view + tab + status filter decides what goes in.
+function exportWhatsApp(){
+  const MNAMES_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const now=new Date();
+  const ordinal=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+  const headerDate=`${MNAMES_LONG[now.getMonth()]} ${ordinal(now.getDate())} ${now.getFullYear()}`;
+  const money=n=>'$'+Math.round(Number(n)||0).toLocaleString();
+  const sep='______________';
+
+  // Gather the rows for the current tab, respecting filters.
+  let rowsForReport=[];
+  let scopeLabel='Property Follow-Up Report';
+
+  if(currentView==='collection' && collectionViewMode==='monthly'){
+    const list=properties.filter(p=>{
+      const mp=getMonthProp(p);
+      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+      return cmhaBal>0||tenBal>0;
+    });
+    const filtered=collMonthlyStatusFilter==='all'?list:list.filter(p=>(getMonthProp(p).status||'')===collMonthlyStatusFilter);
+    rowsForReport=filtered.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0)).map(p=>{
+      const mp=getMonthProp(p);
+      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+      return {addr:p.addr||'', cmhaBal, tenBal, note:mp.collActionNote||'', rentNote:mp.monthNote||''};
+    });
+    scopeLabel=collMonthlyStatusFilter==='all'?'Property Follow-Up Report':`Property Follow-Up Report (${collMonthlyStatusFilter})`;
+  } else if(currentView==='properties' && typeof filteredData==='function'){
+    const list=filteredData();
+    rowsForReport=list.map(p=>{
+      const mp=getMonthProp(p);
+      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+      return {addr:p.addr||'', cmhaBal, tenBal, note:mp.collActionNote||'', rentNote:mp.monthNote||''};
+    });
+    scopeLabel='Rent Tracking Report';
+  } else {
+    rowsForReport=properties.map(p=>{
+      const mp=getMonthProp(p);
+      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+      return {addr:p.addr||'', cmhaBal, tenBal, note:mp.collActionNote||'', rentNote:mp.monthNote||''};
+    });
+  }
+
+  if(rowsForReport.length===0){
+    toast('Nothing to export in this view');
+    return;
+  }
+
+  const lines=[`📋 ${scopeLabel} – ${headerDate}`, ''];
+  rowsForReport.forEach((r,i)=>{
+    lines.push(`🏠 ${r.addr}`);
+    if(r.cmhaBal>0 || r.tenBal>0){
+      lines.push(`💲 Balance – CMHA: ${money(r.cmhaBal)} / Tenant: ${money(r.tenBal)}`);
+    } else {
+      lines.push(`✅ Balance cleared`);
+    }
+    if(r.note) lines.push(`📝 ${r.note}`);
+    else if(r.rentNote) lines.push(`📝 ${r.rentNote}  _(from Rent Tracking)_`);
+    if(i<rowsForReport.length-1) lines.push(sep);
+  });
+  const text=lines.join('\n');
+
+  openWhatsAppPreview(text, rowsForReport.length);
+}
+
+function openWhatsAppPreview(text, count){
+  const existing=document.getElementById('whatsAppExportModal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='whatsAppExportModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:600px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-title"><span>📱 WhatsApp Report Preview</span><button class="modal-close" onclick="document.getElementById('whatsAppExportModal').remove()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${count} propert${count===1?'y':'ies'} · click Copy, then paste into WhatsApp</div>
+    <textarea id="waExportText" readonly style="flex:1;min-height:320px;font-family:var(--mono);font-size:12px;padding:12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);outline:none;resize:vertical;white-space:pre-wrap">${escapeHtml(text)}</textarea>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('whatsAppExportModal').remove()">Close</button>
+      <button class="btn btn-primary btn-sm" style="background:#25d366;border-color:#25d366" onclick="copyWhatsAppReport()">📋 Copy to Clipboard</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  const ta=document.getElementById('waExportText');
+  if(ta){ ta.focus(); ta.select(); }
+}
+
+async function copyWhatsAppReport(){
+  const ta=document.getElementById('waExportText');
+  if(!ta) return;
+  const text=ta.value;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+    } else {
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+    }
+    toast('📋 Copied — now paste into WhatsApp');
+  }catch(e){
+    ta.focus(); ta.select();
+    toast('Select all and press ⌘/Ctrl+C');
+  }
 }
 
 // ─────────────────────────────────────────────
