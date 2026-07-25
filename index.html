@@ -10516,15 +10516,21 @@ async function autoLogToDailyLog(uid, taskText, day){
 }
 
 function calcStats(tasks){
+  // A row only counts when the task text is filled. Points are only
+  // awarded when the row is (a) marked done and (b) has a real
+  // difficulty selected — no more silent 1-pt default when difficulty
+  // was left blank.
   let total=0,done=0,progressing=0,notstarted=0,pts=0,maxPts=0;
   Object.values(tasks).forEach(rows=>{
     rows.forEach(t=>{
-      if(!t.task)return;
+      if(!t.task||!String(t.task).trim())return;
       total++;
-      const p=DIFF_PTS[t.diff]||1;
-      maxPts+=p;
-      if(t.status==='done'){done++;pts+=p;}
-      else if(t.status==='progressing') progressing++;
+      const diffPts=DIFF_PTS[t.diff];
+      if(diffPts) maxPts+=diffPts;
+      if(t.status==='done'){
+        done++;
+        if(diffPts) pts+=diffPts;
+      } else if(t.status==='progressing') progressing++;
       else notstarted++;
     });
   });
@@ -10940,10 +10946,10 @@ function tmRefreshStats(){
     const status=row.querySelector('.tm-status-sel');
     if(!inp||(typeof inp.value==='string'?!inp.value.trim():!inp.textContent.trim()))return;
     total++;
-    const diffVal=diff?diff.value:'medium';
-    const p=DIFF_PTS[diffVal]||1;
+    const diffVal=diff?diff.value:'';
+    const p=DIFF_PTS[diffVal];
     const st=status?status.value:'notstarted';
-    if(st==='done'){done++;pts+=p;}
+    if(st==='done'){done++; if(p) pts+=p;}
     else if(st==='progressing') progressing++;
     else notstarted++;
   });
@@ -11689,7 +11695,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-24-04';
+const APP_VERSION='2026-07-24-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
