@@ -11661,7 +11661,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-03';
+const APP_VERSION='2026-07-25-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13108,11 +13108,157 @@ async function deleteLegalCase(){
   }catch(e){ toast('Error: '+e.message); }
 }
 
+// Context-aware CSV export. Looks at which view + tab + filters the
+// user is currently on, then exports exactly what they're seeing —
+// with the correct active month baked into the filename.
 function exportCSV(){
-  const rows=[['Address','Status','Tenant','Rent','CMHA','Tenant Portion','CMHA Paid','Tenant Paid','Collected','Balance']];
-  properties.forEach(p=>rows.push([`"${p.addr}"`,p.status,`"${p.tenant||''}"`,p.rent,p.cmha,p.tenantPortion,p.cmhaPaid,p.tenantPaid,p.collected,p.balance]));
-  const csv=rows.map(r=>r.join(',')).join('\n');
-  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='PilotManager_Apr2026.csv';a.click();
+  const MNAMES_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MNAMES_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel=MNAMES_SHORT[activeMonth]+activeYear;
+  // CSV-safe: wrap every value in quotes and escape embedded quotes.
+  const esc=v=>{
+    if(v===null||v===undefined) return '""';
+    const s=String(v).replace(/"/g,'""');
+    return `"${s}"`;
+  };
+  const toCsv=(header, dataRows)=>[header.map(esc).join(','), ...dataRows.map(r=>r.map(esc).join(','))].join('\n');
+  const download=(csv, name)=>{
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  };
+
+  // === Collection section ===
+  if(currentView==='collection'){
+    // Monthly Balance — respects the status filter.
+    if(collectionViewMode==='monthly'){
+      const list=properties.filter(p=>{
+        const mp=getMonthProp(p);
+        const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+        const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+        return cmhaBal>0||tenBal>0;
+      });
+      const filtered=collMonthlyStatusFilter==='all'?list:list.filter(p=>(getMonthProp(p).status||'')===collMonthlyStatusFilter);
+      const header=['Send Collection','Address','Unit','Status','CMHA Rent','Tenant Rent','CMHA Paid','Tenant Paid','Collected','CMHA Balance','Tenant Balance','Notes from Rent Tracking','Action Notes'];
+      const rows=filtered.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0)).map(p=>{
+        const mp=getMonthProp(p);
+        const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+        const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+        const collected=(mp.cmhaPaid||0)+(mp.tenantPaid||0);
+        return [p.sentToCollection?'Yes':'', p.addr||'', p.unit||'', mp.status||'', mp.cmha||0, mp.tenantPortion||0, mp.cmhaPaid||0, mp.tenantPaid||0, collected, cmhaBal, tenBal, mp.monthNote||'', mp.collActionNote||''];
+      });
+      const suffix=collMonthlyStatusFilter==='all'?'':'_'+collMonthlyStatusFilter.replace(/\s+/g,'-');
+      download(toCsv(header, rows), `Collection_MonthlyBalance_${monthLabel}${suffix}.csv`);
+      toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+      return;
+    }
+    // All Month Balance — respects the status filter.
+    if(collectionViewMode==='balancesOnly'){
+      // Build the same monthList used by renderBalancesOnly (12-month year view by default).
+      const now=new Date();
+      const curMonth=now.getMonth(), curYear=now.getFullYear();
+      const monthList=[];
+      if(typeof allBalancesRange!=='undefined' && allBalancesRange==='last2'){for(let i=1;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}}
+      else if(typeof allBalancesRange!=='undefined' && allBalancesRange==='last6'){for(let i=5;i>=0;i--){let m=curMonth-i,y=curYear;if(m<0){m+=12;y--;}monthList.push({m,y});}}
+      else if(typeof allBalancesRange!=='undefined' && allBalancesRange==='allyear'){for(let m=0;m<=curMonth;m++) monthList.push({m,y:curYear});}
+      else {for(let m=0;m<=11;m++) monthList.push({m,y:curYear});}
+      const rowsData=[];
+      properties.forEach(p=>{
+        let any=false;
+        const bals=monthList.map(({m,y})=>{
+          const key=monthKey(y,m);
+          const md=(monthData[p.id]||{})[key]||{};
+          const cmhaBal=Math.max(0,(md.cmha||0)-(md.cmhaPaid||0));
+          const tenantBal=Math.max(0,(md.tenantPortion||0)-(md.tenantPaid||0));
+          if(cmhaBal>0||tenantBal>0) any=true;
+          return {cmhaBal, tenantBal};
+        });
+        if(!any) return;
+        const curMd=(monthData[p.id]||{})[monthKey(curYear,curMonth)]||{};
+        rowsData.push({p, status:curMd.status||'', bals});
+      });
+      const filtered=allBalancesStatusFilter==='all'?rowsData:allBalancesStatusFilter==='NO_STATUS'?rowsData.filter(r=>!r.status):rowsData.filter(r=>r.status===allBalancesStatusFilter);
+      const header=['Send Collection','Address','Status'];
+      monthList.forEach(({m,y})=>{const ml=`${MNAMES_SHORT[m]}${y!==curYear?' '+y:''}`;header.push(`${ml} CMHA`, `${ml} Tenant`);});
+      header.push('Total CMHA','Total Tenant','Action Note','Update');
+      const rows=filtered.map(r=>{
+        const line=[r.p.sentToCollection?'Yes':'', r.p.addr||'', r.status];
+        let totC=0, totT=0;
+        r.bals.forEach(b=>{line.push(b.cmhaBal); line.push(b.tenantBal); totC+=b.cmhaBal; totT+=b.tenantBal;});
+        line.push(totC, totT, r.p.actionNote||'', r.p.balanceUpdate||'');
+        return line;
+      });
+      const suffix=allBalancesStatusFilter==='all'?'':'_'+allBalancesStatusFilter.replace(/\s+/g,'-');
+      download(toCsv(header, rows), `Collection_AllMonthBalance_${curYear}${suffix}.csv`);
+      toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+      return;
+    }
+    // Collection Houses — properties currently marked sentToCollection.
+    if(collectionViewMode==='allBalances'){
+      const list=properties.filter(p=>!p.archivedToHistory&&p.sentToCollection);
+      const header=['Address','30 Day Notice','30 Day Pic Received','3 Day Notice','3 Day Pic Received','VAWA','Notes','To Legal','Lawyer Name','Lawyer Info','Update','Court Date','Court Result'];
+      const rows=list.map(p=>[p.addr||'', p.notice30Date||'', p.notice30Pic?'Yes':'', p.notice3Date||'', p.notice3Pic?'Yes':'', p.vawa?'Yes':'', p.collectionNotes||'', p.toLegal?'Yes':'', p.lawyerName||'', p.lawyerInfo||'', p.collectionUpdate||'', p.courtDate||'', p.courtResult||'']);
+      download(toCsv(header, rows), `Collection_Houses_${monthLabel}.csv`);
+      toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+      return;
+    }
+    // Legal Cases — snapshot rows in legalCases collection.
+    if(collectionViewMode==='legal'){
+      db.collection('legalCases').get().then(snap=>{
+        const cases=snap.docs.map(d=>({id:d.id,...d.data()}));
+        const header=['Address','30 Day Notice','3 Day Notice','VAWA','Lawyer Name','Lawyer Info','Court Date','Court Result','Update','Notes','Total Owed'];
+        const rows=cases.map(c=>{
+          const p=properties.find(x=>x.id===c.propertyId);
+          const total=c.totalBalance!=null?c.totalBalance:((c.totalCmhaBal||0)+(c.totalTenantBal||0));
+          return [c.addr||'', c.notice30Date||'', c.notice3Date||'', c.vawa?'Yes':'', (p&&p.lawyerName)||c.lawyerName||'', (p&&p.lawyerInfo)||c.lawyerInfo||'', (p&&p.courtDate)||c.courtDate||'', (p&&p.courtResult)||c.courtResult||'', (p&&p.collectionUpdate)||c.collectionUpdate||'', (p&&p.collectionNotes)||c.notes||'', total];
+        });
+        download(toCsv(header, rows), `Collection_LegalCases_${monthLabel}.csv`);
+        toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+      }).catch(e=>toast('Export failed: '+e.message));
+      return;
+    }
+    // Collection History
+    if(collectionViewMode==='history'){
+      db.collection('collectionHistory').get().then(snap=>{
+        const items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        const header=['Address','Archived Date','Total CMHA','Total Tenant','Total','Court Date','Court Result','Notes'];
+        const rows=items.map(x=>[x.addr||'', (x.archivedAt&&x.archivedAt.toDate)?x.archivedAt.toDate().toISOString().slice(0,10):'', x.totalCmhaBal||0, x.totalTenantBal||0, x.totalBalance||0, x.courtDate||'', x.courtResult||'', x.collectionNotes||'']);
+        download(toCsv(header, rows), `Collection_History_${monthLabel}.csv`);
+        toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+      }).catch(e=>toast('Export failed: '+e.message));
+      return;
+    }
+  }
+
+  // === Properties → Rent Tracking (default properties view) ===
+  if(currentView==='properties'){
+    const list=(typeof filteredData==='function')?filteredData():properties;
+    const header=['Address','Unit','Bedroom','Bath','Tenant','Status','Deposit Total','CMHA Rent','Tenant Rent','CMHA Paid','Tenant Paid','Collected','CMHA Balance','Tenant Balance','Notes'];
+    const rows=list.map(p=>{
+      const mp=getMonthProp(p);
+      const cmhaBal=Math.max(0,(mp.cmha||0)-(mp.cmhaPaid||0));
+      const tenBal=Math.max(0,(mp.tenantPortion||0)-(mp.tenantPaid||0));
+      const collected=(mp.cmhaPaid||0)+(mp.tenantPaid||0);
+      const depTotal=(parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0);
+      return [p.addr||'', p.unit||'', p.bedroom||'', p.bath||'', p.tenant||'', mp.status||'', depTotal, mp.cmha||0, mp.tenantPortion||0, mp.cmhaPaid||0, mp.tenantPaid||0, collected, cmhaBal, tenBal, mp.monthNote||''];
+    });
+    const suffix=(typeof currentFilter!=='undefined'&&currentFilter!=='all')?'_'+String(currentFilter).replace(/\s+/g,'-'):'';
+    download(toCsv(header, rows), `RentTracking_${monthLabel}${suffix}.csv`);
+    toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
+    return;
+  }
+
+  // === Fallback: full property list, current active month ===
+  const header=['Address','Unit','Bedroom','Bath','Tenant','Status','CMHA Rent','Tenant Rent','CMHA Paid','Tenant Paid','Collected','Balance'];
+  const rows=properties.map(p=>{
+    const mp=getMonthProp(p);
+    const collected=(mp.cmhaPaid||0)+(mp.tenantPaid||0);
+    return [p.addr||'', p.unit||'', p.bedroom||'', p.bath||'', p.tenant||'', mp.status||'', mp.cmha||0, mp.tenantPortion||0, mp.cmhaPaid||0, mp.tenantPaid||0, collected, mp.balance||0];
+  });
+  download(toCsv(header, rows), `PilotManager_${monthLabel}.csv`);
+  toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
 }
 
 // ─────────────────────────────────────────────
