@@ -6946,9 +6946,23 @@ function renderTable(){
     const cmhaOver=Math.max(0,mp.cmhaPaid-mp.cmha);
     const tenantOver=Math.max(0,mp.tenantPaid-mp.tenantPortion);
     const totalOver=cmhaOver+tenantOver;
-    const balCell=mp.balance>0
-      ?`<div class="cmha-split" style="color:var(--red)">CMHA: ${fmt(cmhaBalance)} / T: ${fmt(tenantBalance)}</div>`
-      :totalOver>0?`<span style="color:var(--accent)">✓ +${fmt(totalOver)}</span>`:`<span style="color:var(--accent)">✓</span>`;
+    // Render each side (CMHA / Tenant) independently so a shortfall on
+    // one side and an overpayment on the other are BOTH visible — e.g.
+    // "CMHA: $200 / T: +$604" instead of hiding the overpayment.
+    const cmhaPart = cmhaBalance>0
+      ? `<span style="color:var(--red)">CMHA: ${fmt(cmhaBalance)}</span>`
+      : cmhaOver>0
+        ? `<span style="color:var(--accent)">CMHA: +${fmt(cmhaOver)}</span>`
+        : `<span style="color:var(--muted)">CMHA: $0</span>`;
+    const tenantPart = tenantBalance>0
+      ? `<span style="color:var(--red)">T: ${fmt(tenantBalance)}</span>`
+      : tenantOver>0
+        ? `<span style="color:var(--accent)">T: +${fmt(tenantOver)}</span>`
+        : `<span style="color:var(--muted)">T: $0</span>`;
+    const anyImbalance = cmhaBalance>0||tenantBalance>0||cmhaOver>0||tenantOver>0;
+    const balCell = anyImbalance
+      ? `<div class="cmha-split">${cmhaPart} / ${tenantPart}</div>`
+      : `<span style="color:var(--accent)">✓</span>`;
     // Status cell
     const statusCell=edit
       ?`<span class="editable" onclick="inlineEditStatus('${p.id}',this)">${mp.status?`<span class="badge ${BC[mp.status]||'b-vacant'}">${BL[mp.status]||mp.status}</span>`:'<span style="color:var(--muted2);font-size:11px">— click —</span>'}</span>`
@@ -11715,7 +11729,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-24-06';
+const APP_VERSION='2026-07-25-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
