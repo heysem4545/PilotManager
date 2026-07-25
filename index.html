@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-10';
+const APP_VERSION='2026-07-25-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13343,7 +13343,7 @@ function exportWhatsApp(){
     <div class="fg" style="margin-top:8px">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer">
         <input type="checkbox" id="waIncludeRentNote" checked>
-        Fall back to Rent Tracking notes when Action Note is empty
+        Include Rent Tracking notes when present
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:4px">
         <input type="checkbox" id="waHideCleared" checked>
@@ -13451,8 +13451,11 @@ function buildWhatsAppReport(opts){
     // Note lines get a topic-aware icon (🔑 for keys, 📄 for
     // paperwork, 📞 for calls, etc.). Falls back to 📝 when nothing
     // in the text matches a known keyword.
+    // Show BOTH notes when both exist — action note first, rent
+    // tracking note underneath — so recipients see the full context
+    // for a property instead of one hiding the other.
     if(r.note) lines.push(`${pickNoteIcon(r.note)} ${r.note}`);
-    else if(opts.includeRentNote && r.rentNote) lines.push(`${pickNoteIcon(r.rentNote)} ${r.rentNote}  _(from Rent Tracking)_`);
+    if(opts.includeRentNote && r.rentNote) lines.push(`${pickNoteIcon(r.rentNote)} ${r.rentNote}  _(from Rent Tracking)_`);
     if(i<rowsForReport.length-1) lines.push(sep);
   });
   const text=lines.join('\n');
