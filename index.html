@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-16';
+const APP_VERSION='2026-07-25-17';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14962,6 +14962,209 @@ async function openQuickMeetingModal(date){
   document.body.appendChild(modal);
 }
 
+// Ask whether the user wants to schedule a future meeting or log
+// one that already happened. Splits the calendar '+' button into
+// two clear flows so a completed meeting with follow-up tasks
+// doesn't get filed the same way as a scheduled placeholder.
+function openMeetingChoiceModal(date){
+  const existing=document.getElementById('mtgChoiceModal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='mtgChoiceModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:420px;max-width:95vw">
+    <div class="modal-title"><span>📅 ${date}</span><button class="modal-close" onclick="document.getElementById('mtgChoiceModal').remove()">×</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">What are you adding for this day?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-ghost" style="justify-content:flex-start;padding:14px 16px;text-align:left" onclick="document.getElementById('mtgChoiceModal').remove();openQuickMeetingModal('${date}')">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">📅 Create Meeting</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;font-weight:400">Schedule a meeting that will happen on this day</div>
+        </div>
+      </button>
+      <button class="btn btn-ghost" style="justify-content:flex-start;padding:14px 16px;text-align:left" onclick="document.getElementById('mtgChoiceModal').remove();openLogMeetingModal('${date}')">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent)">📝 Log Meeting (already done)</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;font-weight:400">Record a completed meeting with a to-do list for follow-ups</div>
+        </div>
+      </button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('mtgChoiceModal').remove()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+// Draft store for the log-meeting to-do list rows (each row is
+// {text, dueDate, assignedUid, assignedName}). Kept outside the
+// DOM so re-renders don't blow away in-progress edits.
+let lmTodoDraft=[];
+
+async function openLogMeetingModal(date){
+  const users=teamUsersCache.length?teamUsersCache:await getUsers();
+  teamUsersCache=users;
+  const existing=document.getElementById('logMtgModal');
+  if(existing) existing.remove();
+  lmTodoDraft=[];
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='logMtgModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="modal-title"><span>📝 Log Meeting — ${date}</span><button class="modal-close" onclick="document.getElementById('logMtgModal').remove()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Record a meeting that already happened. Each to-do item becomes a task in the assignee's Task Management for their due date.</div>
+    <div class="fg"><label>Meeting Name</label>
+      <input type="text" id="lmName" placeholder="e.g. Team Sync" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+    </div>
+    <div class="fg"><label>Date (when it happened)</label>
+      <input type="date" id="lmDate" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
+    </div>
+    <div class="fg"><label>Difficulty</label>
+      <select id="lmDifficulty" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+        <option value="1">⭐ 1 Star (Easy)</option>
+        <option value="3" selected>⭐⭐⭐ 3 Stars (Medium)</option>
+        <option value="5">⭐⭐⭐⭐⭐ 5 Stars (Hard)</option>
+      </select>
+    </div>
+    <div class="fg"><label>Attendees</label>
+      <div id="lmAttendees" style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">
+        ${users.map(u=>{
+          const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+          const col=userColor(u.uid);
+          return `<label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer">
+            <input type="checkbox" value="${u.uid}" data-name="${escapeAttr(u.name||u.email)}" style="accent-color:var(--accent);width:15px;height:15px" onchange="this.closest('label').style.background=this.checked?'var(--accent-dim)':'var(--surface2)';this.closest('label').style.borderColor=this.checked?'var(--accent-dim)':'var(--border2)'">
+            <span style="width:24px;height:24px;border-radius:50%;background:${col}22;color:${col};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+            <span style="font-size:12px;font-weight:500;flex:1">${escapeHtml(u.name||u.email)}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="fg">
+      <label>📋 To-Do List (assigned follow-ups)</label>
+      <div id="lmTodoList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+      <button class="btn btn-ghost btn-sm" style="align-self:flex-start;padding:6px 12px;font-size:11px;color:var(--accent);border-color:var(--accent-dim)" onclick="addLmTodoRow()">+ Add To-Do</button>
+    </div>
+    <div class="fg"><label>Meeting Notes (optional)</label>
+      <textarea id="lmNotes" rows="2" placeholder="Anything worth remembering about the meeting…" style="font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('logMtgModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" style="background:var(--accent);color:#0d0d10;border-color:var(--accent)" onclick="saveLoggedMeeting()">📝 Log Meeting</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  addLmTodoRow(); // start with one empty row so users see the shape
+}
+
+function addLmTodoRow(){
+  lmTodoDraft.push({text:'', dueDate:'', assignedUid:'', assignedName:''});
+  renderLmTodoList();
+}
+
+function removeLmTodoRow(i){
+  lmTodoDraft.splice(i,1);
+  renderLmTodoList();
+}
+
+function updateLmTodoField(i, field, value){
+  if(!lmTodoDraft[i]) return;
+  lmTodoDraft[i][field]=value;
+  if(field==='assignedUid'){
+    const u=(teamUsersCache||[]).find(x=>x.uid===value);
+    lmTodoDraft[i].assignedName = u ? (u.name||u.email||'') : '';
+  }
+}
+
+function renderLmTodoList(){
+  const el=document.getElementById('lmTodoList');
+  if(!el) return;
+  const users=teamUsersCache||[];
+  const userOpts=users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+  el.innerHTML = lmTodoDraft.length===0
+    ? '<div style="font-size:11px;color:var(--muted2);padding:6px">No to-dos yet — click + Add To-Do</div>'
+    : lmTodoDraft.map((t,i)=>`<div style="display:flex;gap:6px;align-items:center">
+        <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:2;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+        <input type="date" value="${t.dueDate}" oninput="updateLmTodoField(${i},'dueDate',this.value)" title="Due date" style="flex:1;min-width:130px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+        <select onchange="updateLmTodoField(${i},'assignedUid',this.value)" title="Assign to" style="flex:1;min-width:120px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer">
+          <option value="">Assign to…</option>
+          ${users.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
+        </select>
+        <button title="Remove" onclick="removeLmTodoRow(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px">×</button>
+      </div>`).join('');
+}
+
+async function saveLoggedMeeting(){
+  const name=document.getElementById('lmName').value.trim();
+  if(!name){toast('Enter a meeting name');return;}
+  const date=document.getElementById('lmDate').value;
+  if(!date){toast('Select a date');return;}
+  const difficulty=parseInt(document.getElementById('lmDifficulty').value,10)||3;
+  const notes=document.getElementById('lmNotes').value.trim();
+  const attendees=[];
+  document.querySelectorAll('#lmAttendees input[type=checkbox]:checked').forEach(cb=>{
+    attendees.push({uid:cb.value, name:cb.dataset.name||'', attended:true, late:false, lateMinutes:0, absenceReason:'', required:true});
+  });
+  if(!attendees.length){toast('Select at least one attendee');return;}
+  const todos = lmTodoDraft
+    .map(t=>({text:(t.text||'').trim(), dueDate:t.dueDate||'', assignedUid:t.assignedUid||'', assignedName:t.assignedName||'', done:false}))
+    .filter(t=>t.text);
+  try{
+    const mtgRef = await db.collection('meetings').add({
+      name,
+      targetDate:date,
+      actualDate:date,
+      templateId:'',
+      attendees,
+      agenda:[],
+      todos,
+      difficulty,
+      duration:0,
+      efficiency:0,
+      completed:true,
+      loggedAfterFact:true,
+      notes,
+      createdBy:currentUser.uid,
+      createdByName:currentUser.name||currentUser.email,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Fan out each assigned to-do into the tasks collection so the
+    // assignee sees it on their Task Management calendar under the
+    // due date. Skip todos without a due date or assignee.
+    for(const t of todos){
+      if(!t.assignedUid || !t.dueDate) continue;
+      const [y,m,d] = t.dueDate.split('-').map(x=>parseInt(x,10));
+      if(!y||!m||!d) continue;
+      const key = `tm-${y}-${String(m).padStart(2,'0')}`;
+      const rowIdx = await getNextRowIdx(key, d, t.assignedUid);
+      const diffMap = {1:'easy',3:'medium',5:'hard'};
+      try{
+        await db.collection('tasks').add({
+          monthKey:key, day:d, rowIdx,
+          uid:t.assignedUid,
+          userName:t.assignedName,
+          userColor:userColor(t.assignedUid),
+          isGroup:false,
+          diff:diffMap[difficulty]||'medium',
+          task:`[Meeting: ${name}] ${t.text}`,
+          status:'notstarted',
+          assignedUid:t.assignedUid,
+          assignedName:t.assignedName,
+          source:'meetingLog',
+          meetingId:mtgRef.id,
+          suspiciousFlag:false,
+          createdAt:new Date(), updatedAt:new Date()
+        });
+      }catch(e){ console.warn('meeting todo → task failed', e); }
+    }
+    document.getElementById('logMtgModal').remove();
+    lmTodoDraft=[];
+    toast(`Meeting logged${todos.length?` · ${todos.length} to-do${todos.length===1?'':'s'} assigned`:''}`);
+    await renderMeetingsView();
+  }catch(e){toast('Error: '+e.message);}
+}
+
 function prefillQuickMeeting(){
   const tplId=document.getElementById('qmTemplate').value;
   if(!tplId){
@@ -15243,7 +15446,7 @@ async function renderMeetingCalendar(){
     html+=`<div style="background:var(--surface);border:1px solid ${border};border-radius:8px;padding:6px;min-height:75px;position:relative">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'}">${d}</span>
-        ${canEdit()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 2px" onclick="openQuickMeetingModal('${mtgCalYear}-${String(mtgCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}')" title="Create meeting">+</button>`:''}
+        ${canEdit()?`<button style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:0 2px" onclick="openMeetingChoiceModal('${mtgCalYear}-${String(mtgCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}')" title="Create or log meeting">+</button>`:''}
       </div>
       ${dayMtgs.map(m=>{
         const isDone=m.completed;
