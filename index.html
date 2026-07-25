@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-05';
+const APP_VERSION='2026-07-25-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13262,6 +13262,46 @@ function exportCSV(){
   toast(`Exported ${rows.length} row${rows.length===1?'':'s'}`);
 }
 
+// Keyword → icon mapping used by the WhatsApp report so a note that
+// mentions "keys" gets 🔑, "paperwork" gets 📄, etc. Ordered by
+// specificity — the first matching topic wins, so we put narrow /
+// unambiguous keywords first (e.g. 'lease' before 'sign'). Every
+// entry can list multiple keywords separated by |.
+const NOTE_ICON_RULES = [
+  {icon:'🔑', kw:['key','keys','lockbox','lock','locksmith','rekey','re-key']},
+  {icon:'📧', kw:['email','emails','emailed','e-mail','mail','inbox','reply','replied']},
+  {icon:'📞', kw:['call','called','phone','voicemail','voice mail','text','texted','sms','ring']},
+  {icon:'💲', kw:['payment','paid','pay ','pays','paying','money','deposit','check','cheque','zelle','venmo','cash','money order','turbotenant','doorloop']},
+  {icon:'⚖', kw:['court','legal','lawyer','attorney','eviction','evict','judgement','judgment','hearing','filing','filed']},
+  {icon:'🔨', kw:['renovation','renovate','turnover','turn over','repair','fix','construction','plumb','plumbing','electric','hvac','roof','paint','painting','maintenance','contractor']},
+  {icon:'🔍', kw:['inspection','inspect','inspected','walkthrough','walk-through','walk through','view','viewing','showing','shown','tour']},
+  {icon:'📄', kw:['paper','paperwork','document','documents','contract','lease','agreement','signed','signature','sign ','form','notice','vawa','30-day','3-day','30 day','3 day']},
+  {icon:'🤝', kw:['meeting','met','met with','appointment','meet']},
+  {icon:'📅', kw:['scheduled','schedule','reminder','follow up','follow-up','followed up','next week','tomorrow','later','review']},
+  {icon:'⚠', kw:['urgent','asap','warning','issue','problem','damage','damaged','broken','leak','emergency','fire','flood','pest','mold','mice','rat','roach']},
+  {icon:'🏚', kw:['vacant','empty','moved out','moved-out','abandoned','no tenant']},
+  {icon:'👤', kw:['tenant','resident','landlord','owner','manager','office']}
+];
+function pickNoteIcon(text){
+  if(!text) return '📝';
+  const t = String(text).toLowerCase();
+  for(const rule of NOTE_ICON_RULES){
+    for(const w of rule.kw){
+      // Use word-boundary-ish matching for short words to avoid false
+      // hits like 'key' inside 'monkey' — but allow inline for phrases
+      // that already contain spaces.
+      const needle = w.trim();
+      if(needle.includes(' ')){
+        if(t.includes(needle)) return rule.icon;
+      } else {
+        const re = new RegExp('(^|[^a-z])'+needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z]|$)','i');
+        if(re.test(t)) return rule.icon;
+      }
+    }
+  }
+  return '📝';
+}
+
 // Build a WhatsApp-friendly Property Follow-Up report from the rows
 // the user is currently looking at. Same context-awareness as CSV:
 // active view + tab + status filter decides what goes in.
@@ -13323,8 +13363,11 @@ function exportWhatsApp(){
     } else {
       lines.push(`✅ Balance cleared`);
     }
-    if(r.note) lines.push(`📝 ${r.note}`);
-    else if(r.rentNote) lines.push(`📝 ${r.rentNote}  _(from Rent Tracking)_`);
+    // Note lines get a topic-aware icon (🔑 for keys, 📄 for
+    // paperwork, 📞 for calls, etc.). Falls back to 📝 when nothing
+    // in the text matches a known keyword.
+    if(r.note) lines.push(`${pickNoteIcon(r.note)} ${r.note}`);
+    else if(r.rentNote) lines.push(`${pickNoteIcon(r.rentNote)} ${r.rentNote}  _(from Rent Tracking)_`);
     if(i<rowsForReport.length-1) lines.push(sep);
   });
   const text=lines.join('\n');
