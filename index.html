@@ -2091,39 +2091,6 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
   </div>
 </div>
 
-<!-- COLLECTION TASK MODAL -->
-<div class="overlay" id="collTaskModal" onclick="if(event.target===this)closeModal('collTaskModal')">
-  <div class="modal" style="width:440px">
-    <div class="modal-title">
-      <span>📋 Create Task from Collection</span>
-      <button class="modal-close" onclick="closeModal('collTaskModal')">×</button>
-    </div>
-    <div class="notes-modal-meta" id="collTaskAddr"></div>
-    <input type="hidden" id="collTaskPropId" value="">
-    <div class="fg"><label>Task</label>
-      <input type="text" id="collTaskText" placeholder="e.g. Call tenant about balance…" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-    </div>
-    <div class="fg"><label>Assign To</label>
-      <select id="collTaskAssign" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-        <option value="">Select team member…</option>
-      </select>
-    </div>
-    <div class="fg"><label>Scheduled Day</label>
-      <select id="collTaskDay" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%"></select>
-    </div>
-    <div class="fg"><label>Difficulty</label>
-      <select id="collTaskDiff" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-        <option value="easy">🟢 Easy (1 pt)</option>
-        <option value="medium" selected>🟡 Medium (2 pts)</option>
-        <option value="hard">🔴 Hard (3 pts)</option>
-      </select>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('collTaskModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveCollectionTask()">Create Task</button>
-    </div>
-  </div>
-</div>
 
 <!-- TURNOVER NOTES MODAL -->
 <div class="overlay" id="toNotesModal" onclick="if(event.target===this)closeModal('toNotesModal')">
@@ -3156,74 +3123,6 @@ async function getNextRowIdx(key, day, uid){
   }catch(e){return 0;}
 }
 
-async function openCollectionTask(propId, addr, monthName){
-  document.getElementById('collTaskPropId').value=propId;
-  document.getElementById('collTaskAddr').textContent=addr+(monthName?' — '+monthName:'');
-  document.getElementById('collTaskText').value='';
-  document.getElementById('collTaskDiff').value='medium';
-  // Populate day dropdown with days of current month
-  const now=new Date();
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const daySel=document.getElementById('collTaskDay');
-  daySel.innerHTML='';
-  for(let d=1;d<=daysInMonth;d++){
-    const dn=DNAMES[new Date(now.getFullYear(),now.getMonth(),d).getDay()];
-    const sel=d===now.getDate()?'selected':'';
-    daySel.innerHTML+=`<option value="${d}" ${sel}>${d} - ${dn}</option>`;
-  }
-  // Load team users for assignment dropdown
-  const users = teamUsersCache.length ? teamUsersCache : await getUsers();
-  teamUsersCache = users;
-  const sel=document.getElementById('collTaskAssign');
-  sel.innerHTML='<option value="">Select team member…</option><option value="team">👥 Group Task</option>'+users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
-  document.getElementById('collTaskModal').classList.add('open');
-  document.getElementById('collTaskText').focus();
-}
-
-async function saveCollectionTask(){
-  const propId=document.getElementById('collTaskPropId').value;
-  const addr=document.getElementById('collTaskAddr').textContent;
-  const task=document.getElementById('collTaskText').value.trim();
-  if(!task){toast('Please enter a task');return;}
-  const assignedUid=document.getElementById('collTaskAssign').value;
-  const diff=document.getElementById('collTaskDiff').value;
-  const day=parseInt(document.getElementById('collTaskDay').value,10);
-  const isTeam = assignedUid==='team';
-  const assignedUser = isTeam ? null : teamUsersCache.find(u=>u.uid===assignedUid);
-  const assignedName = isTeam ? 'Team' : assignedUser?(assignedUser.name||assignedUser.email||''):'';
-  const now=new Date();
-  const key=tmMonthKey(now.getFullYear(),now.getMonth());
-  try{
-    await db.collection('tasks').add({
-      task: task,
-      description: 'Collection task for: '+addr,
-      diff: diff,
-      status: 'notstarted',
-      assignedUid: isTeam?'team':(assignedUid||''),
-      assignedName,
-      dueDate: '',
-      propertyId: propId,
-      propertyAddress: addr,
-      source: 'collection',
-      monthKey: key,
-      day: day,
-      rowIdx: await getNextRowIdx(key, day, isTeam?'team':(assignedUid||currentUser.uid)),
-      uid: isTeam?'team':(assignedUid||currentUser.uid),
-      userName: currentUser.name||currentUser.email,
-      userColor: userColor(assignedUid||currentUser.uid),
-      isGroup: isTeam,
-      suspiciousFlag: false,
-      createdAt: now,
-      updatedAt: now
-    });
-    closeModal('collTaskModal');
-    toast('Task created'+(assignedName?' for '+assignedName:''));
-  }catch(e){
-    toast('Error: '+e.message);
-  }
-}
-
 async function toggleCollection(propertyId, checked){
   try{
     await updatePropertyField(propertyId, 'sentToCollection', checked);
@@ -3832,7 +3731,6 @@ function renderCollectionMonthlyView(){
       <td class="money">${fmt(cmhaPaid)}</td><td class="money">${fmt(tPaid)}</td>
       <td class="money">${fmt(collected)}</td>
       <td class="money" style="color:${(cmhaBal+tenBal)>0?'var(--red)':'var(--accent)'}">${fmt(cmhaBal)} / ${fmt(tenBal)}</td>
-      <td style="text-align:center;padding:1px"><button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:9px;color:var(--blue);cursor:pointer;font-family:var(--font)" onclick="openCollectionTask('${p.id}','${escapeAttr(p.addr)}','${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][activeMonth]}')">+</button></td>
       <td style="font-size:11px;color:var(--muted)">${escapeHtml(mp.monthNote||'')}</td>
     </tr>`;
   }).join('');
@@ -3848,7 +3746,7 @@ function renderCollectionMonthlyView(){
         <table>
           <thead><tr>
             <th style="text-align:center;width:16px;padding:4px 2px">Send Collection</th><th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
-            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>+</th><th>Notes</th>
+            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th>Notes</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -4354,13 +4252,13 @@ async function renderBalancesOnly(){
             <tr>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Send Collection</th>
               <th rowspan="2" style="text-align:left;min-width:140px;vertical-align:bottom">Address</th>
-              ${monthList.map(({m,y})=>`<th colspan="3" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
+              ${monthList.map(({m,y})=>`<th colspan="2" style="text-align:center;border-bottom:none">${MNAMES[m]}${y!==curYear?' '+y:''}</th>`).join('')}
               <th colspan="2" style="text-align:center;border-bottom:none">Total</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📝 Action Note</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">📋 Update</th>
             </tr>
             <tr>
-              ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th><th style="font-size:9px;color:var(--muted);text-align:center">+</th>`).join('')}
+              ${monthList.map(()=>`<th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>`).join('')}
               <th style="font-size:9px;color:var(--blue);text-align:right">CMHA</th><th style="font-size:9px;color:var(--amber);text-align:right">Tenant</th>
             </tr>
           </thead>
@@ -4371,7 +4269,7 @@ async function renderBalancesOnly(){
               return `<tr style="${r.sentToCollection?'background:rgba(74,222,128,0.06)':''}">
                 <td style="text-align:center"><input type="checkbox" ${r.sentToCollection?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="toggleCollection('${r.id}',this.checked)" title="Send to Collection Houses"></td>
                 <td><div class="addr-main">${r.addr}</div></td>
-                ${r.balances.map((b,bi)=>{const ml=monthList[bi];const mName=MNAMES[ml.m];return `<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td><td style="text-align:center;padding:1px"><button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:9px;color:var(--blue);cursor:pointer;font-family:var(--font)" onclick="openCollectionTask('${r.id}','${escapeAttr(r.addr)}','${mName}')">+</button></td>`;}).join('')}
+                ${r.balances.map(b=>`<td class="money" style="text-align:right;font-size:11px;${b.cmhaBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.cmhaBal>0?fmt(b.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;${b.tenantBal>0?'color:var(--red)':'color:var(--muted2)'}">${b.tenantBal>0?fmt(b.tenantBal):'—'}</td>`).join('')}
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--blue)">${rowTotalC>0?fmt(rowTotalC):'—'}</td>
                 <td class="money" style="text-align:right;font-size:11px;font-weight:600;color:var(--amber)">${rowTotalT>0?fmt(rowTotalT):'—'}</td>
                 <td><input type="text" value="${escapeAttr(r.actionNote)}" placeholder="📝" style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:120px" onblur="updatePropertyField('${r.id}','actionNote',this.value)"></td>
@@ -4380,7 +4278,7 @@ async function renderBalancesOnly(){
             }).join('')}
             <tr style="border-top:2px solid var(--border);font-weight:700">
               <td></td><td>Total</td>
-              ${filteredTotals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td><td></td>`).join('')}
+              ${filteredTotals.map(t=>`<td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${t.cmhaBal>0?fmt(t.cmhaBal):'—'}</td><td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${t.tenantBal>0?fmt(t.tenantBal):'—'}</td>`).join('')}
               <td class="money" style="text-align:right;font-size:11px;color:var(--blue)">${fmt(filteredTotals.reduce((s,t)=>s+t.cmhaBal,0))}</td>
               <td class="money" style="text-align:right;font-size:11px;color:var(--amber)">${fmt(filteredTotals.reduce((s,t)=>s+t.tenantBal,0))}</td>
               <td colspan="2"></td>
@@ -11729,7 +11627,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-01';
+const APP_VERSION='2026-07-25-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
