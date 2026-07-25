@@ -11099,6 +11099,35 @@ async function renderTasksView(){
         </div>
       </div>
     </div>`;
+
+    // Points-only team leaderboard — visible to every user on My Tasks so
+    // everyone can see team totals without seeing anyone else's task text.
+    try{
+      const lbUsers=await getUsers();
+      const lbData=await Promise.all(lbUsers.map(async u=>{
+        const ut=await loadTasksForKey(key,u.uid);
+        return{...u,stats:calcStats(ut)};
+      }));
+      lbData.sort((a,b)=>b.stats.pts-a.stats.pts);
+      const maxPts=lbData[0]?.stats.pts||1;
+      const rankEmojis=['🥇','🥈','🥉'];
+      html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">⚡ Team Points — ${MNAMES_FULL[tmMonth]} ${tmYear}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${lbData.map((u,i)=>{
+            const col=userColor(u.uid);
+            const isMe=u.uid===currentUser.uid;
+            const pctW=maxPts>0?Math.round(u.stats.pts/maxPts*100):0;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;${isMe?'background:'+col+'12':''}">
+              <div style="width:24px;text-align:center;font-size:12px;font-weight:700;color:${i<3?'var(--text)':'var(--muted)'}">${rankEmojis[i]||(i+1)}</div>
+              <div style="flex:1;font-size:12px;font-weight:${isMe?'700':'500'};color:${isMe?col:'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(u.name||u.email||'—')}${isMe?' <span style="font-size:10px;color:var(--muted)">(you)</span>':''}</div>
+              <div style="flex:2;height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;max-width:200px"><div style="height:100%;width:${pctW}%;background:${col}"></div></div>
+              <div style="min-width:52px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:${col}">${u.stats.pts} pts</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }catch(e){ console.warn('leaderboard', e); }
   }
 
   if(tmTab==='admin'){
@@ -11149,7 +11178,12 @@ async function renderTasksView(){
   if(tmTab==='group'){
     // Simple table view for Assign Tasks
     const assignSnap=await db.collection('assignedTasks').orderBy('createdAt','desc').get().catch(()=>({docs:[]}));
-    const assignTasks=assignSnap.docs?assignSnap.docs.map(d=>({id:d.id,...d.data()})):[];
+    const allAssignTasks=assignSnap.docs?assignSnap.docs.map(d=>({id:d.id,...d.data()})):[];
+    // Non-admins can only see tasks they created or are assigned to them —
+    // other users' tasks stay hidden.
+    const assignTasks=isAdminUser
+      ? allAssignTasks
+      : allAssignTasks.filter(t=>t.assignedUid===currentUser.uid||t.createdBy===currentUser.uid);
 
     const userOpts=teamUsersCache.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
     const pendingCount=assignTasks.filter(t=>t.status!=='done').length;
@@ -11652,7 +11686,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-24-02';
+const APP_VERSION='2026-07-24-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
