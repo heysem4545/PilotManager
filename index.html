@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-06';
+const APP_VERSION='2026-07-25-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13302,10 +13302,77 @@ function pickNoteIcon(text){
   return '📝';
 }
 
-// Build a WhatsApp-friendly Property Follow-Up report from the rows
-// the user is currently looking at. Same context-awareness as CSV:
-// active view + tab + status filter decides what goes in.
+// Entry point for the WhatsApp button — pops a filter chooser so
+// the user can decide what slice of rows to include (full picture
+// vs action-notes-only vs balances-only). Runs buildWhatsAppReport()
+// with the picked options.
 function exportWhatsApp(){
+  const existing=document.getElementById('whatsAppFilterModal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='whatsAppFilterModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:460px;max-width:95vw">
+    <div class="modal-title"><span>📱 WhatsApp Report Filter</span><button class="modal-close" onclick="document.getElementById('whatsAppFilterModal').remove()">×</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Pick what to include, then generate.</div>
+    <div class="fg"><label>Preset</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
+          <input type="radio" name="waPreset" value="all" checked style="margin-top:2px">
+          <div><div style="font-weight:600;color:var(--text)">📋 Full report</div><div style="font-size:10px;color:var(--muted)">Every row on this tab (respects status filter)</div></div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
+          <input type="radio" name="waPreset" value="actionOnly" style="margin-top:2px">
+          <div><div style="font-weight:600;color:var(--text)">📝 Only rows with an Action Note</div><div style="font-size:10px;color:var(--muted)">Skip properties without an action note logged</div></div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
+          <input type="radio" name="waPreset" value="anyNote" style="margin-top:2px">
+          <div><div style="font-weight:600;color:var(--text)">🗒 Only rows with any note</div><div style="font-size:10px;color:var(--muted)">Action Notes or Rent Tracking notes</div></div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
+          <input type="radio" name="waPreset" value="balanceOnly" style="margin-top:2px">
+          <div><div style="font-weight:600;color:var(--text)">💲 Only rows with an outstanding balance</div><div style="font-size:10px;color:var(--muted)">CMHA or Tenant balance greater than 0</div></div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12px">
+          <input type="radio" name="waPreset" value="balanceAndAction" style="margin-top:2px">
+          <div><div style="font-weight:600;color:var(--text)">🎯 Balance AND Action Note</div><div style="font-size:10px;color:var(--muted)">Tightest slice — actively worked accounts with money owed</div></div>
+        </label>
+      </div>
+    </div>
+    <div class="fg" style="margin-top:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer">
+        <input type="checkbox" id="waIncludeRentNote" checked>
+        Fall back to Rent Tracking notes when Action Note is empty
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:4px">
+        <input type="checkbox" id="waHideCleared">
+        Hide the "✅ Balance cleared" line when balance is 0
+      </label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('whatsAppFilterModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" style="background:#25d366;border-color:#25d366" onclick="runWhatsAppReport()">Generate Report</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function runWhatsAppReport(){
+  const modal=document.getElementById('whatsAppFilterModal');
+  if(!modal) return;
+  const preset=(modal.querySelector('input[name=waPreset]:checked')||{}).value||'all';
+  const includeRentNote=modal.querySelector('#waIncludeRentNote').checked;
+  const hideCleared=modal.querySelector('#waHideCleared').checked;
+  modal.remove();
+  buildWhatsAppReport({preset, includeRentNote, hideCleared});
+}
+
+// Build the actual message text and open the preview modal. Takes
+// the same context (view / tab / status filter) as exportCSV, then
+// trims the row list by the chosen preset filter.
+function buildWhatsAppReport(opts){
+  opts = opts || {preset:'all', includeRentNote:true, hideCleared:false};
   const MNAMES_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const now=new Date();
   const ordinal=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
@@ -13350,8 +13417,26 @@ function exportWhatsApp(){
     });
   }
 
+  // Apply the preset filter.
+  const presetLabels={
+    actionOnly:'Action Notes only',
+    anyNote:'Notes only',
+    balanceOnly:'Balances only',
+    balanceAndAction:'Balance + Action Note'
+  };
+  if(opts.preset==='actionOnly'){
+    rowsForReport=rowsForReport.filter(r=>r.note && r.note.trim());
+  } else if(opts.preset==='anyNote'){
+    rowsForReport=rowsForReport.filter(r=>(r.note&&r.note.trim())||(r.rentNote&&r.rentNote.trim()));
+  } else if(opts.preset==='balanceOnly'){
+    rowsForReport=rowsForReport.filter(r=>r.cmhaBal>0||r.tenBal>0);
+  } else if(opts.preset==='balanceAndAction'){
+    rowsForReport=rowsForReport.filter(r=>(r.cmhaBal>0||r.tenBal>0) && r.note && r.note.trim());
+  }
+  if(presetLabels[opts.preset]) scopeLabel += ' — '+presetLabels[opts.preset];
+
   if(rowsForReport.length===0){
-    toast('Nothing to export in this view');
+    toast('No rows match this filter');
     return;
   }
 
@@ -13360,14 +13445,14 @@ function exportWhatsApp(){
     lines.push(`🏠 ${r.addr}`);
     if(r.cmhaBal>0 || r.tenBal>0){
       lines.push(`💲 Balance – CMHA: ${money(r.cmhaBal)} / Tenant: ${money(r.tenBal)}`);
-    } else {
+    } else if(!opts.hideCleared){
       lines.push(`✅ Balance cleared`);
     }
     // Note lines get a topic-aware icon (🔑 for keys, 📄 for
     // paperwork, 📞 for calls, etc.). Falls back to 📝 when nothing
     // in the text matches a known keyword.
     if(r.note) lines.push(`${pickNoteIcon(r.note)} ${r.note}`);
-    else if(r.rentNote) lines.push(`${pickNoteIcon(r.rentNote)} ${r.rentNote}  _(from Rent Tracking)_`);
+    else if(opts.includeRentNote && r.rentNote) lines.push(`${pickNoteIcon(r.rentNote)} ${r.rentNote}  _(from Rent Tracking)_`);
     if(i<rowsForReport.length-1) lines.push(sep);
   });
   const text=lines.join('\n');
