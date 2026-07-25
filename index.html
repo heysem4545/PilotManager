@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-17';
+const APP_VERSION='2026-07-25-18';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15021,6 +15021,14 @@ async function openLogMeetingModal(date){
     <div class="fg"><label>Date (when it happened)</label>
       <input type="date" id="lmDate" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
     </div>
+    <div class="fg"><label>Duration (when it started and ended)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="time" id="lmStart" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+        <span style="font-size:12px;color:var(--muted)">to</span>
+        <input type="time" id="lmEnd" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+        <span id="lmDurDisplay" style="font-size:12px;font-weight:600;color:var(--accent);margin-left:6px">—</span>
+      </div>
+    </div>
     <div class="fg"><label>Difficulty</label>
       <select id="lmDifficulty" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <option value="1">⭐ 1 Star (Easy)</option>
@@ -15095,6 +15103,21 @@ function renderLmTodoList(){
       </div>`).join('');
 }
 
+// Live minutes counter shown next to the start/end pickers.
+function updateLmDuration(){
+  const s=document.getElementById('lmStart');
+  const e=document.getElementById('lmEnd');
+  const disp=document.getElementById('lmDurDisplay');
+  if(!s||!e||!disp) return;
+  const dur=(typeof calcDurFromTimes==='function')?calcDurFromTimes(s.value||'', e.value||''):0;
+  if(dur>0){
+    const h=Math.floor(dur/60), m=dur%60;
+    disp.textContent = h ? (m?`${h}h ${m}m`:`${h}h`) : `${m}m`;
+  } else {
+    disp.textContent='—';
+  }
+}
+
 async function saveLoggedMeeting(){
   const name=document.getElementById('lmName').value.trim();
   if(!name){toast('Enter a meeting name');return;}
@@ -15102,6 +15125,9 @@ async function saveLoggedMeeting(){
   if(!date){toast('Select a date');return;}
   const difficulty=parseInt(document.getElementById('lmDifficulty').value,10)||3;
   const notes=document.getElementById('lmNotes').value.trim();
+  const startTime=(document.getElementById('lmStart')||{value:''}).value||'';
+  const endTime=(document.getElementById('lmEnd')||{value:''}).value||'';
+  const duration=(typeof calcDurFromTimes==='function')?calcDurFromTimes(startTime, endTime):0;
   const attendees=[];
   document.querySelectorAll('#lmAttendees input[type=checkbox]:checked').forEach(cb=>{
     attendees.push({uid:cb.value, name:cb.dataset.name||'', attended:true, late:false, lateMinutes:0, absenceReason:'', required:true});
@@ -15120,7 +15146,9 @@ async function saveLoggedMeeting(){
       agenda:[],
       todos,
       difficulty,
-      duration:0,
+      startTime,
+      endTime,
+      duration,
       efficiency:0,
       completed:true,
       loggedAfterFact:true,
