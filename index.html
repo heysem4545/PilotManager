@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-23';
+const APP_VERSION='2026-07-25-24';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15023,23 +15023,25 @@ async function openLogMeetingModal(date){
     <div class="fg"><label>Meeting Name</label>
       <input type="text" id="lmName" placeholder="e.g. Team Sync" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
     </div>
-    <div class="fg"><label>Date (when it happened)</label>
-      <input type="date" id="lmDate" class="lm-picker" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-    </div>
-    <div class="fg"><label>Duration (when it started and ended)</label>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="time" id="lmStart" class="lm-picker" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
-        <span style="font-size:12px;color:var(--muted)">to</span>
-        <input type="time" id="lmEnd" class="lm-picker" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
-        <span id="lmDurDisplay" style="font-size:12px;font-weight:600;color:var(--accent);margin-left:6px">—</span>
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div class="fg" style="flex:1;min-width:180px;margin-bottom:0"><label>Date (when it happened)</label>
+        <input type="date" id="lmDate" class="lm-picker" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+      </div>
+      <div class="fg" style="flex:1;min-width:180px;margin-bottom:0"><label>Difficulty</label>
+        <select id="lmDifficulty" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
+          <option value="1">⭐ 1 Star (Easy)</option>
+          <option value="3" selected>⭐⭐⭐ 3 Stars (Medium)</option>
+          <option value="5">⭐⭐⭐⭐⭐ 5 Stars (Hard)</option>
+        </select>
       </div>
     </div>
-    <div class="fg"><label>Difficulty</label>
-      <select id="lmDifficulty" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-        <option value="1">⭐ 1 Star (Easy)</option>
-        <option value="3" selected>⭐⭐⭐ 3 Stars (Medium)</option>
-        <option value="5">⭐⭐⭐⭐⭐ 5 Stars (Hard)</option>
-      </select>
+    <div class="fg"><label>Duration (start → end)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="time" id="lmStart" class="lm-picker" oninput="updateLmDuration()" style="flex:1;min-width:0;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+        <span style="font-size:12px;color:var(--muted);flex-shrink:0">to</span>
+        <input type="time" id="lmEnd" class="lm-picker" oninput="updateLmDuration()" style="flex:1;min-width:0;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+        <span id="lmDurDisplay" style="font-size:12px;font-weight:600;color:var(--accent);min-width:52px;text-align:right;flex-shrink:0">—</span>
+      </div>
     </div>
     <div class="fg"><label>Attendees</label>
       <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);cursor:pointer;min-height:38px" onclick="toggleLmAttendeesPicker()">
