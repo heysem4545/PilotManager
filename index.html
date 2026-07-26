@@ -7811,9 +7811,13 @@ async function saveNotifRule(){
   try{
     const doc={channel, trigger, triggerType, recipientName, recipientContact};
     if(triggerType==='scheduled') doc.schedule=schedule;
-    else doc.schedule=firebase.firestore.FieldValue.delete();
-    doc.recipientUid=recipientUid||firebase.firestore.FieldValue.delete();
+    if(recipientUid) doc.recipientUid=recipientUid;
     if(editingRuleId){
+      // On edit, use FieldValue.delete() to clear old fields that
+      // no longer apply. add() rejects those sentinels, so this
+      // branch is the only place they belong.
+      if(triggerType!=='scheduled') doc.schedule=firebase.firestore.FieldValue.delete();
+      if(!recipientUid) doc.recipientUid=firebase.firestore.FieldValue.delete();
       // Clear lastFiredKey so a freshly-edited schedule can fire today.
       doc.lastFiredKey=firebase.firestore.FieldValue.delete();
       await db.collection('notificationRules').doc(editingRuleId).update(doc);
@@ -11700,7 +11704,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-35';
+const APP_VERSION='2026-07-25-36';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
