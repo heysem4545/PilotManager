@@ -11672,7 +11672,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-32';
+const APP_VERSION='2026-07-25-33';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14927,6 +14927,7 @@ function switchMeetingsTab(tab){
 let myTodosSearch = '';
 let myTodosStatusFilter = 'open';
 let myTodosMonthFilter = 'all'; // 'all' or 'YYYY-MM'
+let myTodosUserFilter = 'me';   // 'me' | 'all' | '<uid>' (admin only)
 
 // Collect every to-do across all meetings that's assigned to the
 // signed-in user, apply the search + status filter, then render a
@@ -14936,11 +14937,20 @@ function renderMyMeetingTodosTab(){
   const el = document.getElementById('mtgTabContent');
   if(!el) return;
   const uid = currentUser && currentUser.uid;
-  // Flatten { meeting, todo, todoIdx } for every assigned todo.
+  const admin = isAdmin();
+  // Non-admins can only see their own — force the filter regardless
+  // of any leftover value.
+  const effectiveUserFilter = admin ? (myTodosUserFilter||'me') : 'me';
+  const targetUid = effectiveUserFilter==='me' ? uid : (effectiveUserFilter==='all' ? null : effectiveUserFilter);
+
+  // Flatten { meeting, todo, todoIdx } for every assigned todo the
+  // active viewer is allowed to see.
   const items = [];
   (meetingsData||[]).forEach(m=>{
     (m.todos||[]).forEach((t,idx)=>{
-      if(!t || t.assignedUid!==uid) return;
+      if(!t) return;
+      if(targetUid && t.assignedUid!==targetUid) return; // specific user or 'me'
+      if(!targetUid && !t.assignedUid) return; // 'all' — still needs an assignee
       items.push({meeting:m, todo:t, todoIdx:idx});
     });
   });
@@ -14983,6 +14993,29 @@ function renderMyMeetingTodosTab(){
   const monthOptsHtml = ['<option value="all">📅 All months</option>']
     .concat(monthKeys.map(k=>`<option value="${k}" ${myTodosMonthFilter===k?'selected':''}>${monthLabel(k)}</option>`))
     .join('');
+
+  // Build the user filter for admins from unique assignees across
+  // every meeting todo (so leavers still show up in older meetings).
+  let userDropdownHtml = '';
+  if(admin){
+    const seen = new Map();
+    (meetingsData||[]).forEach(m=>{
+      (m.todos||[]).forEach(t=>{
+        if(t && t.assignedUid && !seen.has(t.assignedUid)){
+          seen.set(t.assignedUid, t.assignedName||'(unknown)');
+        }
+      });
+    });
+    const memberOpts = [...seen.entries()]
+      .sort((a,b)=>a[1].localeCompare(b[1]))
+      .map(([id,name])=>`<option value="${id}" ${effectiveUserFilter===id?'selected':''}>${escapeHtml(name)}</option>`)
+      .join('');
+    userDropdownHtml = `<select onchange="myTodosUserFilter=this.value;renderMyMeetingTodosTab()" title="Whose to-dos to show" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer;min-width:150px">
+      <option value="me" ${effectiveUserFilter==='me'?'selected':''}>👤 Me</option>
+      <option value="all" ${effectiveUserFilter==='all'?'selected':''}>👥 All users</option>
+      ${memberOpts}
+    </select>`;
+  }
 
   // Status counts for the pill tabs — always computed on the
   // pre-filter list so the tabs act like navigation, not summary
@@ -15047,6 +15080,7 @@ function renderMyMeetingTodosTab(){
                 </select>
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+                ${effectiveUserFilter!=='me' && t.assignedName ? `<span>👤 ${escapeHtml(t.assignedName)}</span>` : ''}
                 ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 Due ${escapeHtml(t.dueDate)}${overdue?' · OVERDUE':''}</span>`:'<span style="color:var(--muted2)">📅 No due date</span>'}
                 ${statusPill(t)}
                 ${t.notes?`<span style="color:var(--text);font-style:italic">📝 ${escapeHtml(t.notes)}</span>`:''}
@@ -15062,6 +15096,7 @@ function renderMyMeetingTodosTab(){
       <select onchange="myTodosMonthFilter=this.value;renderMyMeetingTodosTab()" title="Filter by meeting month" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer;min-width:160px">
         ${monthOptsHtml}
       </select>
+      ${userDropdownHtml}
       <button class="btn btn-ghost btn-sm" style="color:#25d366;border-color:rgba(37,211,102,0.35);padding:6px 12px;font-size:11px" onclick="exportMyTodosWhatsApp()" title="Export the currently-shown to-dos as a WhatsApp message">📱 WhatsApp</button>
       <span style="font-size:11px;color:var(--muted)">${filtered.length} of ${items.length}</span>
     </div>
@@ -15086,6 +15121,9 @@ function renderMyMeetingTodosTab(){
 function exportMyTodosWhatsApp(){
   const uid = currentUser && currentUser.uid;
   const meName = (currentUser && (currentUser.name||currentUser.email)) || 'Me';
+  const admin = isAdmin();
+  const effectiveUserFilter = admin ? (myTodosUserFilter||'me') : 'me';
+  const targetUid = effectiveUserFilter==='me' ? uid : (effectiveUserFilter==='all' ? null : effectiveUserFilter);
   const term = (myTodosSearch||'').toLowerCase();
   const bucketOf = t => {
     const s = t.status || '';
@@ -15101,7 +15139,9 @@ function exportMyTodosWhatsApp(){
   const items = [];
   (meetingsData||[]).forEach(m=>{
     (m.todos||[]).forEach(t=>{
-      if(!t || t.assignedUid!==uid) return;
+      if(!t) return;
+      if(targetUid && t.assignedUid!==targetUid) return;
+      if(!targetUid && !t.assignedUid) return;
       // Search filter
       if(term){
         const hay = ((m.name||'')+' '+(t.text||'')+' '+(t.notes||'')).toLowerCase();
@@ -15139,9 +15179,17 @@ function exportMyTodosWhatsApp(){
   const statusIconMap={pending:'⏳', progressing:'🔄', done:'✓', canceled:'✕', '':'⏳'};
   const statusTextMap={pending:'Pending', progressing:'In Progress', done:'Done', canceled:'Canceled', '':'Pending'};
 
+  // Header line reflects which user (or team) the report is for.
+  const headerName = effectiveUserFilter==='me'
+    ? meName
+    : effectiveUserFilter==='all'
+      ? 'Team'
+      : (items.find(it=>it.todo.assignedUid===effectiveUserFilter)?.todo?.assignedName || '(unknown)');
+  const titlePrefix = effectiveUserFilter==='all' ? '📝 Team To-Do List' : '📝 My To-Do List';
+
   const sep='______________';
   const lines=[
-    `📝 My To-Do List — ${meName}`,
+    `${titlePrefix} — ${headerName}`,
     `🗓 ${monthHeader} · 📊 ${statusLabel} (${items.length})`,
     ''
   ];
@@ -15153,6 +15201,9 @@ function exportMyTodosWhatsApp(){
       const taskIcon = (typeof pickNoteIcon==='function')?pickNoteIcon(t.text||''):'📝';
       lines.push(`${ti+1}. ${taskIcon} ${t.text||''}`);
       const sub=[];
+      // For 'all users' export, show the assignee inline so the
+      // recipient can tell who owns each row.
+      if(effectiveUserFilter==='all' && t.assignedName) sub.push(`👤 ${t.assignedName}`);
       if(t.dueDate) sub.push(`📅 Due ${t.dueDate}`);
       sub.push(`${statusIconMap[t.status||'']||'⏳'} ${statusTextMap[t.status||'']||'Pending'}`);
       lines.push(`   ${sub.join(' · ')}`);
