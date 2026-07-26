@@ -11662,7 +11662,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-18';
+const APP_VERSION='2026-07-25-19';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15067,7 +15067,7 @@ async function openLogMeetingModal(date){
 }
 
 function addLmTodoRow(){
-  lmTodoDraft.push({text:'', dueDate:'', assignedUid:'', assignedName:''});
+  lmTodoDraft.push({text:'', dueDate:'', assignedUid:'', assignedName:'', status:'pending', notes:''});
   renderLmTodoList();
 }
 
@@ -15089,18 +15089,38 @@ function renderLmTodoList(){
   const el=document.getElementById('lmTodoList');
   if(!el) return;
   const users=teamUsersCache||[];
-  const userOpts=users.map(u=>`<option value="${u.uid}">${escapeHtml(u.name||u.email)}</option>`).join('');
+  // Two-row card per todo so the extra Status + Notes columns don't
+  // squash the primary Task / Due Date / Assign row into unreadable
+  // strips at 520px modal width.
+  const STATUS_OPTS = [
+    {v:'pending',   label:'⏳ Pending',   color:'var(--muted)'},
+    {v:'progressing', label:'🔄 In Progress', color:'var(--amber)'},
+    {v:'done',      label:'✓ Done',       color:'var(--accent)'},
+    {v:'canceled',  label:'✕ Canceled',   color:'var(--red)'}
+  ];
   el.innerHTML = lmTodoDraft.length===0
     ? '<div style="font-size:11px;color:var(--muted2);padding:6px">No to-dos yet — click + Add To-Do</div>'
-    : lmTodoDraft.map((t,i)=>`<div style="display:flex;gap:6px;align-items:center">
-        <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:2;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
-        <input type="date" value="${t.dueDate}" oninput="updateLmTodoField(${i},'dueDate',this.value)" title="Due date" style="flex:1;min-width:130px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
-        <select onchange="updateLmTodoField(${i},'assignedUid',this.value)" title="Assign to" style="flex:1;min-width:120px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer">
-          <option value="">Assign to…</option>
-          ${users.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
-        </select>
-        <button title="Remove" onclick="removeLmTodoRow(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px">×</button>
-      </div>`).join('');
+    : lmTodoDraft.map((t,i)=>{
+        const statusColor=(STATUS_OPTS.find(s=>s.v===(t.status||'pending'))||STATUS_OPTS[0]).color;
+        return `<div style="display:flex;flex-direction:column;gap:5px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);min-width:18px">${i+1}.</span>
+            <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+            <select onchange="updateLmTodoField(${i},'status',this.value);renderLmTodoList()" title="Status" style="font-size:11px;padding:5px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:${statusColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
+              ${STATUS_OPTS.map(s=>`<option value="${s.v}" ${(t.status||'pending')===s.v?'selected':''}>${s.label}</option>`).join('')}
+            </select>
+            <button title="Remove" onclick="removeLmTodoRow(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px">×</button>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input type="date" value="${t.dueDate}" oninput="updateLmTodoField(${i},'dueDate',this.value)" title="Due date" style="flex:1;min-width:130px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+            <select onchange="updateLmTodoField(${i},'assignedUid',this.value)" title="Assign to" style="flex:1;min-width:120px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;cursor:pointer">
+              <option value="">Assign to…</option>
+              ${users.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
+            </select>
+            <input type="text" value="${escapeAttr(t.notes||'')}" placeholder="Notes (optional)…" oninput="updateLmTodoField(${i},'notes',this.value)" style="flex:2;min-width:160px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+          </div>
+        </div>`;
+      }).join('');
 }
 
 // Live minutes counter shown next to the start/end pickers.
@@ -15134,7 +15154,15 @@ async function saveLoggedMeeting(){
   });
   if(!attendees.length){toast('Select at least one attendee');return;}
   const todos = lmTodoDraft
-    .map(t=>({text:(t.text||'').trim(), dueDate:t.dueDate||'', assignedUid:t.assignedUid||'', assignedName:t.assignedName||'', done:false}))
+    .map(t=>({
+      text:(t.text||'').trim(),
+      dueDate:t.dueDate||'',
+      assignedUid:t.assignedUid||'',
+      assignedName:t.assignedName||'',
+      status:t.status||'pending',
+      notes:(t.notes||'').trim(),
+      done:(t.status||'pending')==='done'
+    }))
     .filter(t=>t.text);
   try{
     const mtgRef = await db.collection('meetings').add({
@@ -15159,14 +15187,21 @@ async function saveLoggedMeeting(){
     });
     // Fan out each assigned to-do into the tasks collection so the
     // assignee sees it on their Task Management calendar under the
-    // due date. Skip todos without a due date or assignee.
+    // due date. Skip todos without a due date or assignee, and
+    // skip canceled todos entirely — no point creating a task the
+    // assignee doesn't need to do.
+    const statusToTask = {pending:'notstarted', progressing:'progressing', done:'done'};
     for(const t of todos){
       if(!t.assignedUid || !t.dueDate) continue;
+      if(t.status==='canceled') continue;
       const [y,m,d] = t.dueDate.split('-').map(x=>parseInt(x,10));
       if(!y||!m||!d) continue;
       const key = `tm-${y}-${String(m).padStart(2,'0')}`;
       const rowIdx = await getNextRowIdx(key, d, t.assignedUid);
       const diffMap = {1:'easy',3:'medium',5:'hard'};
+      const taskText = t.notes
+        ? `[Meeting: ${name}] ${t.text} — ${t.notes}`
+        : `[Meeting: ${name}] ${t.text}`;
       try{
         await db.collection('tasks').add({
           monthKey:key, day:d, rowIdx,
@@ -15175,8 +15210,8 @@ async function saveLoggedMeeting(){
           userColor:userColor(t.assignedUid),
           isGroup:false,
           diff:diffMap[difficulty]||'medium',
-          task:`[Meeting: ${name}] ${t.text}`,
-          status:'notstarted',
+          task:taskText,
+          status:statusToTask[t.status]||'notstarted',
           assignedUid:t.assignedUid,
           assignedName:t.assignedName,
           source:'meetingLog',
