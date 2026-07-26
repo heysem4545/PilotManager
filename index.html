@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-26';
+const APP_VERSION='2026-07-25-27';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14888,21 +14888,181 @@ function mtgEffLabel(n){
 async function renderMeetingsView(){
   await Promise.all([loadMeetingTemplates(), loadMeetings()]);
   const el = document.getElementById('meetingsView');
+  // Quick badge on the My To-Do tab so the signed-in user can see
+  // how many open items they have without clicking through.
+  const myOpenCount = (meetingsData||[]).reduce((n,m)=>{
+    (m.todos||[]).forEach(t=>{
+      if(t.assignedUid!==currentUser.uid) return;
+      if(t.status==='done' || t.status==='canceled') return;
+      n++;
+    });
+    return n;
+  },0);
   let html = `<div class="table-card">
     <div class="mtg-tabs">
       <button class="${meetingsTab==='calendar'?'active':''}" onclick="switchMeetingsTab('calendar')">📅 Calendar</button>
+      <button class="${meetingsTab==='myTodos'?'active':''}" onclick="switchMeetingsTab('myTodos')">📝 My To-Do List${myOpenCount>0?` <span style="background:var(--red);color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700">${myOpenCount}</span>`:''}</button>
       <button class="${meetingsTab==='templates'?'active':''}" onclick="switchMeetingsTab('templates')">Templates</button>
     </div>
     <div style="padding:16px 18px" id="mtgTabContent"></div>
   </div>`;
   el.innerHTML = html;
   if(meetingsTab==='templates') renderTemplatesTab();
+  else if(meetingsTab==='myTodos') renderMyMeetingTodosTab();
   else renderMeetingCalendar();
 }
 
 function switchMeetingsTab(tab){
   meetingsTab = tab;
   renderMeetingsView();
+}
+
+// Filter state for the My To-Do tab — kept module-level so nav
+// away/back doesn't reset the user's active filter.
+let myTodosSearch = '';
+let myTodosStatusFilter = 'open';
+
+// Collect every to-do across all meetings that's assigned to the
+// signed-in user, apply the search + status filter, then render a
+// scannable list grouped by meeting so the user sees what came
+// out of each conversation.
+function renderMyMeetingTodosTab(){
+  const el = document.getElementById('mtgTabContent');
+  if(!el) return;
+  const uid = currentUser && currentUser.uid;
+  // Flatten { meeting, todo, todoIdx } for every assigned todo.
+  const items = [];
+  (meetingsData||[]).forEach(m=>{
+    (m.todos||[]).forEach((t,idx)=>{
+      if(!t || t.assignedUid!==uid) return;
+      items.push({meeting:m, todo:t, todoIdx:idx});
+    });
+  });
+
+  // Apply status + search filters.
+  const term = (myTodosSearch||'').toLowerCase();
+  const bucketOf = t => {
+    const s = t.status || '';
+    if(s==='done') return 'done';
+    if(s==='canceled') return 'canceled';
+    if(s==='progressing') return 'progressing';
+    return 'pending'; // pending or empty
+  };
+  const filtered = items.filter(it=>{
+    if(term){
+      const hay = ((it.meeting.name||'')+' '+(it.todo.text||'')+' '+(it.todo.notes||'')).toLowerCase();
+      if(!hay.includes(term)) return false;
+    }
+    const b = bucketOf(it.todo);
+    if(myTodosStatusFilter==='all') return true;
+    if(myTodosStatusFilter==='open') return b==='pending' || b==='progressing';
+    return b===myTodosStatusFilter;
+  });
+
+  // Status counts for the pill tabs — always computed on the
+  // pre-filter list so the tabs act like navigation, not summary
+  // of the current view.
+  const counts = {all:items.length, open:0, pending:0, progressing:0, done:0, canceled:0};
+  items.forEach(it=>{ const b=bucketOf(it.todo); counts[b]++; if(b==='pending'||b==='progressing') counts.open++; });
+
+  // Group by meeting, sorted by actualDate desc so most recent
+  // meetings float to the top.
+  const byMeeting = {};
+  filtered.forEach(it=>{
+    const key = it.meeting.id;
+    if(!byMeeting[key]) byMeeting[key] = {meeting:it.meeting, todos:[]};
+    byMeeting[key].todos.push(it);
+  });
+  const groups = Object.values(byMeeting).sort((a,b)=>{
+    const ad = a.meeting.actualDate || a.meeting.targetDate || '';
+    const bd = b.meeting.actualDate || b.meeting.targetDate || '';
+    return bd.localeCompare(ad);
+  });
+
+  const filterTab = (v,label,count,color)=>`<button class="ftab ${myTodosStatusFilter===v?'active':''}" style="${myTodosStatusFilter===v?'':''}" onclick="myTodosStatusFilter='${v}';renderMyMeetingTodosTab()">${label} (${count})</button>`;
+
+  const STATUS_INFO = {
+    pending:    {icon:'⏳', label:'Pending',     color:'var(--muted)'},
+    progressing:{icon:'🔄', label:'In Progress', color:'var(--amber)'},
+    done:       {icon:'✓',  label:'Done',        color:'var(--accent)'},
+    canceled:   {icon:'✕',  label:'Canceled',    color:'var(--red)'}
+  };
+  const statusPill = (t)=>{
+    const info = STATUS_INFO[bucketOf(t)] || STATUS_INFO.pending;
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;background:${info.color}1F;border:1px solid ${info.color}55;color:${info.color};font-size:10px;font-weight:600">${info.icon} ${info.label}</span>`;
+  };
+
+  const rowsHtml = groups.length===0
+    ? `<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px">
+        ${items.length===0
+          ? '🎯 You have no meeting to-dos assigned yet.'
+          : 'No to-dos match this filter.'}
+      </div>`
+    : groups.map(g=>{
+        const dateLabel = g.meeting.actualDate || g.meeting.targetDate || '';
+        return `<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          <div style="padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:700;color:var(--text)">📝 ${escapeHtml(g.meeting.name||'Untitled meeting')}</span>
+            ${dateLabel?`<span style="font-size:11px;color:var(--muted)">· 🗓 ${escapeHtml(dateLabel)}</span>`:''}
+            <span style="font-size:10px;color:var(--muted);margin-left:auto">${g.todos.length} to-do${g.todos.length===1?'':'s'}</span>
+          </div>
+          <div>${g.todos.map(it=>{
+            const t = it.todo;
+            const taskIcon = (typeof pickNoteIcon==='function')?pickNoteIcon(t.text||''):'📝';
+            const overdue = t.dueDate && bucketOf(t)!=='done' && bucketOf(t)!=='canceled' && (new Date(t.dueDate+'T23:59:59') < new Date());
+            return `<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
+                <span style="font-size:13px;flex:1;min-width:200px;color:var(--text);font-weight:500">${taskIcon} ${escapeHtml(t.text||'')}</span>
+                <select onchange="updateMyMeetingTodoStatus('${it.meeting.id}',${it.todoIdx},this.value)" title="Change status" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);cursor:pointer;font-family:var(--font)">
+                  ${['','pending','progressing','done','canceled'].map(v=>{
+                    const label = v==='' ? 'Status' : STATUS_INFO[v==='pending'?'pending':v].label;
+                    const cur = t.status||'';
+                    return `<option value="${v}" ${cur===v?'selected':''}>${v?STATUS_INFO[v].icon+' ':''}${label}</option>`;
+                  }).join('')}
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+                ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 Due ${escapeHtml(t.dueDate)}${overdue?' · OVERDUE':''}</span>`:'<span style="color:var(--muted2)">📅 No due date</span>'}
+                ${statusPill(t)}
+                ${t.notes?`<span style="color:var(--text);font-style:italic">📝 ${escapeHtml(t.notes)}</span>`:''}
+              </div>
+            </div>`;
+          }).join('')}</div>
+        </div>`;
+      }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <input type="text" placeholder="🔍 Filter by meeting or task…" value="${escapeAttr(myTodosSearch)}" oninput="myTodosSearch=this.value;renderMyMeetingTodosTab();setTimeout(()=>{const el=document.querySelector('#mtgTabContent input[type=text]');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},0)" style="flex:1;min-width:220px;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+      <span style="font-size:11px;color:var(--muted)">${filtered.length} of ${items.length}</span>
+    </div>
+    <div class="ftabs" style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">
+      ${filterTab('open','⚡ Open',counts.open)}
+      ${filterTab('all','All',counts.all)}
+      ${filterTab('pending','⏳ Pending',counts.pending)}
+      ${filterTab('progressing','🔄 In Progress',counts.progressing)}
+      ${filterTab('done','✓ Done',counts.done)}
+      ${filterTab('canceled','✕ Canceled',counts.canceled)}
+    </div>
+    ${rowsHtml}
+  `;
+}
+
+// Update a single todo's status inside a meeting doc. Rewrites the
+// whole todos array (Firestore doesn't have per-index update on
+// arrays). Optimistic local update so the tab re-renders instantly.
+async function updateMyMeetingTodoStatus(meetingId, todoIdx, newStatus){
+  const m = (meetingsData||[]).find(x=>x.id===meetingId);
+  if(!m) return;
+  const todos = Array.isArray(m.todos) ? m.todos.slice() : [];
+  if(!todos[todoIdx]) return;
+  todos[todoIdx] = {...todos[todoIdx], status:newStatus, done:newStatus==='done'};
+  try{
+    await db.collection('meetings').doc(meetingId).update({todos, updatedAt:new Date()});
+    m.todos = todos;
+    toast('Status updated');
+    renderMyMeetingTodosTab();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function openQuickMeetingModal(date){
