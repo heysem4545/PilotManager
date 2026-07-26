@@ -11704,7 +11704,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-36';
+const APP_VERSION='2026-07-25-37';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12306,6 +12306,17 @@ async function renderSosRequestsView(){
 
     const delBtn = (editable && admin) ? `<button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteSosRequest('${r.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>` : '';
 
+    // Submit gate — the assignee only gets a Telegram ping after
+    // the row is explicitly submitted, so half-finished rows don't
+    // wake anyone up.
+    const submitted = !!r.submitted;
+    const canSubmit = editable && !submitted && (r.assignedToUid||'').trim() && (r.requestNote||'').trim();
+    const submitCell = submitted
+      ? `<span title="Submitted ${escapeAttr((r.submittedAt||'').slice(0,10)||'')}" style="display:inline-block;padding:4px 8px;border-radius:12px;background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.35);color:#4ade80;font-size:10px;font-weight:700">✓ Submitted</span>`
+      : editable
+        ? `<button class="btn btn-primary btn-sm" ${canSubmit?'':'disabled title="Add an assignee + note first"'} onclick="submitSosRequest('${r.id}')" style="padding:5px 12px;font-size:11px;background:${canSubmit?'#25d366':'var(--surface3)'};border-color:${canSubmit?'#25d366':'var(--border2)'};color:${canSubmit?'#0d0d10':'var(--muted2)'};font-weight:700;${canSubmit?'':'opacity:.55;cursor:not-allowed'}">📨 Submit</button>`
+        : `<span style="font-size:10px;color:var(--muted2)">Draft</span>`;
+
     return `<tr>
       <td style="vertical-align:top">
         ${fromCell}
@@ -12314,9 +12325,10 @@ async function renderSosRequestsView(){
       <td style="vertical-align:top">${assignCell}</td>
       <td style="vertical-align:top">${noteInput}</td>
       <td style="vertical-align:top">${statusSelect}</td>
+      <td style="vertical-align:top;text-align:center">${submitCell}</td>
       <td style="vertical-align:top;text-align:center">${delBtn}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No SOS requests yet${editable?'. Click <strong>+ Add Request</strong> to log one.':'.'}</td></tr>`;
+  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No SOS requests yet${editable?'. Click <strong>+ Add Request</strong> to log one.':'.'}</td></tr>`;
 
   const addBtn = editable ? `<button class="btn btn-primary btn-sm" onclick="addSosRequest()" style="font-size:12px;padding:6px 14px">+ Add Request</button>` : '';
 
@@ -12329,10 +12341,11 @@ async function renderSosRequestsView(){
     ${statRow}
     <div class="tbl-wrap"><table style="width:100%">
       <thead><tr>
-        <th style="width:18%">Request From</th>
-        <th style="width:18%">Assigned To</th>
-        <th style="width:44%">Request Note</th>
-        <th style="width:14%">Status</th>
+        <th style="width:16%">Request From</th>
+        <th style="width:16%">Assigned To</th>
+        <th style="width:38%">Request Note</th>
+        <th style="width:12%">Status</th>
+        <th style="width:110px;text-align:center">Submit</th>
         <th style="width:50px"></th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
@@ -12411,6 +12424,32 @@ async function updateSosField(id, field, value){
       renderSosRequestsView(); // re-render so labels/badges refresh
     }
   }catch(e){ toast('Failed: ' + (e.message || 'error')); }
+}
+
+// Mark an SOS request as submitted. The onSosSubmitted Cloud
+// Function watches for this transition and pings the assignee
+// (plus any 'SOS Request Assigned' subscribers) via Telegram.
+async function submitSosRequest(id){
+  const r = sosRequestsCache.find(x=>x.id===id);
+  if(!r) return;
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  if(r.submitted){ toast('Already submitted'); return; }
+  if(!(r.assignedToUid||'').trim()){ toast('Assign someone first'); return; }
+  if(!(r.requestNote||'').trim()){ toast('Add a request note first'); return; }
+  const conf = confirm(`Submit this request to ${r.assignedToName||'the assignee'}? They will get a Telegram notification.`);
+  if(!conf) return;
+  try{
+    await db.collection('sosRequests').doc(id).update({
+      submitted:true,
+      submittedAt:new Date().toISOString(),
+      submittedByUid:(currentUser&&currentUser.uid)||null,
+      submittedByName:(currentUser&&(currentUser.name||currentUser.email))||'',
+      updatedAt:new Date()
+    });
+    r.submitted=true;
+    toast('📨 Submitted — Telegram sent to '+(r.assignedToName||'assignee'));
+    renderSosRequestsView();
+  }catch(e){ toast('Failed: '+(e.message||'error')); }
 }
 
 async function deleteSosRequest(id){

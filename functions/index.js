@@ -261,14 +261,15 @@ exports.onNewInnovation = onDocumentCreated(
   }
 );
 
-// Send a Telegram alert whenever an SOS request is assigned (or
-// re-assigned) to a user. Two channels fire from the same event:
-//   1. Direct ping to the assignee themselves — they get told
+// Send a Telegram alert when an SOS request is Submitted — either
+// the very first submit, or a re-submit after the assignee was
+// changed. Two channels fire from the same event:
+//   1. Direct ping to the current assignee — they get told
 //      immediately without needing a rule for their own uid.
 //   2. Any active 'SOS Request Assigned' notificationRules — for
 //      admins / supervisors who want to see all assignments.
-// Skips deletions and no-op writes where assignedToUid didn't
-// actually change.
+// The submit gate prevents in-progress drafts from waking anyone
+// up while the user is still typing.
 exports.onSosAssigned = onDocumentWritten(
   { document: "sosRequests/{docId}", secrets: [TELEGRAM_BOT_TOKEN] },
   async (event) => {
@@ -276,12 +277,17 @@ exports.onSosAssigned = onDocumentWritten(
     const after = (event.data && event.data.after && event.data.after.data()) || null;
     if (!after) return; // doc deleted
 
-    const oldUid = before.assignedToUid || "";
+    if (!after.submitted) return; // still a draft — ignore
     const newUid = after.assignedToUid || "";
-    // Only fire when the assignee is newly set or changes to a
-    // different person. Empty → empty and unchanged assignments
-    // shouldn't wake anyone up.
-    if (!newUid || newUid === oldUid) return;
+    if (!newUid) return; // submitted but no assignee — nothing to send
+
+    // Fire the notification when:
+    //   a) submitted just transitioned false → true (first submit), or
+    //   b) submitted was already true AND the assignee changed
+    //      (re-routed to a different person).
+    const justSubmitted = !before.submitted && after.submitted;
+    const reassigned = before.submitted && before.assignedToUid && before.assignedToUid !== newUid;
+    if (!justSubmitted && !reassigned) return;
 
     const requesterName = after.requestFromName || after.createdByName || "Someone";
     const note = ((after.requestNote || "") + "").substring(0, 250);
