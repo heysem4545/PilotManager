@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-27';
+const APP_VERSION='2026-07-25-28';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15394,7 +15394,7 @@ function openLmWhatsAppFilter(){
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Pick which to-dos to include.</div>
     <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Preset</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-      ${preset('all','📋','Full to-do list','Every to-do row you\\'ve added (skips canceled)')}
+      ${preset('all','📋','Full to-do list','Every to-do row on this meeting (skips canceled)')}
       ${preset('pending','⏳','Only Pending','Status is Pending (or not set yet)')}
       ${preset('progressing','🔄','Only In Progress','Status is In Progress')}
       ${preset('done','✓','Only Done','Status is Done')}
