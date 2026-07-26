@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-22';
+const APP_VERSION='2026-07-25-23';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15042,12 +15042,16 @@ async function openLogMeetingModal(date){
       </select>
     </div>
     <div class="fg"><label>Attendees</label>
-      <div id="lmAttendees" style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);cursor:pointer;min-height:38px" onclick="toggleLmAttendeesPicker()">
+        <div id="lmAttSummary" style="flex:1;display:flex;flex-wrap:wrap;gap:4px;font-size:11px;color:var(--muted2)">Click to select attendees…</div>
+        <span id="lmAttToggle" style="font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap">▾ Pick</span>
+      </div>
+      <div id="lmAttendees" style="display:none;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;margin-top:6px;padding:6px;background:var(--surface3);border:1px solid var(--border2);border-radius:8px">
         ${users.map(u=>{
           const initials=(u.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
           const col=userColor(u.uid);
           return `<label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer">
-            <input type="checkbox" value="${u.uid}" data-name="${escapeAttr(u.name||u.email)}" style="accent-color:var(--accent);width:15px;height:15px" onchange="this.closest('label').style.background=this.checked?'var(--accent-dim)':'var(--surface2)';this.closest('label').style.borderColor=this.checked?'var(--accent-dim)':'var(--border2)'">
+            <input type="checkbox" value="${u.uid}" data-name="${escapeAttr(u.name||u.email)}" data-color="${col}" data-initials="${initials}" style="accent-color:var(--accent);width:15px;height:15px" onchange="onLmAttendeeToggle(this)">
             <span style="width:24px;height:24px;border-radius:50%;background:${col}22;color:${col};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
             <span style="font-size:12px;font-weight:500;flex:1">${escapeHtml(u.name||u.email)}</span>
           </label>`;
@@ -15161,6 +15165,48 @@ function renderLmTodoList(){
           </div>
         </div>`;
       }).join('');
+}
+
+// Expand / collapse the attendee checkbox panel. Kept collapsed by
+// default so the full user list doesn't eat half the modal.
+function toggleLmAttendeesPicker(){
+  const panel=document.getElementById('lmAttendees');
+  const toggle=document.getElementById('lmAttToggle');
+  if(!panel||!toggle) return;
+  const open=panel.style.display!=='none';
+  panel.style.display=open?'none':'flex';
+  toggle.textContent=open?'▾ Pick':'▴ Close';
+}
+
+// Rebuild the compact chip summary above the picker whenever a
+// checkbox flips, and paint the row so the checked user is
+// visually distinct inside the popup too.
+function onLmAttendeeToggle(cb){
+  const label=cb.closest('label');
+  if(label){
+    label.style.background=cb.checked?'var(--accent-dim)':'var(--surface2)';
+    label.style.borderColor=cb.checked?'var(--accent-dim)':'var(--border2)';
+  }
+  refreshLmAttSummary();
+}
+
+function refreshLmAttSummary(){
+  const wrap=document.getElementById('lmAttSummary');
+  if(!wrap) return;
+  const checked=[...document.querySelectorAll('#lmAttendees input[type=checkbox]:checked')];
+  if(checked.length===0){
+    wrap.innerHTML='<span style="color:var(--muted2)">Click to select attendees…</span>';
+    return;
+  }
+  wrap.innerHTML=checked.map(cb=>{
+    const col=cb.dataset.color||'var(--muted)';
+    const initials=cb.dataset.initials||'?';
+    const name=cb.dataset.name||'';
+    return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 3px;border-radius:12px;background:${col}22;border:1px solid ${col}55;color:${col};font-size:11px;font-weight:600">
+      <span style="width:16px;height:16px;border-radius:50%;background:${col};color:#0d0d10;font-size:8px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</span>
+      ${escapeHtml(name)}
+    </span>`;
+  }).join('');
 }
 
 // Live minutes counter shown next to the start/end pickers.
