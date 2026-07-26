@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-21';
+const APP_VERSION='2026-07-25-22';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15092,6 +15092,37 @@ function updateLmTodoField(i, field, value){
   }
 }
 
+// Floating tooltip so a to-do row's long task / notes text is
+// fully readable on hover without waiting for the browser's slow
+// native title tooltip. Only shows when the text overflows its
+// input so short values stay quiet.
+function showLmTip(el, text){
+  const value=(text!=null?text:(el&&el.value)||'').toString();
+  if(!value.trim()){ hideLmTip(); return; }
+  // Skip when the value clearly fits in the visible field.
+  if(el && el.scrollWidth <= el.clientWidth + 2 && value.length < 60){ hideLmTip(); return; }
+  let tip=document.getElementById('lmTooltip');
+  if(!tip){
+    tip=document.createElement('div');
+    tip.id='lmTooltip';
+    tip.style.cssText='position:fixed;z-index:10000;max-width:360px;padding:8px 10px;background:var(--surface);border:1px solid var(--accent);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.4;pointer-events:none';
+    document.body.appendChild(tip);
+  }
+  tip.textContent=value;
+  tip.style.display='block';
+  if(el){
+    const r=el.getBoundingClientRect();
+    tip.style.left=Math.max(8, Math.min(window.innerWidth-370, r.left))+'px';
+    // Prefer above the field; fall back to below if not enough room.
+    const above=r.top-tip.offsetHeight-6;
+    tip.style.top=(above>8?above:r.bottom+6)+'px';
+  }
+}
+function hideLmTip(){
+  const tip=document.getElementById('lmTooltip');
+  if(tip) tip.style.display='none';
+}
+
 function renderLmTodoList(){
   const el=document.getElementById('lmTodoList');
   if(!el) return;
@@ -15114,7 +15145,7 @@ function renderLmTodoList(){
         return `<div style="display:flex;flex-direction:column;gap:5px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
           <div style="display:flex;gap:6px;align-items:center">
             <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);min-width:18px">${i+1}.</span>
-            <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+            <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value);showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()" onblur="hideLmTip()" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
             <select onchange="updateLmTodoField(${i},'status',this.value);renderLmTodoList()" title="Status" style="width:130px;flex-shrink:0;font-size:11px;padding:5px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:${statusColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
               ${STATUS_OPTS.map(s=>`<option value="${s.v}" ${cur===s.v?'selected':''}>${s.label}</option>`).join('')}
             </select>
@@ -15126,7 +15157,7 @@ function renderLmTodoList(){
               <option value="">Assign to…</option>
               ${users.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
             </select>
-            <input type="text" value="${escapeAttr(t.notes||'')}" placeholder="Notes (optional)…" oninput="updateLmTodoField(${i},'notes',this.value)" style="flex:2;min-width:160px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+            <input type="text" value="${escapeAttr(t.notes||'')}" placeholder="Notes (optional)…" oninput="updateLmTodoField(${i},'notes',this.value);showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()" onblur="hideLmTip()" style="flex:2;min-width:160px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
           </div>
         </div>`;
       }).join('');
