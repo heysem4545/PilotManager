@@ -1007,9 +1007,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         SOS Request
         <span class="nav-badge" id="sosRequestBadge" style="display:none">0</span>
       </button>
-      <button class="nav-item" id="nav-meetings" onclick="showView('meetings')">
+      <button class="nav-item" id="nav-meetings" onclick="showView('meetings')" style="position:relative">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
         Meeting Tracking
+        <span class="nav-badge" id="meetingTodoBadge" style="display:none">0</span>
       </button>
       <button class="nav-item" id="nav-maintenance" onclick="showView('maintenance')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 3l-2 2-2-2 2-2zM3 13l2-2 2 2-2 2zM11 5L5 11"/></svg>
@@ -2709,6 +2710,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startInnovationBadge();
   startAssignedTaskBadge();
   startSosRequestBadge();
+  startMeetingTodoBadge();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -7991,6 +7993,32 @@ function startAssignedTaskBadge(){
   });
 }
 
+function startMeetingTodoBadge(){
+  // Red-dot badge on the Meeting Tracking nav item — counts open
+  // (pending or in-progress) meeting to-dos assigned to the
+  // signed-in user across every logged meeting. Live via snapshot
+  // so a new logged meeting or a peer marking one done flips the
+  // number without needing to reopen the section.
+  if(!currentUser || !currentUser.uid) return;
+  db.collection('meetings').onSnapshot(snap=>{
+    let open = 0;
+    snap.docs.forEach(d=>{
+      const todos = (d.data().todos)||[];
+      todos.forEach(t=>{
+        if(!t || t.assignedUid!==currentUser.uid) return;
+        const s = t.status || '';
+        if(s==='done' || s==='canceled') return;
+        open++;
+      });
+    });
+    const badge = document.getElementById('meetingTodoBadge');
+    if(badge){
+      badge.textContent = open;
+      badge.style.display = open>0 ? '' : 'none';
+    }
+  }, err=>console.warn('meetingTodoBadge', err && err.message));
+}
+
 function startSosRequestBadge(){
   // Red-dot badge on the SOS Request nav item — counts open requests
   // assigned to the signed-in user (Not Started or Pending). Uses the
@@ -11672,7 +11700,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-33';
+const APP_VERSION='2026-07-25-34';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
