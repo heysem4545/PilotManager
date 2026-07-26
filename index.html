@@ -11672,7 +11672,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-30';
+const APP_VERSION='2026-07-25-31';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -16213,10 +16213,12 @@ function renderMtgLogTodos(mtg){
     const info = STATUS_INFO[cur] || STATUS_INFO.pending;
     const taskIcon = (typeof pickNoteIcon==='function')?pickNoteIcon(t.text||''):'📝';
     const overdue = t.dueDate && cur!=='done' && cur!=='canceled' && (new Date(t.dueDate+'T23:59:59') < new Date());
+    const comments = Array.isArray(t.comments) ? t.comments : [];
     return `<div style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">
-        <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);min-width:18px">${i+1}.</span>
-        <span style="flex:1;min-width:200px;font-size:12px;color:var(--text);font-weight:500">${taskIcon} ${escapeHtml(t.text||'')}</span>
+        <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);min-width:18px;padding-top:6px">${i+1}.</span>
+        <span style="padding-top:6px">${taskIcon}</span>
+        <input type="text" value="${escapeAttr(t.text||'')}" placeholder="Task…" onchange="updateSavedMtgTodoField(${i},'text',this.value)" style="flex:1;min-width:200px;font-size:12px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);font-weight:500;outline:none">
         <select onchange="updateSavedMtgTodoStatus(${i},this.value)" title="Change status" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:${info.color};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
           ${['pending','progressing','done','canceled'].map(v=>{
             const label=STATUS_INFO[v].label;
@@ -16227,10 +16229,95 @@ function renderMtgLogTodos(mtg){
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
         ${t.assignedName?`<span>👤 ${escapeHtml(t.assignedName)}</span>`:''}
         ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 ${escapeHtml(t.dueDate)}${overdue?' · OVERDUE':''}</span>`:''}
-        ${t.notes?`<span style="color:var(--text);font-style:italic">📝 ${escapeHtml(t.notes)}</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--muted2);flex-shrink:0">📝</span>
+        <input type="text" value="${escapeAttr(t.notes||'')}" placeholder="Add notes…" onchange="updateSavedMtgTodoField(${i},'notes',this.value)" style="flex:1;font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+      </div>
+      ${comments.length?`<div style="display:flex;flex-direction:column;gap:4px;padding-left:10px;border-left:2px solid var(--border2);margin-top:2px">
+        ${comments.map((c,ci)=>`<div style="display:flex;gap:6px;align-items:flex-start;font-size:11px">
+          <span style="color:var(--accent);font-weight:600;flex-shrink:0">💬 ${escapeHtml(c.by||'')}</span>
+          <span style="color:var(--muted);font-family:var(--mono);font-size:9px;flex-shrink:0;padding-top:1px">${escapeHtml((c.at||'').slice(0,10))}</span>
+          <span style="flex:1;color:var(--text)">${escapeHtml(c.text||'')}</span>
+          <button title="Delete comment" onclick="deleteSavedMtgTodoComment(${i},${ci})" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0 2px">×</button>
+        </div>`).join('')}
+      </div>`:''}
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="text" id="mtgLogTodoComment-${i}" placeholder="💬 Add a comment and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addSavedMtgTodoComment(${i},this.value);this.value=''}" style="flex:1;font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="const el=document.getElementById('mtgLogTodoComment-${i}');addSavedMtgTodoComment(${i},el.value);el.value=''">Post</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// Update any editable field (text, notes) on a single todo of the
+// currently-viewed saved meeting.
+async function updateSavedMtgTodoField(idx, field, value){
+  const id = meetingLogTodosMeetingId;
+  if(!id) return;
+  const m = (meetingsData||[]).find(x=>x.id===id);
+  if(!m || !Array.isArray(m.todos) || !m.todos[idx]) return;
+  const trimmed = typeof value==='string' ? value.trim() : value;
+  if(m.todos[idx][field]===trimmed) return;
+  const todos = m.todos.slice();
+  todos[idx] = {...todos[idx], [field]:trimmed};
+  try{
+    await db.collection('meetings').doc(id).update({todos, updatedAt:new Date()});
+    m.todos = todos;
+    toast(field==='text'?'Task updated':field==='notes'?'Notes saved':'Saved');
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+// Append a comment to the todo's comments array. Each comment
+// carries who wrote it and when, so the meeting thread is a real
+// record instead of a single overwrite-y notes field.
+async function addSavedMtgTodoComment(idx, text){
+  const id = meetingLogTodosMeetingId;
+  if(!id) return;
+  const m = (meetingsData||[]).find(x=>x.id===id);
+  if(!m || !Array.isArray(m.todos) || !m.todos[idx]) return;
+  const clean = (text||'').trim();
+  if(!clean){ toast('Type a comment first'); return; }
+  const comments = Array.isArray(m.todos[idx].comments) ? m.todos[idx].comments.slice() : [];
+  comments.push({
+    text: clean,
+    by: (currentUser && (currentUser.name||currentUser.email)) || 'unknown',
+    byUid: (currentUser && currentUser.uid) || null,
+    at: new Date().toISOString()
+  });
+  const todos = m.todos.slice();
+  todos[idx] = {...todos[idx], comments};
+  try{
+    await db.collection('meetings').doc(id).update({todos, updatedAt:new Date()});
+    m.todos = todos;
+    renderMtgLogTodos(m);
+    toast('Comment added');
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function deleteSavedMtgTodoComment(todoIdx, commentIdx){
+  const id = meetingLogTodosMeetingId;
+  if(!id) return;
+  const m = (meetingsData||[]).find(x=>x.id===id);
+  if(!m || !Array.isArray(m.todos) || !m.todos[todoIdx]) return;
+  const comments = Array.isArray(m.todos[todoIdx].comments) ? m.todos[todoIdx].comments.slice() : [];
+  if(commentIdx<0||commentIdx>=comments.length) return;
+  const c = comments[commentIdx];
+  // Only the author (or an admin) can remove a comment.
+  if(!isAdmin() && c.byUid && c.byUid!==currentUser.uid){
+    toast("Only the author or an admin can remove this comment");
+    return;
+  }
+  if(!confirm('Delete this comment?')) return;
+  comments.splice(commentIdx,1);
+  const todos = m.todos.slice();
+  todos[todoIdx] = {...todos[todoIdx], comments};
+  try{
+    await db.collection('meetings').doc(id).update({todos, updatedAt:new Date()});
+    m.todos = todos;
+    renderMtgLogTodos(m);
+    toast('Comment deleted');
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 async function updateSavedMtgTodoStatus(idx, newStatus){
