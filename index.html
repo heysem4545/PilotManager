@@ -7592,7 +7592,7 @@ async function openAddNotifRule(existing){
   modal.className='overlay open';
   modal.id='notifRuleModal';
   modal.onclick=e=>{if(e.target===modal) modal.remove();};
-  const eventTriggers=['New Innovation Submitted','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
+  const eventTriggers=['New Innovation Submitted','SOS Request Assigned','Task Completed','Lease Expiring (30 days)','Balance Overdue','New Maintenance Added','New Call Log Entry','Custom'];
   const eventTriggerOpts=eventTriggers.map(t=>`<option value="${t}" ${existing&&existing.trigger===t?'selected':''}>${t}</option>`).join('');
   const scheduledReports=[
     {value:'dashboardCollection', label:'📊 Dashboard Collection Report (Tenant / CMHA / Total)'},
@@ -11700,7 +11700,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-34';
+const APP_VERSION='2026-07-25-35';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;

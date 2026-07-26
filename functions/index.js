@@ -1,5 +1,5 @@
 const { setGlobalOptions } = require("firebase-functions");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
@@ -257,6 +257,88 @@ exports.onNewInnovation = onDocumentCreated(
       }
     } catch (e) {
       logger.error("Error checking notification rules:", e.message);
+    }
+  }
+);
+
+// Send a Telegram alert whenever an SOS request is assigned (or
+// re-assigned) to a user. Two channels fire from the same event:
+//   1. Direct ping to the assignee themselves — they get told
+//      immediately without needing a rule for their own uid.
+//   2. Any active 'SOS Request Assigned' notificationRules — for
+//      admins / supervisors who want to see all assignments.
+// Skips deletions and no-op writes where assignedToUid didn't
+// actually change.
+exports.onSosAssigned = onDocumentWritten(
+  { document: "sosRequests/{docId}", secrets: [TELEGRAM_BOT_TOKEN] },
+  async (event) => {
+    const before = (event.data && event.data.before && event.data.before.data()) || {};
+    const after = (event.data && event.data.after && event.data.after.data()) || null;
+    if (!after) return; // doc deleted
+
+    const oldUid = before.assignedToUid || "";
+    const newUid = after.assignedToUid || "";
+    // Only fire when the assignee is newly set or changes to a
+    // different person. Empty → empty and unchanged assignments
+    // shouldn't wake anyone up.
+    if (!newUid || newUid === oldUid) return;
+
+    const requesterName = after.requestFromName || after.createdByName || "Someone";
+    const note = ((after.requestNote || "") + "").substring(0, 250);
+    const status = after.requestStatus || "Not Started";
+    const message = "🆘 SOS Request Assigned to You\n\n" +
+      "👤 From: " + requesterName + "\n" +
+      "📌 Status: " + status + "\n\n" +
+      "📝 " + (note || "(no note yet)") + "\n\n" +
+      "Open PilotManager to review and update status.";
+
+    const tgToken = TELEGRAM_BOT_TOKEN.value();
+    let assigneeNotified = false;
+
+    // 1. Direct notification to the assignee (if they have a Chat ID)
+    try {
+      const userSnap = await firestore.collection("users").doc(newUid).get();
+      const u = userSnap.exists ? userSnap.data() : null;
+      const chatId = u && u.telegramChatId;
+      const name = (u && (u.name || u.email)) || after.assignedToName || "Assignee";
+      if (chatId) {
+        try {
+          await _telegramSend(tgToken, chatId, message);
+          await logNotification("telegram", "SOS Request Assigned", name, chatId, message, "delivered");
+          assigneeNotified = true;
+        } catch (err) {
+          await logNotification("telegram", "SOS Request Assigned", name, chatId, message, "failed");
+          logger.error("SOS Telegram to " + chatId + " failed: " + err.message);
+        }
+      } else {
+        logger.info("Assignee " + newUid + " has no telegramChatId; skipped direct notification.");
+      }
+    } catch (e) {
+      logger.error("SOS assignee lookup failed: " + e.message);
+    }
+
+    // 2. Also fire any subscribed 'SOS Request Assigned' Telegram
+    //    rules — skip the one pointing at the assignee to avoid a
+    //    duplicate ping.
+    try {
+      const rulesSnap = await firestore.collection("notificationRules")
+        .where("trigger", "==", "SOS Request Assigned")
+        .where("active", "==", true)
+        .get();
+      for (const ruleDoc of rulesSnap.docs) {
+        const rule = ruleDoc.data();
+        if (rule.channel !== "telegram" || !rule.recipientContact) continue;
+        if (assigneeNotified && rule.recipientUid === newUid) continue;
+        try {
+          await _telegramSend(tgToken, rule.recipientContact, message);
+          await logNotification("telegram", "SOS Request Assigned", rule.recipientName, rule.recipientContact, message, "delivered");
+        } catch (err) {
+          await logNotification("telegram", "SOS Request Assigned", rule.recipientName, rule.recipientContact, message, "failed");
+          logger.error("SOS rule Telegram to " + rule.recipientContact + " failed: " + err.message);
+        }
+      }
+    } catch (e) {
+      logger.error("Error checking SOS notification rules: " + e.message);
     }
   }
 );
