@@ -11672,7 +11672,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-31';
+const APP_VERSION='2026-07-25-32';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15062,6 +15062,7 @@ function renderMyMeetingTodosTab(){
       <select onchange="myTodosMonthFilter=this.value;renderMyMeetingTodosTab()" title="Filter by meeting month" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer;min-width:160px">
         ${monthOptsHtml}
       </select>
+      <button class="btn btn-ghost btn-sm" style="color:#25d366;border-color:rgba(37,211,102,0.35);padding:6px 12px;font-size:11px" onclick="exportMyTodosWhatsApp()" title="Export the currently-shown to-dos as a WhatsApp message">📱 WhatsApp</button>
       <span style="font-size:11px;color:var(--muted)">${filtered.length} of ${items.length}</span>
     </div>
     <div class="ftabs" style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">
@@ -15079,6 +15080,91 @@ function renderMyMeetingTodosTab(){
 // Update a single todo's status inside a meeting doc. Rewrites the
 // whole todos array (Firestore doesn't have per-index update on
 // arrays). Optimistic local update so the tab re-renders instantly.
+// Export the currently-filtered My To-Do rows as a WhatsApp
+// message. Respects the search, month, and status filters exactly
+// as they are on screen, so 'what I see is what I share'.
+function exportMyTodosWhatsApp(){
+  const uid = currentUser && currentUser.uid;
+  const meName = (currentUser && (currentUser.name||currentUser.email)) || 'Me';
+  const term = (myTodosSearch||'').toLowerCase();
+  const bucketOf = t => {
+    const s = t.status || '';
+    if(s==='done') return 'done';
+    if(s==='canceled') return 'canceled';
+    if(s==='progressing') return 'progressing';
+    return 'pending';
+  };
+  const mtgMonthKey = m => {
+    const d = m.actualDate || m.targetDate || '';
+    return (typeof d==='string' && d.length>=7) ? d.slice(0,7) : '';
+  };
+  const items = [];
+  (meetingsData||[]).forEach(m=>{
+    (m.todos||[]).forEach(t=>{
+      if(!t || t.assignedUid!==uid) return;
+      // Search filter
+      if(term){
+        const hay = ((m.name||'')+' '+(t.text||'')+' '+(t.notes||'')).toLowerCase();
+        if(!hay.includes(term)) return;
+      }
+      // Month filter
+      if(myTodosMonthFilter!=='all' && mtgMonthKey(m)!==myTodosMonthFilter) return;
+      // Status filter
+      const b = bucketOf(t);
+      if(myTodosStatusFilter==='open' && !(b==='pending'||b==='progressing')) return;
+      if(myTodosStatusFilter!=='all' && myTodosStatusFilter!=='open' && b!==myTodosStatusFilter) return;
+      items.push({meeting:m, todo:t});
+    });
+  });
+  if(items.length===0){ toast('No to-dos match the current filter'); return; }
+
+  // Group by meeting, most recent first.
+  const groups = {};
+  items.forEach(it=>{
+    const key = it.meeting.id;
+    if(!groups[key]) groups[key] = {meeting:it.meeting, todos:[]};
+    groups[key].todos.push(it.todo);
+  });
+  const groupList = Object.values(groups).sort((a,b)=>{
+    const ad=a.meeting.actualDate||a.meeting.targetDate||'';
+    const bd=b.meeting.actualDate||b.meeting.targetDate||'';
+    return bd.localeCompare(ad);
+  });
+
+  const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthHeader = myTodosMonthFilter==='all'
+    ? 'All months'
+    : (()=>{const [y,m]=myTodosMonthFilter.split('-').map(x=>parseInt(x,10));return (MONTH_NAMES[m-1]||'')+' '+y;})();
+  const statusLabel = ({open:'Open items', all:'All', pending:'Pending', progressing:'In Progress', done:'Done', canceled:'Canceled'})[myTodosStatusFilter]||'All';
+  const statusIconMap={pending:'⏳', progressing:'🔄', done:'✓', canceled:'✕', '':'⏳'};
+  const statusTextMap={pending:'Pending', progressing:'In Progress', done:'Done', canceled:'Canceled', '':'Pending'};
+
+  const sep='______________';
+  const lines=[
+    `📝 My To-Do List — ${meName}`,
+    `🗓 ${monthHeader} · 📊 ${statusLabel} (${items.length})`,
+    ''
+  ];
+  groupList.forEach((g, gi)=>{
+    const dateLabel = g.meeting.actualDate || g.meeting.targetDate || '';
+    lines.push(`📋 ${g.meeting.name||'Untitled meeting'}${dateLabel?` — 🗓 ${dateLabel}`:''}`);
+    lines.push(sep);
+    g.todos.forEach((t,ti)=>{
+      const taskIcon = (typeof pickNoteIcon==='function')?pickNoteIcon(t.text||''):'📝';
+      lines.push(`${ti+1}. ${taskIcon} ${t.text||''}`);
+      const sub=[];
+      if(t.dueDate) sub.push(`📅 Due ${t.dueDate}`);
+      sub.push(`${statusIconMap[t.status||'']||'⏳'} ${statusTextMap[t.status||'']||'Pending'}`);
+      lines.push(`   ${sub.join(' · ')}`);
+      if(t.notes) lines.push(`   ${(typeof pickNoteIcon==='function')?pickNoteIcon(t.notes):'📝'} ${t.notes}`);
+      if(ti<g.todos.length-1) lines.push(sep);
+    });
+    if(gi<groupList.length-1) lines.push('');
+  });
+
+  openWhatsAppPreview(lines.join('\n'), items.length);
+}
+
 async function updateMyMeetingTodoStatus(meetingId, todoIdx, newStatus){
   const m = (meetingsData||[]).find(x=>x.id===meetingId);
   if(!m) return;
