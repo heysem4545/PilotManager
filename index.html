@@ -11667,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-20';
+const APP_VERSION='2026-07-25-21';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15072,7 +15072,9 @@ async function openLogMeetingModal(date){
 }
 
 function addLmTodoRow(){
-  lmTodoDraft.push({text:'', dueDate:'', assignedUid:'', assignedName:'', status:'pending', notes:''});
+  // Status starts unset — the user picks 'Pending' etc. once
+  // they've decided where the task is at.
+  lmTodoDraft.push({text:'', dueDate:'', assignedUid:'', assignedName:'', status:'', notes:''});
   renderLmTodoList();
 }
 
@@ -15098,6 +15100,7 @@ function renderLmTodoList(){
   // squash the primary Task / Due Date / Assign row into unreadable
   // strips at 520px modal width.
   const STATUS_OPTS = [
+    {v:'',          label:'Status',       color:'var(--muted)'},
     {v:'pending',   label:'⏳ Pending',   color:'var(--muted)'},
     {v:'progressing', label:'🔄 In Progress', color:'var(--amber)'},
     {v:'done',      label:'✓ Done',       color:'var(--accent)'},
@@ -15106,13 +15109,14 @@ function renderLmTodoList(){
   el.innerHTML = lmTodoDraft.length===0
     ? '<div style="font-size:11px;color:var(--muted2);padding:6px">No to-dos yet — click + Add To-Do</div>'
     : lmTodoDraft.map((t,i)=>{
-        const statusColor=(STATUS_OPTS.find(s=>s.v===(t.status||'pending'))||STATUS_OPTS[0]).color;
+        const cur=t.status||'';
+        const statusColor=(STATUS_OPTS.find(s=>s.v===cur)||STATUS_OPTS[0]).color;
         return `<div style="display:flex;flex-direction:column;gap:5px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
           <div style="display:flex;gap:6px;align-items:center">
             <span style="font-size:10px;color:var(--muted2);font-family:var(--mono);min-width:18px">${i+1}.</span>
-            <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
-            <select onchange="updateLmTodoField(${i},'status',this.value);renderLmTodoList()" title="Status" style="font-size:11px;padding:5px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:${statusColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
-              ${STATUS_OPTS.map(s=>`<option value="${s.v}" ${(t.status||'pending')===s.v?'selected':''}>${s.label}</option>`).join('')}
+            <input type="text" value="${escapeAttr(t.text)}" placeholder="Task…" oninput="updateLmTodoField(${i},'text',this.value)" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+            <select onchange="updateLmTodoField(${i},'status',this.value);renderLmTodoList()" title="Status" style="width:130px;flex-shrink:0;font-size:11px;padding:5px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:${statusColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
+              ${STATUS_OPTS.map(s=>`<option value="${s.v}" ${cur===s.v?'selected':''}>${s.label}</option>`).join('')}
             </select>
             <button title="Remove" onclick="removeLmTodoRow(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px">×</button>
           </div>
@@ -15159,15 +15163,21 @@ async function saveLoggedMeeting(){
   });
   if(!attendees.length){toast('Select at least one attendee');return;}
   const todos = lmTodoDraft
-    .map(t=>({
-      text:(t.text||'').trim(),
-      dueDate:t.dueDate||'',
-      assignedUid:t.assignedUid||'',
-      assignedName:t.assignedName||'',
-      status:t.status||'pending',
-      notes:(t.notes||'').trim(),
-      done:(t.status||'pending')==='done'
-    }))
+    .map(t=>{
+      // Empty status stays empty on the meeting doc, but for the
+      // fanned-out task and the 'done' flag we treat it as pending
+      // so nothing accidentally starts as complete.
+      const status=t.status||'';
+      return {
+        text:(t.text||'').trim(),
+        dueDate:t.dueDate||'',
+        assignedUid:t.assignedUid||'',
+        assignedName:t.assignedName||'',
+        status,
+        notes:(t.notes||'').trim(),
+        done:status==='done'
+      };
+    })
     .filter(t=>t.text);
   try{
     const mtgRef = await db.collection('meetings').add({
@@ -15195,7 +15205,7 @@ async function saveLoggedMeeting(){
     // due date. Skip todos without a due date or assignee, and
     // skip canceled todos entirely — no point creating a task the
     // assignee doesn't need to do.
-    const statusToTask = {pending:'notstarted', progressing:'progressing', done:'done'};
+    const statusToTask = {'':'notstarted', pending:'notstarted', progressing:'progressing', done:'done'};
     for(const t of todos){
       if(!t.assignedUid || !t.dueDate) continue;
       if(t.status==='canceled') continue;
