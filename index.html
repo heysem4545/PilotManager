@@ -44,6 +44,11 @@
 [data-theme="light"] .fg select option{background:var(--surface)}
 [data-theme="light"] .ab-input::-webkit-calendar-picker-indicator{filter:none}
 [data-theme="light"] .maint-sum-date::-webkit-calendar-picker-indicator{filter:none}
+/* Log Meeting modal date/time inputs — follow the active theme so the
+ * calendar / clock icons stay visible on light backgrounds. */
+.lm-picker{color-scheme:dark}
+[data-theme="light"] .lm-picker{color-scheme:light}
+[data-theme="light"] .lm-picker::-webkit-calendar-picker-indicator{filter:none;opacity:0.75}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
 body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
@@ -11662,7 +11667,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-19';
+const APP_VERSION='2026-07-25-20';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15019,13 +15024,13 @@ async function openLogMeetingModal(date){
       <input type="text" id="lmName" placeholder="e.g. Team Sync" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
     </div>
     <div class="fg"><label>Date (when it happened)</label>
-      <input type="date" id="lmDate" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%;color-scheme:dark">
+      <input type="date" id="lmDate" class="lm-picker" value="${date}" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
     </div>
     <div class="fg"><label>Duration (when it started and ended)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="time" id="lmStart" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+        <input type="time" id="lmStart" class="lm-picker" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
         <span style="font-size:12px;color:var(--muted)">to</span>
-        <input type="time" id="lmEnd" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+        <input type="time" id="lmEnd" class="lm-picker" oninput="updateLmDuration()" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
         <span id="lmDurDisplay" style="font-size:12px;font-weight:600;color:var(--accent);margin-left:6px">—</span>
       </div>
     </div>
@@ -15112,7 +15117,7 @@ function renderLmTodoList(){
             <button title="Remove" onclick="removeLmTodoRow(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 4px">×</button>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <input type="date" value="${t.dueDate}" oninput="updateLmTodoField(${i},'dueDate',this.value)" title="Due date" style="flex:1;min-width:130px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;color-scheme:dark">
+            <input type="date" class="lm-picker" value="${t.dueDate}" oninput="updateLmTodoField(${i},'dueDate',this.value)" title="Due date" style="flex:1;min-width:130px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
             <select onchange="updateLmTodoField(${i},'assignedUid',this.value)" title="Assign to" style="flex:1;min-width:120px;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;cursor:pointer">
               <option value="">Assign to…</option>
               ${users.map(u=>`<option value="${u.uid}" ${t.assignedUid===u.uid?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('')}
