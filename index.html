@@ -11672,7 +11672,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-25-29';
+const APP_VERSION='2026-07-25-30';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14926,6 +14926,7 @@ function switchMeetingsTab(tab){
 // away/back doesn't reset the user's active filter.
 let myTodosSearch = '';
 let myTodosStatusFilter = 'open';
+let myTodosMonthFilter = 'all'; // 'all' or 'YYYY-MM'
 
 // Collect every to-do across all meetings that's assigned to the
 // signed-in user, apply the search + status filter, then render a
@@ -14953,16 +14954,35 @@ function renderMyMeetingTodosTab(){
     if(s==='progressing') return 'progressing';
     return 'pending'; // pending or empty
   };
+  // Month key for each item, derived from the meeting's actual /
+  // target date. Used both for the dropdown options and filtering.
+  const mtgMonthKey = it => {
+    const d = it.meeting.actualDate || it.meeting.targetDate || '';
+    return (typeof d==='string' && d.length>=7) ? d.slice(0,7) : '';
+  };
   const filtered = items.filter(it=>{
     if(term){
       const hay = ((it.meeting.name||'')+' '+(it.todo.text||'')+' '+(it.todo.notes||'')).toLowerCase();
       if(!hay.includes(term)) return false;
     }
+    if(myTodosMonthFilter!=='all' && mtgMonthKey(it)!==myTodosMonthFilter) return false;
     const b = bucketOf(it.todo);
     if(myTodosStatusFilter==='all') return true;
     if(myTodosStatusFilter==='open') return b==='pending' || b==='progressing';
     return b===myTodosStatusFilter;
   });
+
+  // Build the month dropdown from months that actually have items,
+  // sorted newest first. 'All months' is always first.
+  const monthKeys = [...new Set(items.map(mtgMonthKey).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthLabel = k => {
+    const [y,m]=k.split('-').map(x=>parseInt(x,10));
+    return (MONTH_NAMES[m-1]||'')+' '+y;
+  };
+  const monthOptsHtml = ['<option value="all">📅 All months</option>']
+    .concat(monthKeys.map(k=>`<option value="${k}" ${myTodosMonthFilter===k?'selected':''}>${monthLabel(k)}</option>`))
+    .join('');
 
   // Status counts for the pill tabs — always computed on the
   // pre-filter list so the tabs act like navigation, not summary
@@ -15039,6 +15059,9 @@ function renderMyMeetingTodosTab(){
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <input type="text" placeholder="🔍 Filter by meeting or task…" value="${escapeAttr(myTodosSearch)}" oninput="myTodosSearch=this.value;renderMyMeetingTodosTab();setTimeout(()=>{const el=document.querySelector('#mtgTabContent input[type=text]');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},0)" style="flex:1;min-width:220px;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+      <select onchange="myTodosMonthFilter=this.value;renderMyMeetingTodosTab()" title="Filter by meeting month" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer;min-width:160px">
+        ${monthOptsHtml}
+      </select>
       <span style="font-size:11px;color:var(--muted)">${filtered.length} of ${items.length}</span>
     </div>
     <div class="ftabs" style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">
@@ -15881,8 +15904,16 @@ async function renderMeetingCalendar(){
           if(att&&att.attended) userStatus=att.late?' ⏰':'';
           else userStatus=' ✗';
         }
+        // Todo summary chip so status changes made on the 'My To-Do
+        // List' tab are visible in the calendar too. Only shown when
+        // the meeting has any todos.
+        const openCount=(m.todos||[]).filter(t=>t.status!=='done'&&t.status!=='canceled').length;
+        const totalCount=(m.todos||[]).filter(t=>t.status!=='canceled').length;
+        const todoChip = totalCount>0
+          ? ` <span style="display:inline-block;padding:0 4px;border-radius:6px;font-size:8px;font-weight:700;background:${openCount>0?'rgba(245,158,11,0.18)':'rgba(74,222,128,0.15)'};color:${openCount>0?'var(--amber)':'#4ade80'};margin-left:2px">${totalCount-openCount}/${totalCount}✓</span>`
+          : '';
         return `<div onclick="openMeetingLogModal('${m.id}')" style="font-size:9px;padding:3px 6px;margin-bottom:2px;border-radius:4px;cursor:pointer;background:${isDone?'rgba(74,222,128,0.1)':'rgba(245,112,106,0.08)'};border-left:2px solid ${isDone?'#4ade80':'var(--red)'};color:${isDone?'#4ade80':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isDone?'text-decoration:line-through':''}">
-          ${isDone?'✓ ':''}${escapeHtml(m.name||'Meeting')}${userStatus}
+          ${isDone?'✓ ':''}${escapeHtml(m.name||'Meeting')}${userStatus}${todoChip}
         </div>`;
       }).join('')}
     </div>`;
