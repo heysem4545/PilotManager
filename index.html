@@ -3747,7 +3747,7 @@ function renderCollectionMonthlyView(){
       <td class="money">${fmt(cmhaPaid)}</td><td class="money">${fmt(tPaid)}</td>
       <td class="money">${fmt(collected)}</td>
       <td class="money" style="color:${(cmhaBal+tenBal)>0?'var(--red)':'var(--accent)'}">${fmt(cmhaBal)} / ${fmt(tenBal)}</td>
-      <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(mp.monthNote||'')}">${mp.monthNote?escapeHtml(mp.monthNote):'<span style="color:var(--muted2)">—</span>'}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:${mp.monthNote?'help':'default'}" data-note="${escapeAttr(mp.monthNote||'')}" onmouseenter="showLmTip(this,this.dataset.note)" onmouseleave="hideLmTip()">${mp.monthNote?escapeHtml(mp.monthNote):'<span style="color:var(--muted2)">—</span>'}</td>
       <td>${canEdit()
         ? `<span class="editable" onclick="inlineEditCollActionNote('${p.id}',this)" style="cursor:pointer;font-size:11px;color:${mp.collActionNote?'var(--text)':'var(--muted2)'};display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom" title="${escapeAttr(mp.collActionNote||'')}">${mp.collActionNote?escapeHtml(mp.collActionNote):'📝 click to add…'}</span>`
         : `<span style="font-size:11px;color:var(--muted)" title="${escapeAttr(mp.collActionNote||'')}">${mp.collActionNote?escapeHtml(mp.collActionNote):'—'}</span>`}</td>
@@ -11775,7 +11775,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-26-04';
+const APP_VERSION='2026-07-26-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
