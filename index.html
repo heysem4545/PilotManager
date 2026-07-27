@@ -11775,7 +11775,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-26-05';
+const APP_VERSION='2026-07-27-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14208,7 +14208,7 @@ async function renderLeadsView(skipLoad){
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left"><strong style="color:var(--text)">${myLeads.length}</strong> ${sourceLabel}${myLeads.length===1?'':'s'} ${ownerLabel}</div>
-        <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-primary btn-sm" onclick="openLeadAdd('${activeUid}')">+ Add Lead</button></div>
+        <div style="display:flex;gap:8px;align-items:center">${leadsSubTab==='own'?`<button class="btn btn-primary btn-sm" onclick="openLeadAdd('${activeUid}')">+ Add Lead</button>`:''}</div>
       </div>
       <div class="tbl-wrap">
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
