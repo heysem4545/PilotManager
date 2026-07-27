@@ -1040,9 +1040,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 2.5h2.2l1 3-1.5 1a8 8 0 004.3 4.3l1-1.5 3 1v2.2a1 1 0 01-1.1 1A11 11 0 012.5 3.6a1 1 0 011-1.1z"/></svg>
         Call Log
       </button>
-      <button class="nav-item" id="nav-leads" onclick="showView('leads')">
+      <button class="nav-item" id="nav-leads" onclick="showView('leads')" style="position:relative">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
         Leads
+        <span class="nav-badge" id="leadsBadge" style="display:none">0</span>
       </button>
       <button class="nav-item" id="nav-available" onclick="showView('available')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z"/><path d="M6 15V9h4v6"/></svg>
@@ -2713,6 +2714,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startAssignedTaskBadge();
   startSosRequestBadge();
   startMeetingTodoBadge();
+  startLeadsBadge();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -7999,6 +8001,47 @@ function startAssignedTaskBadge(){
   });
 }
 
+function startLeadsBadge(){
+  // Red-dot badge on the Leads nav item — counts call-log leads
+  // (leadSource !== 'self') that were assigned to the signed-in
+  // user AFTER the last time they opened the Leads section.
+  // Own-leads (self) aren't counted since the user created those
+  // themselves.
+  if(!currentUser || !currentUser.uid) return;
+  db.collection('callLog').where('assignedToUid','==',currentUser.uid).onSnapshot(snap=>{
+    const seenAt = (currentUser.leadsLastViewedAt && currentUser.leadsLastViewedAt.toMillis)
+      ? currentUser.leadsLastViewedAt.toMillis()
+      : (currentUser.leadsLastViewedAt ? new Date(currentUser.leadsLastViewedAt).getTime() : 0);
+    let unseen = 0;
+    snap.docs.forEach(d=>{
+      const c = d.data();
+      if(c.leadSource==='self') return; // own lead, not an assignment
+      const at = c.assignedAt && c.assignedAt.toMillis
+        ? c.assignedAt.toMillis()
+        : (c.assignedAt ? new Date(c.assignedAt).getTime() : 0);
+      if(!at) return; // no timestamp — skip
+      if(at > seenAt) unseen++;
+    });
+    const badge = document.getElementById('leadsBadge');
+    if(badge){
+      badge.textContent = unseen;
+      badge.style.display = unseen>0 ? '' : 'none';
+    }
+  }, err=>console.warn('leadsBadge', err && err.message));
+}
+
+// Stamp the Leads section as viewed so the badge count resets.
+async function markLeadsViewed(){
+  if(!currentUser || !currentUser.uid) return;
+  try{
+    const now = new Date();
+    await db.collection('users').doc(currentUser.uid).update({leadsLastViewedAt: now});
+    currentUser.leadsLastViewedAt = now;
+    const badge = document.getElementById('leadsBadge');
+    if(badge){ badge.textContent='0'; badge.style.display='none'; }
+  }catch(e){ console.warn('markLeadsViewed', e && e.message); }
+}
+
 function startMeetingTodoBadge(){
   // Red-dot badge on the Meeting Tracking nav item — counts open
   // (pending or in-progress) meeting to-dos assigned to the
@@ -11775,7 +11818,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-01';
+const APP_VERSION='2026-07-27-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13998,7 +14041,7 @@ function showView(v){
   if(v==='callLog') renderCallLogView();
   if(v==='tenantLease') renderTenantLeaseView();
   if(v==='available') renderAvailableView();
-  if(v==='leads') renderLeadsView();
+  if(v==='leads'){ renderLeadsView(); markLeadsViewed(); }
   if(v==='leasingDashboard') renderLeasingDashboardView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
