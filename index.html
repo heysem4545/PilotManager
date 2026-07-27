@@ -668,6 +668,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .diff-hard{color:var(--red)}
 .diff-long{color:#a78bfa}
 .diff-epic{color:#ec4899}
+/* Own Leads sub-tab hides columns that only make sense for
+   call-log-sourced leads (direction, reason, script, assigned by). */
+.leads-mode-own .lead-own-hide{display:none}
 .diff-none{color:var(--text)}
 .tm-task-input{background:var(--surface2);border:1px solid var(--border2);font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:5px 8px;border-radius:6px;transition:all .12s}
 .tm-task-input:focus{background:var(--surface3);border-color:var(--accent)}
@@ -11818,7 +11821,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-03';
+const APP_VERSION='2026-07-27-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14099,6 +14102,10 @@ function switchLeadsSubTab(sub){
 async function renderLeadsView(skipLoad){
   const el = document.getElementById('leadsView');
   if(!el) return;
+  // Toggle the own-mode class so the 4 own-lead-hide columns
+  // (Direction, Reason, Script, Assigned By) disappear via CSS
+  // without touching the row/header markup.
+  el.classList.toggle('leads-mode-own', leadsSubTab==='own');
   if(!skipLoad){
     el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
     await loadCallLog();
@@ -14203,9 +14210,9 @@ async function renderLeadsView(skipLoad){
       const assignedBy=c.createdBy||'';
       return `<tr data-lead-id="${c.id}">
         <td class="cl-date">${fmtCallDate(c.date)}</td>
-        <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction||'Inbound')}</span></td>
+        <td class="lead-own-hide"><span class="call-direction ${dirCls}">${escapeHtml(c.direction||'Inbound')}</span></td>
         <td class="cl-addr" title="${escapeAttr(c.propertyAddress||'')}">${addrDisp}</td>
-        <td class="cl-reason">${c.reason?escapeHtml(c.reason):'<span class="cl-empty-val">—</span>'}</td>
+        <td class="cl-reason lead-own-hide">${c.reason?escapeHtml(c.reason):'<span class="cl-empty-val">—</span>'}</td>
         <td><span class="call-status ${statusCls}"><span class="cs-dot"></span>${escapeHtml(statusKey)}</span></td>
         <td><input type="text" value="${escapeAttr(c.name||'')}" style="${is};width:100px" onblur="${uf('name')}"></td>
         <td><input type="tel" value="${escapeAttr(c.number||'')}" style="${isn};width:100px" onblur="${uf('number')}"></td>
@@ -14221,9 +14228,9 @@ async function renderLeadsView(skipLoad){
         <td><input type="text" value="${escapeAttr(c.howLongStayed||'')}" placeholder="⏳" style="${is};width:80px" onblur="${uf('howLongStayed')}"></td>
         <td><input type="date" value="${c.whenToMove||''}" style="${is};width:125px" onchange="${uf('whenToMove')}"></td>
         <td>${mkSel('showingPref',['','9-12','12-2','2-4','Evening'],c.showingPref)}</td>
-        <td style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('stepScript')}"></td>
+        <td class="lead-own-hide" style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('stepScript')}"></td>
         <td style="cursor:pointer" onclick="openLeadNote('${c.id}')" title="${escapeAttr(c.notes||'Click to edit')}">${notesPreview}</td>
-        <td style="font-size:11px;color:var(--muted)">${assignedBy?renderUserBadge(assignedBy):'<span class="cl-empty-val">—</span>'}</td>
+        <td class="lead-own-hide" style="font-size:11px;color:var(--muted)">${assignedBy?renderUserBadge(assignedBy):'<span class="cl-empty-val">—</span>'}</td>
         <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('followUp')}"></td>
         <td>${mkSel('proofVoucher',['','Received','No Proof'],c.proofVoucher)}</td>
         <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('proofNote')}"></td>
@@ -14268,16 +14275,16 @@ async function renderLeadsView(skipLoad){
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
           <thead>
           <tr>
-            <th colspan="22" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
+            <th colspan="${leadsSubTab==='own'?18:22}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
             <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
             <th colspan="8" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 4 — Screening</th>
             <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 5 — Move In</th>
           </tr>
           <tr>
-            <th>Date</th><th>Direction</th><th>Property</th><th>Reason</th><th>Status</th><th>Name</th><th>Number</th>
-            <th>✉ Email</th><th>🏠 Bedroom</th><th>💳 Tenant</th><th>📣 Source</th><th>⚖ Eviction</th><th>💲 Income</th><th>🐾 Pets</th><th>👨‍👩‍👧 Members</th><th>📝 Why Leaving</th><th>⏳ How Long</th><th>📅 Move Date</th><th>🕐 Showing</th><th>✅ Script</th>
-            <th>Notes</th><th>Assigned By</th>
+            <th>Date</th><th class="lead-own-hide">Direction</th><th>Property</th><th class="lead-own-hide">Reason</th><th>Status</th><th>Name</th><th>Number</th>
+            <th>✉ Email</th><th>🏠 Bedroom</th><th>💳 Tenant</th><th>📣 Source</th><th>⚖ Eviction</th><th>💲 Income</th><th>🐾 Pets</th><th>👨‍👩‍👧 Members</th><th>📝 Why Leaving</th><th>⏳ How Long</th><th>📅 Move Date</th><th>🕐 Showing</th><th class="lead-own-hide">✅ Script</th>
+            <th>Notes</th><th class="lead-own-hide">Assigned By</th>
             <th style="border-top:2px solid var(--blue)">🔄 Follow Up</th><th style="border-top:2px solid var(--blue)">📄 Proof</th><th style="border-top:2px solid var(--blue)">📝 Proof Note</th><th style="border-top:2px solid var(--blue)">🏠 Landlord</th><th style="border-top:2px solid var(--blue)">📞 Landlord #</th><th style="border-top:2px solid var(--blue)">💼 Work #</th><th style="border-top:2px solid var(--blue)">📊 Status</th>
             <th style="border-top:2px solid var(--purple)">💳 Tenant</th><th style="border-top:2px solid var(--purple)">🤳 Selfie</th><th style="border-top:2px solid var(--purple)">🕐 Arrival</th><th style="border-top:2px solid var(--purple)">📅 Appt Date</th><th style="border-top:2px solid var(--purple)">🕑 Appt Time</th><th style="border-top:2px solid var(--purple)">📞 Verify</th><th style="border-top:2px solid var(--purple)">🏠 Showing</th><th style="border-top:2px solid var(--purple)">💬 Comments</th>
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🔍 Turbo</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">📝 Notes</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🚀 Forward</th>
