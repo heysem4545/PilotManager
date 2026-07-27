@@ -666,6 +666,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .diff-easy{color:#4ade80}
 .diff-medium{color:var(--amber)}
 .diff-hard{color:var(--red)}
+.diff-q4{color:#a78bfa}
+.diff-q5{color:#ec4899}
 .diff-none{color:var(--text)}
 .tm-task-input{background:var(--surface2);border:1px solid var(--border2);font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:5px 8px;border-radius:6px;transition:all .12s}
 .tm-task-input:focus{background:var(--surface3);border-color:var(--accent)}
@@ -10347,8 +10349,23 @@ function tmMonthKey(y,m){return `tm-${y}-${String(m+1).padStart(2,'0')}`;}
 function tmActiveKey(){return tmMonthKey(tmYear,tmMonth);}
 
 const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DIFF_LABELS={easy:'Easy',medium:'Medium',hard:'Hard'};
-const DIFF_PTS={easy:1,medium:2,hard:3};
+// Difficulty scale is time-based:
+//   easy   = 0–5 min  (1 pt)
+//   medium = 5–15 min (2 pts)
+//   hard   = 15–30 min (3 pts)
+//   q4     = 30–60 min (4 pts) — new
+//   q5     = 60 min+   (5 pts) — new
+// Legacy keys (easy/medium/hard) preserved so historical task
+// docs continue to award the right points without a migration.
+const DIFF_LABELS={easy:'0–5 min',medium:'5–15 min',hard:'15–30 min',q4:'30–60 min',q5:'60 min+'};
+const DIFF_PTS={easy:1,medium:2,hard:3,q4:4,q5:5};
+const DIFF_OPTIONS=[
+  {v:'easy',   pts:1, label:'🟢 0–5 min (1 pt)'},
+  {v:'medium', pts:2, label:'🟡 5–15 min (2 pts)'},
+  {v:'hard',   pts:3, label:'🔴 15–30 min (3 pts)'},
+  {v:'q4',     pts:4, label:'🟣 30–60 min (4 pts)'},
+  {v:'q5',     pts:5, label:'🌸 60 min+ (5 pts)'}
+];
 const STATUS_LABELS={notstarted:'Not Started',progressing:'Progressing',done:'Done'};
 
 function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate();}
@@ -10533,8 +10550,14 @@ async function autoLogToDailyLog(uid, taskText, day){
 async function openTmPointsBreakdown(uid, name){
   const key = tmActiveKey();
   const tasks = await loadTasksForKey(key, uid);
-  const DIFF_LABELS_LOCAL = {easy:'🟢 Easy (1)', medium:'🟡 Medium (2)', hard:'🔴 Hard (3)'};
-  const buckets = {easy:[], medium:[], hard:[], noDiff:[], emptyText:[]};
+  const DIFF_LABELS_LOCAL = {
+    easy:'🟢 0–5 min (1)',
+    medium:'🟡 5–15 min (2)',
+    hard:'🔴 15–30 min (3)',
+    q4:'🟣 30–60 min (4)',
+    q5:'🌸 60 min+ (5)'
+  };
+  const buckets = {easy:[], medium:[], hard:[], q4:[], q5:[], noDiff:[], emptyText:[]};
   let ptsTotal = 0;
   Object.entries(tasks).forEach(([day, rows])=>{
     rows.forEach(t=>{
@@ -10561,6 +10584,8 @@ async function openTmPointsBreakdown(uid, name){
   modal.innerHTML=`<div class="modal" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
     <div class="modal-title"><span>🔍 Points Breakdown — ${escapeHtml(name)}</span><button class="modal-close" onclick="document.getElementById('tmPtsBreakdownModal').remove()">×</button></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${MNAMES_FULL[tmMonth]} ${tmYear} · Total earned: <strong style="color:var(--accent)">${ptsTotal} pts</strong></div>
+    ${rowList(buckets.q5, 5, DIFF_LABELS_LOCAL.q5)}
+    ${rowList(buckets.q4, 4, DIFF_LABELS_LOCAL.q4)}
     ${rowList(buckets.hard, 3, DIFF_LABELS_LOCAL.hard)}
     ${rowList(buckets.medium, 2, DIFF_LABELS_LOCAL.medium)}
     ${rowList(buckets.easy, 1, DIFF_LABELS_LOCAL.easy)}
@@ -10691,9 +10716,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       `:`
       <select class="tm-diff-sel ${diffClass}" onchange="onTmDiff(${day},${i},this)" style="cursor:pointer">
         <option value="" ${!t.diff?'selected':''}>Difficulty</option>
-        <option value="easy" ${t.diff==='easy'?'selected':''}>🟢 Easy (1pt)</option>
-        <option value="medium" ${t.diff==='medium'?'selected':''}>🟡 Medium (2pt)</option>
-        <option value="hard" ${t.diff==='hard'?'selected':''}>🔴 Hard (3pt)</option>
+        ${DIFF_OPTIONS.map(o=>`<option value="${o.v}" ${t.diff===o.v?'selected':''}>${o.label}</option>`).join('')}
       </select>
       <div style="display:flex;align-items:center;gap:3px;min-width:0"
         onmouseenter="showTaskNoteTip(this.querySelector('input').value,this)"
@@ -10975,9 +10998,7 @@ function tmAddRow(day){
     div.innerHTML=`
       <select class="tm-diff-sel diff-none" onchange="onTmDiff(${d},${newIdx},this)" style="cursor:pointer">
         <option value="">Difficulty</option>
-        <option value="easy">🟢 Easy (1pt)</option>
-        <option value="medium">🟡 Medium (2pt)</option>
-        <option value="hard">🔴 Hard (3pt)</option>
+        ${DIFF_OPTIONS.map(o=>`<option value="${o.v}">${o.label}</option>`).join('')}
       </select>
       <div style="display:flex;align-items:center;gap:3px;min-width:0">
         <input class="tm-task-input" value="" placeholder="Add task..."
@@ -11595,9 +11616,7 @@ async function renderRecurringTab(baseHtml, el, tabs){
       </div>
       <div class="fg"><label>Difficulty</label>
         <select id="recDiff" style="font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:100%">
-          <option value="easy" selected>🟢 Easy (1 pt)</option>
-          <option value="medium">🟡 Medium (2 pts)</option>
-          <option value="hard">🔴 Hard (3 pts)</option>
+          ${DIFF_OPTIONS.map(o=>`<option value="${o.v}" ${o.v==='easy'?'selected':''}>${o.label}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -11614,7 +11633,8 @@ async function renderRecurringTab(baseHtml, el, tabs){
     html+=`<div style="padding:40px;text-align:center;color:var(--muted)">No recurring tasks yet. Create one above.</div>`;
   } else {
     rules.forEach(r=>{
-      const diffBadge=r.diff==='hard'?'🔴 Hard (3pts)':r.diff==='easy'?'🟢 Easy (1pt)':'🟡 Medium (2pts)';
+      const diffOpt=(typeof DIFF_OPTIONS!=='undefined')?DIFF_OPTIONS.find(o=>o.v===r.diff):null;
+      const diffBadge=diffOpt?diffOpt.label:(r.diff?DIFF_LABELS[r.diff]||r.diff:'🟡 5–15 min (2 pts)');
       const assignLabel=r.isGroup?'👥 Group Task':escapeHtml(r.assignedName||'Unknown');
       const statusColor=r.active?'var(--accent)':'var(--muted)';
       const statusText=r.active?'Active':'Paused';
@@ -11754,7 +11774,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-26-02';
+const APP_VERSION='2026-07-26-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
