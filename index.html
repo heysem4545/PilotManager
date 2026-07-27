@@ -10524,6 +10524,55 @@ async function autoLogToDailyLog(uid, taskText, day){
   }catch(e){console.warn('autoLogToDailyLog',e);}
 }
 
+// Admin drill-down: click a name on the Team Overview leaderboard
+// to see exactly which tasks earned points, plus how many 'done'
+// rows had no difficulty (0 pts) or no task text (uncounted).
+// Helps explain a total that doesn't match the visible calendar
+// at a glance — usually old rows where status='done' persisted
+// after the task text was cleared.
+async function openTmPointsBreakdown(uid, name){
+  const key = tmActiveKey();
+  const tasks = await loadTasksForKey(key, uid);
+  const DIFF_LABELS_LOCAL = {easy:'🟢 Easy (1)', medium:'🟡 Medium (2)', hard:'🔴 Hard (3)'};
+  const buckets = {easy:[], medium:[], hard:[], noDiff:[], emptyText:[]};
+  let ptsTotal = 0;
+  Object.entries(tasks).forEach(([day, rows])=>{
+    rows.forEach(t=>{
+      if(t.status!=='done') return;
+      const hasText = t.task && String(t.task).trim();
+      if(!hasText){ buckets.emptyText.push({day, task:'(no task text)', diff:t.diff||''}); return; }
+      if(!t.diff || !DIFF_PTS[t.diff]){ buckets.noDiff.push({day, task:t.task, diff:''}); return; }
+      buckets[t.diff].push({day, task:t.task, diff:t.diff});
+      ptsTotal += DIFF_PTS[t.diff];
+    });
+  });
+  const rowList = (arr, ptsEach, label) => `<details ${arr.length>0?'open':''} style="margin-bottom:8px">
+    <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:6px 0">${label} — ${arr.length} row${arr.length===1?'':'s'}${ptsEach!=null?` · <span style="color:var(--accent)">${arr.length*ptsEach} pts</span>`:' <span style="color:var(--muted2)">· 0 pts</span>'}</summary>
+    <div style="padding:4px 0 4px 12px;font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:2px">
+      ${arr.length===0?'<div style="color:var(--muted2)">None</div>':arr.map(r=>`<div>• Day ${r.day} — <span style="color:var(--text)">${escapeHtml(r.task)}</span></div>`).join('')}
+    </div>
+  </details>`;
+  const existing=document.getElementById('tmPtsBreakdownModal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.className='overlay open';
+  modal.id='tmPtsBreakdownModal';
+  modal.onclick=e=>{if(e.target===modal) modal.remove();};
+  modal.innerHTML=`<div class="modal" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="modal-title"><span>🔍 Points Breakdown — ${escapeHtml(name)}</span><button class="modal-close" onclick="document.getElementById('tmPtsBreakdownModal').remove()">×</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${MNAMES_FULL[tmMonth]} ${tmYear} · Total earned: <strong style="color:var(--accent)">${ptsTotal} pts</strong></div>
+    ${rowList(buckets.hard, 3, DIFF_LABELS_LOCAL.hard)}
+    ${rowList(buckets.medium, 2, DIFF_LABELS_LOCAL.medium)}
+    ${rowList(buckets.easy, 1, DIFF_LABELS_LOCAL.easy)}
+    ${rowList(buckets.noDiff, 0, '✓ Done without a difficulty selected')}
+    ${buckets.emptyText.length ? rowList(buckets.emptyText, 0, '⚠ Done rows with no task text (not counted at all)') : ''}
+    <div class="modal-foot">
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('tmPtsBreakdownModal').remove()">Close</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
 function calcStats(tasks){
   // A row only counts when the task text is filled. Points are only
   // awarded when the row is (a) marked done and (b) has a real
@@ -11165,11 +11214,11 @@ async function renderTasksView(){
       ${lbData.map((u,i)=>{
         const col=userColor(u.uid);
         const initials=u.name?u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?';
-        return `<div class="tm-lb-row">
+        return `<div class="tm-lb-row" style="cursor:pointer" title="Click to see how ${escapeAttr(u.name)}'s points break down" onclick="openTmPointsBreakdown('${u.uid}','${escapeAttr(u.name||u.email||'')}')">
           <div class="tm-lb-rank ${rankClass[i]||''}">${rankEmojis[i]||i+1}</div>
           <div class="tm-lb-avatar" style="background:${col}22;color:${col}">${initials}</div>
           <div class="tm-lb-info">
-            <div class="tm-lb-name">${u.name}</div>
+            <div class="tm-lb-name">${u.name} <span style="font-size:10px;color:var(--muted2);font-weight:400">🔍</span></div>
             <div class="tm-lb-sub">${u.stats.done}/${u.stats.total} tasks completed</div>
           </div>
           <div class="tm-lb-bar"><div class="tm-lb-bar-fill" style="width:${maxPts>0?Math.round(u.stats.pts/maxPts*100):0}%;background:${col}"></div></div>
@@ -11705,7 +11754,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-26-01';
+const APP_VERSION='2026-07-26-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
