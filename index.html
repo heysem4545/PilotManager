@@ -11818,7 +11818,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-02';
+const APP_VERSION='2026-07-27-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14136,11 +14136,22 @@ async function renderLeadsView(skipLoad){
   const callLogLeads = userAllLeads.filter(c => c.leadSource !== 'self');
   const ownLeads     = userAllLeads.filter(c => c.leadSource === 'self');
 
-  // Sub-tab bar (Call Log vs Own Leads). Always visible.
+  // How many of the active user's leads have an appointment date
+  // — used to badge the Calendar tab so it hints at scheduled work.
+  const apptLeadsCount = userAllLeads.filter(c => c.appointmentDate).length;
+
+  // Sub-tab bar (Call Log vs Own Leads vs Calendar). Always visible.
   const subTabBar = `<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">
     <button class="ftab ${leadsSubTab==='callLog'?'active':''}" onclick="switchLeadsSubTab('callLog')">📞 From Call Log${callLogLeads.length?' ('+callLogLeads.length+')':''}</button>
     <button class="ftab ${leadsSubTab==='own'?'active':''}" onclick="switchLeadsSubTab('own')">🎯 Own Leads${ownLeads.length?' ('+ownLeads.length+')':''}</button>
+    <button class="ftab ${leadsSubTab==='calendar'?'active':''}" onclick="switchLeadsSubTab('calendar')">📅 Calendar${apptLeadsCount?' ('+apptLeadsCount+')':''}</button>
   </div>`;
+
+  // Calendar sub-tab short-circuits the rest of the render.
+  if(leadsSubTab === 'calendar'){
+    el.innerHTML = tabBar + subTabBar + renderLeadsCalendarBody(userAllLeads, activeUid, activeFirst);
+    return;
+  }
 
   const myLeads = leadsSubTab === 'own' ? ownLeads : callLogLeads;
 
@@ -14190,7 +14201,7 @@ async function renderLeadsView(skipLoad){
       const addrDisp=c.propertyAddress?escapeHtml(c.propertyAddress):'<span class="cl-empty-val">—</span>';
       const notesPreview=c.notes?escapeHtml(c.notes.split(/\s+/).slice(0,3).join(' '))+(c.notes.split(/\s+/).length>3?'…':''):'<span class="cl-empty-val">—</span>';
       const assignedBy=c.createdBy||'';
-      return `<tr>
+      return `<tr data-lead-id="${c.id}">
         <td class="cl-date">${fmtCallDate(c.date)}</td>
         <td><span class="call-direction ${dirCls}">${escapeHtml(c.direction||'Inbound')}</span></td>
         <td class="cl-addr" title="${escapeAttr(c.propertyAddress||'')}">${addrDisp}</td>
@@ -14277,6 +14288,156 @@ async function renderLeadsView(skipLoad){
         </table>
       </div>
     </div>`;
+}
+
+// Month-picker state for the Leads Calendar sub-tab. Kept module-
+// level so a user can bounce between users / sub-tabs and land
+// back on the month they were looking at.
+let leadsCalMonth = new Date().getMonth();
+let leadsCalYear = new Date().getFullYear();
+
+function leadsCalNav(delta){
+  leadsCalMonth += delta;
+  if(leadsCalMonth < 0){ leadsCalMonth = 11; leadsCalYear--; }
+  else if(leadsCalMonth > 11){ leadsCalMonth = 0; leadsCalYear++; }
+  renderLeadsView(true);
+}
+
+function leadsCalToday(){
+  const now = new Date();
+  leadsCalMonth = now.getMonth();
+  leadsCalYear = now.getFullYear();
+  renderLeadsView(true);
+}
+
+// Build the calendar body for the Leads section. Renders a
+// standard month grid + a right-hand list of every appointment in
+// the active month. Each entry links back to the lead's row on the
+// Call Log tab.
+function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
+  const MNAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DNAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const y = leadsCalYear, m = leadsCalMonth;
+  const monthKey = `${y}-${String(m+1).padStart(2,'0')}`;
+
+  // Filter to leads whose appointmentDate lands in this month.
+  const monthLeads = userLeads.filter(c => {
+    const d = c.appointmentDate || '';
+    return typeof d === 'string' && d.slice(0,7) === monthKey;
+  });
+  // Group by day-of-month.
+  const byDay = {};
+  monthLeads.forEach(c => {
+    const day = parseInt((c.appointmentDate||'').slice(8,10), 10);
+    if(!day) return;
+    (byDay[day] = byDay[day] || []).push(c);
+  });
+  // Sort each day's list by time.
+  Object.values(byDay).forEach(list => list.sort((a,b) => (a.appointmentTime||'').localeCompare(b.appointmentTime||'')));
+
+  // Grid geometry.
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const firstDow = new Date(y, m, 1).getDay();
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear()===y && today.getMonth()===m;
+  const todayDate = today.getDate();
+
+  const fmtTime = t => {
+    if(!t || !/^\d{2}:\d{2}/.test(t)) return '';
+    const [hh, mm] = t.split(':').map(x => parseInt(x,10));
+    const ap = hh >= 12 ? 'PM' : 'AM';
+    const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+    return `${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+  };
+
+  const openLeadFromCalendar = id => `openLeadFromCalendar('${id}')`;
+
+  // Left side — calendar grid.
+  let grid = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px">`;
+  DNAMES.forEach(d => { grid += `<div style="text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding:4px">${d}</div>`; });
+  for(let i=0; i<firstDow; i++) grid += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const items = byDay[d] || [];
+    const isToday = isCurrentMonth && d===todayDate;
+    const hasItems = items.length > 0;
+    const border = isToday
+      ? 'border:2px solid var(--accent)'
+      : hasItems
+        ? 'border:1px solid rgba(167,139,250,.35)'
+        : 'border:1px solid var(--border)';
+    const bg = hasItems ? 'rgba(167,139,250,.06)' : 'var(--surface)';
+    grid += `<div style="background:${bg};${border};border-radius:8px;padding:6px;min-height:88px;font-size:10px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'};font-size:11px">${d}</span>
+        ${hasItems?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700">${items.length}</span>`:''}
+      </div>
+      ${items.slice(0,3).map(c => `<div onclick="${openLeadFromCalendar(c.id)}" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(167,139,250,.12);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr((c.name||'Lead')+' — '+fmtTime(c.appointmentTime))}">
+        <span style="color:#a78bfa;font-weight:600">${escapeHtml(fmtTime(c.appointmentTime)||'—')}</span> ${escapeHtml(c.name||'Lead')}
+      </div>`).join('')}
+      ${items.length>3?`<div style="font-size:9px;color:var(--muted);padding-left:4px">+${items.length-3} more</div>`:''}
+    </div>`;
+  }
+  grid += `</div>`;
+
+  // Right side — flat list of every appointment in this month.
+  const list = monthLeads.length===0
+    ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No appointments this month.</div>`
+    : monthLeads
+        .slice()
+        .sort((a,b) => (a.appointmentDate||'').localeCompare(b.appointmentDate||'') || (a.appointmentTime||'').localeCompare(b.appointmentTime||''))
+        .map(c => {
+          const d = new Date((c.appointmentDate||'')+'T00:00:00');
+          const isTodayItem = !isNaN(d) && d.toDateString()===today.toDateString();
+          const isPast = !isNaN(d) && d < new Date(today.toDateString());
+          const propLabel = c.property || c.propertyAddress || '';
+          return `<div onclick="${openLeadFromCalendar(c.id)}" style="display:flex;gap:10px;padding:8px 10px;border:1px solid var(--border2);border-left:3px solid ${isTodayItem?'var(--accent)':isPast?'var(--muted2)':'#a78bfa'};border-radius:6px;margin-bottom:6px;cursor:pointer;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+            <div style="min-width:52px;text-align:center;padding-top:2px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${DNAMES[d.getDay()]||''}</div>
+              <div style="font-size:16px;font-weight:700;color:${isTodayItem?'var(--accent)':'var(--text)'};line-height:1">${d.getDate()||'—'}</div>
+              <div style="font-size:9px;color:var(--muted);margin-top:1px">${fmtTime(c.appointmentTime)||''}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.name||'(no name)')}</div>
+              ${propLabel?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🏠 ${escapeHtml(propLabel)}</div>`:''}
+              ${c.number?`<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px">📞 ${escapeHtml(c.number)}</div>`:''}
+            </div>
+          </div>`;
+        }).join('');
+
+  return `<div class="table-card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(-1)" style="padding:4px 10px">‹</button>
+      <div style="font-size:15px;font-weight:700;color:var(--text);min-width:150px;text-align:center">${MNAMES[m]} ${y}</div>
+      <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(1)" style="padding:4px 10px">›</button>
+      <button class="btn btn-ghost btn-sm" onclick="leadsCalToday()" style="padding:4px 12px;font-size:11px">Today</button>
+      <div style="flex:1"></div>
+      <div style="font-size:11px;color:var(--muted)">${monthLeads.length} appointment${monthLeads.length===1?'':'s'} · ${escapeHtml(activeFirst||'—')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start">
+      <div>${grid}</div>
+      <div style="max-height:640px;overflow-y:auto;padding-right:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📌 All Appointments This Month</div>
+        ${list}
+      </div>
+    </div>
+  </div>`;
+}
+
+// Jump from a calendar entry back to the corresponding lead row on
+// the Call Log sub-tab, then scroll it into view + flash the row.
+function openLeadFromCalendar(callId){
+  leadsSubTab = 'callLog';
+  renderLeadsView(true);
+  setTimeout(()=>{
+    const row = document.querySelector(`#leadsView tr[data-lead-id="${callId}"]`);
+    if(row){
+      row.scrollIntoView({behavior:'smooth', block:'center'});
+      row.style.transition='background .3s';
+      const orig = row.style.background;
+      row.style.background='rgba(167,139,250,.25)';
+      setTimeout(()=>{ row.style.background=orig||''; }, 1600);
+    }
+  }, 120);
 }
 
 async function updateLeadField(callId, field, value){
