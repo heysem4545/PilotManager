@@ -666,8 +666,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .diff-easy{color:#4ade80}
 .diff-medium{color:var(--amber)}
 .diff-hard{color:var(--red)}
-.diff-q4{color:#a78bfa}
-.diff-q5{color:#ec4899}
+.diff-long{color:#a78bfa}
+.diff-epic{color:#ec4899}
 .diff-none{color:var(--text)}
 .tm-task-input{background:var(--surface2);border:1px solid var(--border2);font-size:12px;color:var(--text);font-family:var(--font);outline:none;width:100%;min-width:0;flex:1;padding:5px 8px;border-radius:6px;transition:all .12s}
 .tm-task-input:focus{background:var(--surface3);border-color:var(--accent)}
@@ -10349,22 +10349,23 @@ function tmMonthKey(y,m){return `tm-${y}-${String(m+1).padStart(2,'0')}`;}
 function tmActiveKey(){return tmMonthKey(tmYear,tmMonth);}
 
 const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-// Difficulty scale is time-based:
-//   easy   = 0–5 min  (1 pt)
+// Difficulty scale is time-based. Legacy keys (easy/medium/hard)
+// preserved so historical task docs continue to award the right
+// points; the two new tiers use plain english adjectives that fit
+// the same convention.
+//   easy = 0–5 min   (1 pt)
 //   medium = 5–15 min (2 pts)
 //   hard   = 15–30 min (3 pts)
-//   q4     = 30–60 min (4 pts) — new
-//   q5     = 60 min+   (5 pts) — new
-// Legacy keys (easy/medium/hard) preserved so historical task
-// docs continue to award the right points without a migration.
-const DIFF_LABELS={easy:'0–5 min',medium:'5–15 min',hard:'15–30 min',q4:'30–60 min',q5:'60 min+'};
-const DIFF_PTS={easy:1,medium:2,hard:3,q4:4,q5:5};
+//   long   = 30–60 min (4 pts)
+//   epic   = 60 min+   (5 pts)
+const DIFF_LABELS={easy:'0–5 min',medium:'5–15 min',hard:'15–30 min',long:'30–60 min',epic:'60 min+'};
+const DIFF_PTS={easy:1,medium:2,hard:3,long:4,epic:5};
 const DIFF_OPTIONS=[
   {v:'easy',   pts:1, label:'🟢 0–5 min (1 pt)'},
   {v:'medium', pts:2, label:'🟡 5–15 min (2 pts)'},
   {v:'hard',   pts:3, label:'🔴 15–30 min (3 pts)'},
-  {v:'q4',     pts:4, label:'🟣 30–60 min (4 pts)'},
-  {v:'q5',     pts:5, label:'🌸 60 min+ (5 pts)'}
+  {v:'long',   pts:4, label:'🟣 30–60 min (4 pts)'},
+  {v:'epic',   pts:5, label:'🌸 60 min+ (5 pts)'}
 ];
 const STATUS_LABELS={notstarted:'Not Started',progressing:'Progressing',done:'Done'};
 
@@ -10554,10 +10555,10 @@ async function openTmPointsBreakdown(uid, name){
     easy:'🟢 0–5 min (1)',
     medium:'🟡 5–15 min (2)',
     hard:'🔴 15–30 min (3)',
-    q4:'🟣 30–60 min (4)',
-    q5:'🌸 60 min+ (5)'
+    long:'🟣 30–60 min (4)',
+    epic:'🌸 60 min+ (5)'
   };
-  const buckets = {easy:[], medium:[], hard:[], q4:[], q5:[], noDiff:[], emptyText:[]};
+  const buckets = {easy:[], medium:[], hard:[], long:[], epic:[], noDiff:[], emptyText:[]};
   let ptsTotal = 0;
   Object.entries(tasks).forEach(([day, rows])=>{
     rows.forEach(t=>{
@@ -10584,8 +10585,8 @@ async function openTmPointsBreakdown(uid, name){
   modal.innerHTML=`<div class="modal" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
     <div class="modal-title"><span>🔍 Points Breakdown — ${escapeHtml(name)}</span><button class="modal-close" onclick="document.getElementById('tmPtsBreakdownModal').remove()">×</button></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${MNAMES_FULL[tmMonth]} ${tmYear} · Total earned: <strong style="color:var(--accent)">${ptsTotal} pts</strong></div>
-    ${rowList(buckets.q5, 5, DIFF_LABELS_LOCAL.q5)}
-    ${rowList(buckets.q4, 4, DIFF_LABELS_LOCAL.q4)}
+    ${rowList(buckets.epic, 5, DIFF_LABELS_LOCAL.epic)}
+    ${rowList(buckets.long, 4, DIFF_LABELS_LOCAL.long)}
     ${rowList(buckets.hard, 3, DIFF_LABELS_LOCAL.hard)}
     ${rowList(buckets.medium, 2, DIFF_LABELS_LOCAL.medium)}
     ${rowList(buckets.easy, 1, DIFF_LABELS_LOCAL.easy)}
@@ -11774,7 +11775,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-26-03';
+const APP_VERSION='2026-07-26-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
