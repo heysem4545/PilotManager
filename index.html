@@ -11868,7 +11868,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-03';
+const APP_VERSION='2026-07-28-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15151,6 +15151,23 @@ async function updateAvailablePendingNote(propId, note){
   }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
+// Generic per-field saver for the Pending Rent Houses tab (tenant
+// name, phone, deposit, type, package-sent date, utility account
+// numbers, screening note, etc.). All fields live on the property
+// doc under `pendingRent*` keys so they travel with the property.
+async function updateAvailablePendingField(propId, field, value){
+  if(!canEdit()) return;
+  const p = properties.find(x=>x.id===propId);
+  if(!p) return;
+  const allowed = ['pendingRentTenantName','pendingRentTenantPhone','pendingRentDeposit','pendingRentType','pendingRentPackageDate','pendingRentElectric','pendingRentGas','pendingRentScreeningNote','pendingRentNote'];
+  if(!allowed.includes(field)) return;
+  const v = value == null ? '' : value;
+  try{
+    await db.collection('properties').doc(propId).update({[field]:v, updatedAt:new Date()});
+    p[field] = v;
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+}
+
 function renderAvailableView(){
   const el = document.getElementById('availableView');
   const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -15204,16 +15221,46 @@ function renderAvailableView(){
 
   // Pending Rent tab short-circuits the rest of the render.
   if(availableTab === 'pending'){
+    // Small factories for the per-cell editable inputs so the row
+    // template below stays readable.
+    const textCell = (p, field, placeholder, width) => {
+      const v = p[field] || '';
+      if(!editable) return `<span style="font-size:11px;color:var(--text)">${escapeHtml(v||'—')}</span>`;
+      return `<input type="text" value="${escapeAttr(v)}" placeholder="${placeholder}" onblur="updateAvailablePendingField('${p.id}','${field}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:${width||'100%'};min-width:${width||'110px'}">`;
+    };
+    const moneyCell = (p, field, placeholder) => {
+      const v = p[field] || '';
+      if(!editable) return `<span style="font-size:11px;color:var(--text);font-family:var(--mono)">${escapeHtml(v||'—')}</span>`;
+      return `<input type="text" inputmode="decimal" value="${escapeAttr(v)}" placeholder="${placeholder}" onblur="updateAvailablePendingField('${p.id}','${field}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--mono);outline:none;width:90px;text-align:right">`;
+    };
+    const dateCell = (p, field) => {
+      const v = p[field] || '';
+      if(!editable) return `<span style="font-size:11px;color:var(--text)">${escapeHtml(v||'—')}</span>`;
+      return `<input type="date" value="${escapeAttr(v)}" onchange="updateAvailablePendingField('${p.id}','${field}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:135px">`;
+    };
+    const typeCell = (p) => {
+      const v = p.pendingRentType || '';
+      if(!editable){
+        if(!v) return '<span style="color:var(--muted2);font-size:11px">—</span>';
+        const c = v==='CMHA' ? '#60a5fa' : v==='Cash' ? '#4ade80' : '#9ca3af';
+        return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${c}1F;border:1px solid ${c}55;color:${c};font-weight:700;font-size:11px">${escapeHtml(v)}</span>`;
+      }
+      return `<select onchange="updateAvailablePendingField('${p.id}','pendingRentType',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:100px">
+        <option value=""${v?'':' selected'}>—</option>
+        <option value="Cash"${v==='Cash'?' selected':''}>Cash</option>
+        <option value="CMHA"${v==='CMHA'?' selected':''}>CMHA</option>
+        <option value="Mixed"${v==='Mixed'?' selected':''}>Mixed</option>
+      </select>`;
+    };
+
+    const COLSPAN = 16;
     const pendingRows = pendingList.length === 0
-      ? `<tbody><tr><td colspan="7"><div style="padding:40px 20px;text-align:center;color:var(--muted)">
+      ? `<tbody><tr><td colspan="${COLSPAN}"><div style="padding:40px 20px;text-align:center;color:var(--muted)">
           <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">🕐 No pending-rent houses yet</div>
           On the Available Units tab, click the ✓ in the <strong>Pending</strong> column of any row to move it here.
         </div></td></tr></tbody>`
       : '<tbody>' + pendingList.map(p => {
           const mp = getMonthProp(p);
-          const noteInput = editable
-            ? `<input type="text" value="${escapeAttr(p.pendingRentNote||'')}" placeholder="Deposit paid · CMHA packet mailed · waiting on…" onblur="updateAvailablePendingNote('${p.id}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:100%">`
-            : `<span style="font-size:11px;color:var(--text)">${escapeHtml(p.pendingRentNote||'—')}</span>`;
           const removeBtn = editable
             ? `<button title="Remove from Pending Rent" onclick="toggleAvailablePending('${p.id}',false)" style="background:none;border:1px solid rgba(245,112,106,.45);color:var(--red);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">✕ Remove</button>`
             : '';
@@ -15224,7 +15271,15 @@ function renderAvailableView(){
             <td style="text-align:center">${pill(p.bath, BA_COLORS, ' BA')}</td>
             <td class="money" style="font-family:var(--mono);text-align:right">${mp.cmha ? fmt(mp.cmha) : '<span style="color:var(--muted2)">—</span>'}</td>
             <td class="money" style="font-family:var(--mono);text-align:right">${mp.tenantPortion ? fmt(mp.tenantPortion) : '<span style="color:var(--muted2)">—</span>'}</td>
-            <td>${noteInput}</td>
+            <td>${textCell(p,'pendingRentTenantName','Tenant name','140px')}</td>
+            <td>${textCell(p,'pendingRentTenantPhone','555-555-5555','130px')}</td>
+            <td style="text-align:right">${moneyCell(p,'pendingRentDeposit','$0')}</td>
+            <td style="text-align:center">${typeCell(p)}</td>
+            <td>${dateCell(p,'pendingRentPackageDate')}</td>
+            <td>${textCell(p,'pendingRentElectric','Acct #','120px')}</td>
+            <td>${textCell(p,'pendingRentGas','Acct #','120px')}</td>
+            <td>${textCell(p,'pendingRentScreeningNote','Screening note','160px')}</td>
+            <td>${textCell(p,'pendingRentNote','General note','160px')}</td>
             <td style="text-align:center">${removeBtn}</td>
           </tr>`;
         }).join('') + '</tbody>';
@@ -15234,15 +15289,23 @@ function renderAvailableView(){
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
         <strong style="color:var(--text)">${pendingList.length}</strong> pending-rent house${pendingList.length===1?'':'s'} · Someone has committed but paperwork/deposit/etc. is still in progress.
       </div>
-      <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">
+      <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;min-width:2100px">
         <thead><tr>
           <th style="width:130px">Status</th>
-          <th>Address</th>
-          <th style="text-align:center;width:90px">Bedroom</th>
-          <th style="text-align:center;width:90px">Bath</th>
-          <th style="text-align:right;width:120px">CMHA Rent</th>
-          <th style="text-align:right;width:120px">Tenant Rent</th>
-          <th>📝 Pending Note</th>
+          <th style="min-width:180px">Address</th>
+          <th style="text-align:center;width:80px">BR</th>
+          <th style="text-align:center;width:80px">BA</th>
+          <th style="text-align:right;width:100px">CMHA Rent</th>
+          <th style="text-align:right;width:100px">Tenant Rent</th>
+          <th style="min-width:150px">👤 Tenant Name</th>
+          <th style="min-width:140px">📞 Tenant #</th>
+          <th style="text-align:right;width:110px">💵 Deposit</th>
+          <th style="text-align:center;width:110px">🏷 Type</th>
+          <th style="width:150px">📦 Package Sent</th>
+          <th style="min-width:130px">⚡ Electric #</th>
+          <th style="min-width:130px">🔥 Gas #</th>
+          <th style="min-width:170px">🔍 Screening Note</th>
+          <th style="min-width:170px">📝 Note</th>
           <th style="width:110px;text-align:center"></th>
         </tr></thead>
         ${pendingRows}
