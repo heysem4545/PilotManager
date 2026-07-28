@@ -11829,7 +11829,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-16';
+const APP_VERSION='2026-07-27-17';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -17474,9 +17474,25 @@ async function deleteMeetingFromLog(){
 // ─────────────────────────────────────────────
 let callLogData = [];
 let callLogSearch = '';
+let callLogPage = 1;
+let callLogPageSize = 50;
+
+function setCallLogPage(p){
+  callLogPage = Math.max(1, p);
+  renderCallLogView(true);
+  // Keep the user at the top of the freshly-rendered rows.
+  const wrap = document.querySelector('#callLogView .tbl-wrap');
+  if(wrap) wrap.scrollTop = 0;
+}
+function setCallLogPageSize(sz){
+  callLogPageSize = parseInt(sz,10) || 50;
+  callLogPage = 1;
+  renderCallLogView(true);
+}
 
 function setCallLogSearch(v){
   callLogSearch = v;
+  callLogPage = 1;
   renderCallLogView(true);
   // Re-render replaces the input element; refocus and put the cursor at the end
   // so typing keeps flowing without the user noticing.
@@ -17608,13 +17624,21 @@ async function renderCallLogView(skipLoad){
     return hay.includes(q);
   }) : callLogData;
 
+  // Pagination — slice down to the current page's rows only.
+  // Renders 50 rows by default so 500+ calls don't build 500×40
+  // DOM nodes on every open.
+  const totalPages = Math.max(1, Math.ceil(filteredCalls.length / callLogPageSize));
+  if(callLogPage > totalPages) callLogPage = totalPages;
+  const pageStart = (callLogPage - 1) * callLogPageSize;
+  const pageRows = filteredCalls.slice(pageStart, pageStart + callLogPageSize);
+
   let body;
   if(callLogData.length === 0){
     body = `<tbody><tr><td colspan="50"><div class="call-empty"><div class="call-empty-title">No calls logged yet</div>Click "+ Add Call" to log the first call.</div></td></tr></tbody>`;
   } else if(filteredCalls.length === 0){
     body = `<tbody><tr><td colspan="50"><div class="call-empty"><div class="call-empty-title">No matches for "${escapeHtml(callLogSearch)}"</div>Try a different search term, or clear the box to see all calls.</div></td></tr></tbody>`;
   } else {
-    body = '<tbody>' + filteredCalls.map(c => {
+    body = '<tbody>' + pageRows.map(c => {
       const dirCls = (c.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
       const statusKey = (c.status || 'Completed');
       const statusCls = statusKey === 'Needs Attention' ? 'needs-attention'
@@ -17674,7 +17698,7 @@ async function renderCallLogView(skipLoad){
       return `<tr>
         <td><input type="date" value="${c.date||''}" style="${is};width:125px" onchange="logCallChange('${c.id}','date',this.value,'${escapeAttr(c.date||'')}');updateCallLogField('${c.id}','date',this.value)"></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','direction',this.value,'${escapeAttr(c.direction||'')}');updateCallLogField('${c.id}','direction',this.value)">${dirOpts}</select></td>
-        <td><input type="text" list="clPropDl_${c.id}" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"><datalist id="clPropDl_${c.id}">${[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0)).map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist></td>
+        <td><input type="text" list="clSharedPropList" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','reason',this.value,'${escapeAttr(c.reason||'')}');updateCallLogField('${c.id}','reason',this.value)"><option value="">—</option>${reasonOpts}</select></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','status',this.value,'${escapeAttr(c.status||'')}');updateCallLogField('${c.id}','status',this.value)">${statusOpts2}</select></td>
         <td><input type="text" value="${escapeAttr(c.name||'')}" placeholder="Name" style="${is};width:100px" onblur="logCallChange('${c.id}','name',this.value,'${escapeAttr(c.name||'')}');updateCallLogField('${c.id}','name',this.value)"></td>
@@ -17746,16 +17770,38 @@ async function renderCallLogView(skipLoad){
     return;
   }
 
+  const pageInfo = filteredCalls.length===0
+    ? ''
+    : ` · <span style="color:var(--muted)">rows <strong style="color:var(--text)">${pageStart+1}–${Math.min(pageStart+callLogPageSize, filteredCalls.length)}</strong> of ${filteredCalls.length}</span>`;
   const matchesLabel = q
-    ? `<strong style="color:var(--text)">${filteredCalls.length}</strong> of ${callLogData.length} match "${escapeHtml(callLogSearch)}"`
-    : `${callLogData.length} call${callLogData.length===1?'':'s'} logged`;
+    ? `<strong style="color:var(--text)">${filteredCalls.length}</strong> of ${callLogData.length} match "${escapeHtml(callLogSearch)}"${pageInfo}`
+    : `${callLogData.length} call${callLogData.length===1?'':'s'} logged${pageInfo}`;
   const searchInput = `<input type="search" id="callLogSearchInput" placeholder="🔍 Search address, name, number, notes…" value="${escapeAttr(callLogSearch)}" oninput="setCallLogSearch(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;width:280px;max-width:50vw">`;
-  el.innerHTML = tabBar + `
+
+  // Build the pagination bar once — reuse above + below the table
+  // so the user doesn't have to scroll to the bottom to change
+  // pages. Hidden when only one page's worth of rows exist.
+  const pageSizeOpts = [25,50,100,200].map(sz => `<option value="${sz}" ${sz===callLogPageSize?'selected':''}>${sz}/page</option>`).join('');
+  const pagerHtml = totalPages>1 ? `<div style="display:flex;gap:6px;align-items:center;padding:6px 12px;background:var(--surface2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)">
+    <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" ${callLogPage<=1?'disabled':''} onclick="setCallLogPage(${callLogPage-1})">‹ Prev</button>
+    <span>Page <strong style="color:var(--text)">${callLogPage}</strong> of ${totalPages}</span>
+    <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px" ${callLogPage>=totalPages?'disabled':''} onclick="setCallLogPage(${callLogPage+1})">Next ›</button>
+    <div style="flex:1"></div>
+    <select onchange="setCallLogPageSize(this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);cursor:pointer">${pageSizeOpts}</select>
+  </div>` : '';
+
+  // Shared datalist for the property picker — one copy instead of
+  // N per-row copies with the same 130 options. Removed a huge DOM
+  // cost on large tables.
+  const sharedPropDatalist = `<datalist id="clSharedPropList">${[...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0)).map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist>`;
+
+  el.innerHTML = tabBar + sharedPropDatalist + `
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left">${matchesLabel}</div>
         <div style="display:flex;gap:8px;align-items:center">${searchInput}${addBtn}</div>
       </div>
+      ${pagerHtml}
       <div class="tbl-wrap">
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
           <thead>
@@ -17823,6 +17869,7 @@ async function renderCallLogView(skipLoad){
           ${body}
         </table>
       </div>
+      ${pagerHtml}
     </div>`;
 }
 
