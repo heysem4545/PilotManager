@@ -7068,20 +7068,18 @@ function pilotDisplayAddr(j){
   return a;
 }
 
-function pilotAddrSelectOptions(currentAddr){
-  const found = properties.find(p=>p.addr===currentAddr);
-  const parts = [];
-  parts.push(`<option value="">— Select address —</option>`);
-  parts.push(`<option value="__OTHER__" ${currentAddr==='__OTHER__'?'selected':''}>Other (see notes)</option>`);
-  // Preserve legacy free-text values so we don't lose them on edit.
-  if(currentAddr && currentAddr !== '__OTHER__' && !found){
-    parts.push(`<option value="${escapeAttr(currentAddr)}" selected>${escapeHtml(currentAddr)}</option>`);
-  }
-  parts.push(properties.map(p=>{
-    const sel = p.addr === currentAddr ? 'selected' : '';
-    return `<option value="${escapeAttr(p.addr)}" ${sel}>${escapeHtml(p.addr)}</option>`;
-  }).join(''));
-  return parts.join('');
+// Shared datalist HTML for the pilot address search input. Same
+// pattern as the Call Log picker — one <datalist> per modal, every
+// row's <input list="pilotAddrDl"> autocompletes from it as the
+// user types (e.g. typing "m" surfaces "Morton Ave"). If the value
+// is left blank, treat as an 'Other / no property' entry — the
+// task type dropdown identifies what kind of work it was.
+function pilotAddrDatalistHTML(){
+  const opts = [...properties]
+    .sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0))
+    .map(p=>`<option value="${escapeAttr(p.addr||'')}">`)
+    .join('');
+  return `<datalist id="pilotAddrDl">${opts}</datalist>`;
 }
 
 function pilotTaskTypeOptions(current){
@@ -7442,7 +7440,7 @@ function openPilotDay(day){
         : 'minmax(180px,1.3fr) 150px 100px 100px 55px minmax(180px,1.4fr)';
       const addrCell = isExcuse
         ? `<div><input type="text" value="${escapeAttr(j.propertyAddress||'')}" placeholder="Reason…" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>`
-        : `<div><select class="pj-addr" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">${pilotAddrSelectOptions(j.propertyAddress||'')}</select></div>`;
+        : `<div><input type="text" list="pilotAddrDl" value="${escapeAttr(j.propertyAddress==='__OTHER__'?'':(j.propertyAddress||''))}" placeholder="🔍 Type to search… (or blank for Other)" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||''" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%" class="pj-addr"></div>`;
       const taskTypeCell = isExcuse
         ? ''
         : `<div><select class="pj-task-type" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">${pilotTaskTypeOptions(j.taskCategory||'')}</select></div>`;
@@ -7483,8 +7481,9 @@ function openPilotDay(day){
       <div id="pilotJobsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         ${jobRows||'<div style="text-align:center;color:var(--muted);padding:10px;font-size:11px">Work Entries</div>'}
       </div>
+      ${pilotAddrDatalistHTML()}
       <div style="display:grid;grid-template-columns:minmax(180px,1.3fr) 150px 100px 100px 55px minmax(180px,1.4fr);gap:8px;padding:8px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;align-items:center;margin-bottom:16px">
-        <select id="pjNewAddr" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">${pilotAddrSelectOptions('')}</select>
+        <input type="text" id="pjNewAddr" list="pilotAddrDl" placeholder="🔍 Type to search… (or blank for Other)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">
         <select id="pjNewTaskType" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;width:100%">${pilotTaskTypeOptions('')}</select>
         <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-start','calcNewPilotDur()',true)}</div>
         <div style="display:flex;gap:2px">${pilotTimeSelect('','pjNew-end','calcNewPilotDur()',true)}</div>
@@ -7517,21 +7516,19 @@ async function addPilotJob(day, jobType){
   const prefix=isExcuse?'pjNewExc':'pjNew';
   const addrEl=document.getElementById(isExcuse?'pjNewExcAddr':'pjNewAddr');
   const addrRaw=addrEl?(addrEl.value||'').trim():'';
-  const isOther = !isExcuse && addrRaw === '__OTHER__';
   const notes=(document.getElementById(isExcuse?'pjNewExcNotes':'pjNewNotes')||{}).value?.trim()||'';
   const taskType = isExcuse ? '' : (document.getElementById('pjNewTaskType')?.value || '').trim();
+  const prop = isExcuse ? null : properties.find(p=>p.addr===addrRaw);
+  const hasAddr = !!addrRaw;
 
   if(isExcuse){
     if(!addrRaw){toast('Enter a reason');return;}
   } else {
-    if(!addrRaw){toast('Pick an address (or "Other")');return;}
     if(!taskType){toast('Pick a task type');return;}
-    if(isOther && !notes){toast('For "Other", add a note describing the task');return;}
+    if(!hasAddr && !notes){toast('Type an address (or leave blank + add a note for "Other")');return;}
   }
 
   const mKey=`${pilotYear}-${String(pilotMonth+1).padStart(2,'0')}`;
-  const addr = isOther ? '' : addrRaw;
-  const prop = isExcuse ? null : properties.find(p=>p.addr===addr);
   const startPfx=prefix+'-start';
   const endPfx=prefix+'-end';
   const timeStart=(()=>{const h=document.getElementById(startPfx+'-h'),m=document.getElementById(startPfx+'-m');return h&&h.value!==''&&m&&m.value!==''?h.value.padStart(2,'0')+':'+m.value.padStart(2,'0'):'';})();
@@ -7543,7 +7540,7 @@ async function addPilotJob(day, jobType){
       jobType:jobType||'work',
       taskCategory: taskType,
       propertyId: prop?prop.id:'',
-      propertyAddress: isOther ? '__OTHER__' : addr,
+      propertyAddress: addrRaw,
       timeStart, timeEnd, duration,
       notes,
       createdAt:new Date(),
@@ -7583,13 +7580,12 @@ async function savePilotDayEdits(day){
       const startVal=getPilotTime(row,'pj-start');
       const endVal=getPilotTime(row,'pj-end');
       const addrVal = row.querySelector('.pj-addr').value.trim();
-      const isOther = !isExcuse && addrVal === '__OTHER__';
       const taskTypeEl = row.querySelector('.pj-task-type');
       const taskType = taskTypeEl ? taskTypeEl.value.trim() : '';
       const prop = isExcuse ? null : properties.find(p=>p.addr===addrVal);
       const notes = row.querySelector('.pj-notes').value.trim();
       const update = {
-        propertyAddress: isOther ? '__OTHER__' : addrVal,
+        propertyAddress: addrVal,
         propertyId: prop ? prop.id : '',
         taskCategory: taskType,
         timeStart:startVal,
@@ -12000,7 +11996,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-09';
+const APP_VERSION='2026-07-28-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
