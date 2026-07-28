@@ -7089,7 +7089,7 @@ function pilotTaskTypeOptions(current){
     parts.push(`<option value="${escapeAttr(c)}" ${c===current?'selected':''}>${escapeHtml(c)}</option>`);
   });
   parts.push('</optgroup>');
-  parts.push('<optgroup label="📋 Other Task">');
+  parts.push('<optgroup label="📋 Other Task (NOT logged to Maintenance)">');
   PILOT_OTHER_CATEGORIES.forEach(c => {
     parts.push(`<option value="${escapeAttr(c)}" ${c===current?'selected':''}>${escapeHtml(c)}</option>`);
   });
@@ -7103,8 +7103,14 @@ function pilotTaskTypeOptions(current){
 // stays `pilotTech_${jobId}` for idempotent re-saves.
 async function mirrorPilotJobToMaintenance(jobId, jobData){
   if(!jobId || !jobData) return;
-  const isMaint = PILOT_MAINT_CATEGORIES.includes(jobData.taskCategory);
-  if(!isMaint || !jobData.propertyId) return;
+  const cat = jobData.taskCategory;
+  // Double-gate: only mirror if the category is on the maintenance
+  // allow-list AND not on the non-maintenance deny-list. Belt and
+  // braces so a mislabeled category can never leak into Maintenance
+  // Records.
+  const isMaint = PILOT_MAINT_CATEGORIES.includes(cat);
+  const isOther = PILOT_OTHER_CATEGORIES.includes(cat);
+  if(!isMaint || isOther || !jobData.propertyId) return;
   const mKey = jobData.monthKey || '';
   const [yStr, mStr] = mKey.split('-');
   const year = parseInt(yStr, 10);
@@ -7548,11 +7554,16 @@ async function addPilotJob(day, jobType){
       createdByName:currentUser.name||currentUser.email
     };
     const ref = await db.collection('pilotTechWork').add(docData);
-    await mirrorPilotJobToMaintenance(ref.id, docData);
+    const willMirror = PILOT_MAINT_CATEGORIES.includes(taskType)
+      && !PILOT_OTHER_CATEGORIES.includes(taskType)
+      && !!prop;
+    if(willMirror) await mirrorPilotJobToMaintenance(ref.id, docData);
     document.getElementById('pilotDayModal').remove();
-    toast(PILOT_MAINT_CATEGORIES.includes(taskType) && prop
+    toast(willMirror
       ? 'Job added + logged to Maintenance Records'
-      : 'Job added');
+      : (PILOT_OTHER_CATEGORIES.includes(taskType)
+          ? `Job added (${taskType} — not a maintenance record)`
+          : 'Job added'));
     renderPilotTechView();
     openPilotDay(day);
   }catch(e){toast('Error: '+e.message);}
@@ -7598,9 +7609,13 @@ async function savePilotDayEdits(day){
       // Re-mirror or unmirror based on the edited fields.
       if(!isExcuse){
         const merged = { ...update, monthKey: mKey, createdByName: currentUser.name||currentUser.email };
-        if(PILOT_MAINT_CATEGORIES.includes(taskType) && prop){
+        const isMaint = PILOT_MAINT_CATEGORIES.includes(taskType)
+          && !PILOT_OTHER_CATEGORIES.includes(taskType);
+        if(isMaint && prop){
           await mirrorPilotJobToMaintenance(id, merged);
         } else {
+          // Non-maintenance task OR no property attached — make sure
+          // no stale mirror sticks around from a previous edit.
           await removePilotMirroredMaintenance(id);
         }
       }
@@ -11996,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-11';
+const APP_VERSION='2026-07-28-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
