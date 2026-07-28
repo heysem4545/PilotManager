@@ -11826,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-10';
+const APP_VERSION='2026-07-27-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12749,13 +12749,13 @@ async function renderDocumentsView(){
           ? `<input type="date" value="${d.docReceivedDate||''}" style="${inputCss};width:135px;color-scheme:${document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'}" onchange="updateDocField('${d.id}','docReceivedDate',this.value)">`
           : `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(d.docReceivedDate||'—')}</span>`;
 
-        // Searchable property picker — a hidden input holds the
-        // chosen value; a visible text input triggers a filterable
-        // popup so typing 'm' narrows to Main / Morton / etc.
+        // Native HTML5 combobox — same pattern the Call Log tab
+        // uses for its property input. Typing filters the datalist
+        // in real time; on blur we resolve the typed address back
+        // to a propertyId (or fall through to 🌐 General).
         const propertyCell = editable
-          ? `<div style="position:relative;max-width:220px">
-              <input type="text" data-doc-id="${d.id}" value="${escapeAttr(d.propertyId?propName:'🌐 General')}" placeholder="Type to search…" onfocus="openDocPropPicker('${d.id}',this)" onclick="openDocPropPicker('${d.id}',this)" oninput="filterDocPropPicker('${d.id}',this.value)" style="${inputCss};width:100%;cursor:pointer">
-            </div>`
+          ? `<input type="text" list="docPropDl_${d.id}" value="${escapeAttr(d.propertyId?propName:'🌐 General')}" placeholder="🔍 Type property or 'General'…" style="${inputCss};max-width:220px;width:100%" onfocus="this.dataset.prev=this.value;this.value=''" onblur="onDocPropertyBlur('${d.id}',this)">
+            <datalist id="docPropDl_${d.id}"><option value="🌐 General">${sortedProps.map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist>`
           : `<span style="font-size:12px;font-weight:500">${escapeHtml(propName)}</span>`;
 
         const aboutCell = editable
@@ -12823,94 +12823,37 @@ async function renderDocumentsView(){
   </div>`;
 }
 
-// Searchable property picker used by the Documents Tracking table.
-// Opens a floating popup anchored under the clicked input; typing
-// filters properties by address. First option is always 🌐 General.
-let _docPickerActive = null; // {docId, input, popup}
-
-function openDocPropPicker(docId, input){
-  // If a picker for this same row is already open, keep it — the
-  // click that would have reopened it was actually the user
-  // clicking away or typing more filter text.
-  if(_docPickerActive && _docPickerActive.docId===docId) return;
-  closeDocPropPicker();
-  const popup = document.createElement('div');
-  popup.className = 'doc-prop-popup';
-  const rect = input.getBoundingClientRect();
-  popup.style.cssText = `position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;width:${Math.max(rect.width,240)}px;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10000;padding:4px`;
-  // Event delegation for row selection — one listener on the
-  // popup instead of inline onclick strings that break when a
-  // property ID has a quote or backslash. Uses mousedown so it
-  // beats the outside-click close handler.
-  popup.addEventListener('mousedown', e => {
-    const row = e.target.closest('[data-prop-id]');
-    if(!row) return;
-    e.preventDefault();
-    e.stopPropagation();
-    selectDocProp(docId, row.getAttribute('data-prop-id'));
-  });
-  document.body.appendChild(popup);
-  _docPickerActive = {docId, input, popup, term:''};
-  renderDocPropPickerOptions();
-  setTimeout(()=>{ input.select(); }, 0);
-  // Close on click outside both the popup and the anchor input.
-  // Use 'click' (fires after mouseup) instead of 'mousedown' so
-  // the popup's own mousedown handler wins when the user selects
-  // a row.
-  setTimeout(()=>{
-    const handler = e => {
-      if(!popup.contains(e.target) && e.target !== input){
-        closeDocPropPicker();
-        document.removeEventListener('click', handler);
-      }
-    };
-    document.addEventListener('click', handler);
-  }, 50);
-}
-
-function filterDocPropPicker(docId, term){
-  if(!_docPickerActive || _docPickerActive.docId!==docId){
-    // Reopen if the popup was closed but the user is still typing.
-    const input = document.querySelector(`.tbl-wrap input[data-doc-id="${docId}"]`);
-    if(input) openDocPropPicker(docId, input);
+// Blur handler for the Documents Tracking property input. Resolves
+// the typed value back to a propertyId — matches on exact address,
+// falls back to '🌐 General' (empty propertyId) when the field is
+// cleared or the typed text doesn't match any property.
+function onDocPropertyBlur(docId, input){
+  const raw = (input.value || '').trim();
+  const prev = input.dataset.prev || '';
+  // If user cleared it and just wants to bail out, restore previous label.
+  if(!raw){
+    input.value = prev;
+    return;
   }
-  if(_docPickerActive) _docPickerActive.term = (term||'').toLowerCase();
-  renderDocPropPickerOptions();
-}
-
-function renderDocPropPickerOptions(){
-  if(!_docPickerActive) return;
-  const {popup, term} = _docPickerActive;
-  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
-  const filtered = sortedProps.filter(p => {
-    if(!term) return true;
-    return (p.addr||'').toLowerCase().includes(term);
-  });
-  // data-prop-id (empty for General) is read by the popup's
-  // delegated mousedown listener in openDocPropPicker.
-  const row = (label, valueId, isGeneral) => `<div data-prop-id="${valueId||''}" style="padding:8px 12px;font-size:12px;cursor:pointer;border-radius:5px;color:var(--text);${isGeneral?'font-weight:600;border-bottom:1px solid var(--border2);margin-bottom:4px':''}" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">${label}</div>`;
-  let html = '';
-  // 'General' always at top unless the search term explicitly hides it.
-  if(!term || 'general'.includes(term)) html += row('🌐 General', '', true);
-  html += filtered.map(p => row('🏠 ' + escapeHtml(p.addr||'(no address)'), p.id, false)).join('');
-  if(!html) html = '<div style="padding:10px 12px;font-size:11px;color:var(--muted2);text-align:center">No properties match</div>';
-  popup.innerHTML = html;
-}
-
-function selectDocProp(docId, propId, el){
-  const input = _docPickerActive && _docPickerActive.input;
-  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
-  const label = propId ? (sortedProps.find(p=>p.id===propId)?.addr || '(unknown)') : '🌐 General';
-  if(input) input.value = label;
-  closeDocPropPicker();
-  updateDocField(docId, 'propertyId', propId);
-}
-
-function closeDocPropPicker(){
-  if(_docPickerActive && _docPickerActive.popup && _docPickerActive.popup.parentNode){
-    _docPickerActive.popup.parentNode.removeChild(_docPickerActive.popup);
+  const d = documentsCache.find(x => x.id === docId);
+  if(!d) return;
+  // Special-case: General.
+  if(raw === '🌐 General' || raw.toLowerCase() === 'general'){
+    input.value = '🌐 General';
+    if(d.propertyId){ updateDocField(docId, 'propertyId', ''); }
+    return;
   }
-  _docPickerActive = null;
+  // Match on address (case-insensitive) — datalist typically writes
+  // the exact string from the option so this is usually a direct hit.
+  const match = properties.find(p => (p.addr||'').toLowerCase() === raw.toLowerCase());
+  if(match){
+    input.value = match.addr;
+    if(d.propertyId !== match.id){ updateDocField(docId, 'propertyId', match.id); }
+    return;
+  }
+  // Nothing matched — revert to the previous label.
+  input.value = prev;
+  toast('Pick a property from the list or type General');
 }
 
 async function addDocument(){
