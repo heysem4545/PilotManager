@@ -11826,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-14';
+const APP_VERSION='2026-07-27-15';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12690,16 +12690,24 @@ const DOC_STATUSES = [
 
 async function loadDocuments(){
   try{
-    const snap = await db.collection('documentsTracking').orderBy('docReceivedDate','desc').get();
+    // Pull everything and sort client-side by createdAt DESC — that
+    // way a freshly-added row always lands at the top of the table,
+    // even when it shares its docReceivedDate with existing rows.
+    const snap = await db.collection('documentsTracking').get();
     documentsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  }catch(e){
-    // Fallback for docs without the sort field yet
-    try{
-      const snap = await db.collection('documentsTracking').get();
-      documentsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
-      documentsCache.sort((a,b)=>(b.docReceivedDate||'').localeCompare(a.docReceivedDate||''));
-    }catch(e2){ console.error('loadDocuments', e2); documentsCache = []; }
-  }
+    const ts = v => {
+      if(!v) return 0;
+      if(typeof v.toMillis === 'function') return v.toMillis();
+      const t = new Date(v).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    documentsCache.sort((a,b)=>{
+      const dt = ts(b.createdAt) - ts(a.createdAt);
+      if(dt) return dt;
+      // Fallback tiebreaker for legacy rows without createdAt.
+      return (b.docReceivedDate||'').localeCompare(a.docReceivedDate||'');
+    });
+  }catch(e){ console.error('loadDocuments', e); documentsCache = []; }
 }
 
 async function renderDocumentsView(){
