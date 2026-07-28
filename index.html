@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-14';
+const APP_VERSION='2026-07-28-15';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15401,7 +15401,6 @@ function renderAvailableView(){
         <option value=""${v?'':' selected'}>—</option>
         <option value="Cash"${v==='Cash'?' selected':''}>Cash</option>
         <option value="CMHA"${v==='CMHA'?' selected':''}>CMHA</option>
-        <option value="Mixed"${v==='Mixed'?' selected':''}>Mixed</option>
       </select>`;
     };
 
