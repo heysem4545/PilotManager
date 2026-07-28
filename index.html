@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-13';
+const APP_VERSION='2026-07-28-14';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12929,6 +12929,7 @@ async function renderDocumentsView(){
         const pdfCell = d.pdfUrl
           ? `<div style="display:flex;align-items:center;gap:6px">
               <a href="${escapeAttr(d.pdfUrl)}" target="_blank" rel="noopener" title="${escapeAttr(d.pdfName||'Open file')}" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">📎 ${escapeHtml(d.pdfName||'file')}</a>
+              <a href="${escapeAttr(d.pdfUrl)}" download="${escapeAttr(d.pdfName||'document')}" target="_blank" rel="noopener" title="Download (fallback if inline view fails)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px;text-decoration:none">⬇</a>
               ${editable?`<button title="Replace file" onclick="document.getElementById('docPdfInput-${d.id}').click()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px">↻</button>
               <button title="Delete file" onclick="deleteDocumentPdf('${d.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button>
               <input type="file" id="docPdfInput-${d.id}" accept="application/pdf,image/*" style="display:none" onchange="uploadDocumentPdf('${d.id}',this)">`:''}
@@ -13146,13 +13147,21 @@ async function uploadDocumentPdf(id, input){
   const file = input.files && input.files[0];
   input.value = ''; // let the user re-pick the same file later
   if(!file){ return; }
+  if(file.size === 0){ toast('That file is empty — pick a different one'); return; }
   if(file.size > 25 * 1024 * 1024){ toast('File too large (max 25 MB)'); return; }
   toast('Uploading…');
   try{
     const safeName = (file.name || 'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+    // Force a correct content-type from the extension so Chrome's PDF
+    // viewer can render PDFs inline. Some drag-drop / clipboard files
+    // arrive with an empty file.type, which used to fall through to
+    // octet-stream and made Chrome show "Failed to load PDF document".
+    const ext = (safeName.split('.').pop() || '').toLowerCase();
+    const extMap = {pdf:'application/pdf', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif'};
+    const contentType = extMap[ext] || file.type || 'application/octet-stream';
     const path = `documents/${id}/${Date.now()}_${safeName}`;
     const ref = firebase.storage().ref(path);
-    await ref.put(file, {contentType: file.type || 'application/octet-stream'});
+    await ref.put(file, {contentType, contentDisposition: `inline; filename="${safeName}"`});
     const url = await ref.getDownloadURL();
     // If replacing an existing file, delete the old one first (best-effort).
     const d = documentsCache.find(x=>x.id===id);
