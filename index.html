@@ -11826,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-07';
+const APP_VERSION='2026-07-27-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12724,7 +12724,7 @@ async function renderDocumentsView(){
   const totalCount = documentsCache.length;
 
   const rowsHtml = documentsCache.length===0
-    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:12px">${editable?'No documents yet. Click <strong>+ Add Document</strong> to log the first one.':'No documents yet.'}</td></tr>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:12px">${editable?'No documents yet. Click <strong>+ Add Row</strong> to log the first one.':'No documents yet.'}</td></tr>`
     : documentsCache.map(d=>{
         const status = d.status || 'in-progress';
         const isRisk = status === 'risk';
@@ -12786,7 +12786,7 @@ async function renderDocumentsView(){
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <div style="font-size:12px;color:var(--muted)">Track incoming documents, tie them to a property (or leave General), and note the required follow-up action.</div>
       <div style="flex:1"></div>
-      ${editable?`<button class="btn btn-primary btn-sm" onclick="addDocument()" style="font-size:12px;padding:6px 14px">+ Add Document</button>`:''}
+      ${editable?`<button class="btn btn-primary btn-sm" onclick="addDocument()" style="font-size:12px;padding:6px 14px">+ Add Row</button>`:''}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
@@ -12809,6 +12809,11 @@ async function renderDocumentsView(){
         <th style="width:50px"></th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
+      ${editable?`<tfoot><tr><td colspan="7" style="padding:0;border-top:1px dashed var(--border2)">
+        <button onclick="addDocument()" style="width:100%;background:none;border:none;padding:10px 12px;font-size:12px;color:var(--accent);font-weight:600;cursor:pointer;text-align:left;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+          + Add Row
+        </button>
+      </td></tr></tfoot>`:''}
     </table></div>
   </div>`;
 }
