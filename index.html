@@ -11868,7 +11868,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-02';
+const APP_VERSION='2026-07-28-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15110,10 +15110,45 @@ async function renderLeasingDashboardView(opts){
 // Which non-rented status bucket the Available Units tab is
 // currently filtered by. 'all' shows every non-RENTED property.
 let availableFilter = 'all';
+let availableTab = 'available'; // 'available' | 'pending'
 
 function setAvailableFilter(f){
   availableFilter = f;
   renderAvailableView();
+}
+function setAvailableTab(t){
+  availableTab = t;
+  if(t === 'pending') availableFilter = 'all';
+  renderAvailableView();
+}
+
+// Toggle the pendingRent flag on a property. Writes straight to
+// the property doc so both tabs re-render off the same source.
+async function toggleAvailablePending(propId, isPending){
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  const p = properties.find(x=>x.id===propId);
+  if(!p) return;
+  const updates = {
+    pendingRent: !!isPending,
+    updatedAt: new Date()
+  };
+  if(isPending && !p.pendingRentAt) updates.pendingRentAt = new Date().toISOString();
+  try{
+    await db.collection('properties').doc(propId).update(updates);
+    Object.assign(p, updates);
+    toast(isPending?'Marked as Pending Rent':'Removed from Pending Rent');
+    renderAvailableView();
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+}
+
+async function updateAvailablePendingNote(propId, note){
+  if(!canEdit()) return;
+  const p = properties.find(x=>x.id===propId);
+  if(!p) return;
+  try{
+    await db.collection('properties').doc(propId).update({pendingRentNote:note||'', updatedAt:new Date()});
+    p.pendingRentNote = note || '';
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
 function renderAvailableView(){
@@ -15154,19 +15189,89 @@ function renderAvailableView(){
     return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${c}1F;border:1px solid ${c}55;color:${c};font-weight:700;font-size:11px;letter-spacing:.02em">${escapeHtml(val)}${suffix||''}</span>`;
   };
 
+  // Pending-rent properties are marked via a per-property flag —
+  // they show a green highlight in the Available list even though
+  // their status still says Vacant / Construction / etc., and get
+  // their own tab for follow-up work.
+  const pendingList = availableAll.filter(p => !!p.pendingRent);
+  const editable = canEdit();
+
+  // Top-level tab bar (Available Units vs Pending Rent Houses)
+  const tabBar = `<div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 4px">
+    <button onclick="setAvailableTab('available')" style="background:none;border:none;padding:12px 18px;font-size:13px;font-weight:${availableTab==='available'?'700':'500'};color:${availableTab==='available'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${availableTab==='available'?'var(--accent)':'transparent'};margin-bottom:-1px;cursor:pointer;font-family:var(--font)">🏠 Available Units</button>
+    <button onclick="setAvailableTab('pending')" style="background:none;border:none;padding:12px 18px;font-size:13px;font-weight:${availableTab==='pending'?'700':'500'};color:${availableTab==='pending'?'#4ade80':'var(--muted)'};border-bottom:2px solid ${availableTab==='pending'?'#4ade80':'transparent'};margin-bottom:-1px;cursor:pointer;font-family:var(--font)">🕐 Pending Rent Houses${pendingList.length?` <span style="background:#4ade80;color:#0d0d10;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700">${pendingList.length}</span>`:''}</button>
+  </div>`;
+
+  // Pending Rent tab short-circuits the rest of the render.
+  if(availableTab === 'pending'){
+    const pendingRows = pendingList.length === 0
+      ? `<tbody><tr><td colspan="7"><div style="padding:40px 20px;text-align:center;color:var(--muted)">
+          <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">🕐 No pending-rent houses yet</div>
+          On the Available Units tab, click the ✓ in the <strong>Pending</strong> column of any row to move it here.
+        </div></td></tr></tbody>`
+      : '<tbody>' + pendingList.map(p => {
+          const mp = getMonthProp(p);
+          const noteInput = editable
+            ? `<input type="text" value="${escapeAttr(p.pendingRentNote||'')}" placeholder="Deposit paid · CMHA packet mailed · waiting on…" onblur="updateAvailablePendingNote('${p.id}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:100%">`
+            : `<span style="font-size:11px;color:var(--text)">${escapeHtml(p.pendingRentNote||'—')}</span>`;
+          const removeBtn = editable
+            ? `<button title="Remove from Pending Rent" onclick="toggleAvailablePending('${p.id}',false)" style="background:none;border:1px solid rgba(245,112,106,.45);color:var(--red);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">✕ Remove</button>`
+            : '';
+          return `<tr style="background:rgba(74,222,128,.06)">
+            <td>${statusBadge(mp.status)}</td>
+            <td style="font-weight:500">${escapeHtml(p.addr || '')}</td>
+            <td style="text-align:center">${pill(p.bedroom, BR_COLORS)}</td>
+            <td style="text-align:center">${pill(p.bath, BA_COLORS, ' BA')}</td>
+            <td class="money" style="font-family:var(--mono);text-align:right">${mp.cmha ? fmt(mp.cmha) : '<span style="color:var(--muted2)">—</span>'}</td>
+            <td class="money" style="font-family:var(--mono);text-align:right">${mp.tenantPortion ? fmt(mp.tenantPortion) : '<span style="color:var(--muted2)">—</span>'}</td>
+            <td>${noteInput}</td>
+            <td style="text-align:center">${removeBtn}</td>
+          </tr>`;
+        }).join('') + '</tbody>';
+
+    el.innerHTML = `<div class="table-card">
+      ${tabBar}
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
+        <strong style="color:var(--text)">${pendingList.length}</strong> pending-rent house${pendingList.length===1?'':'s'} · Someone has committed but paperwork/deposit/etc. is still in progress.
+      </div>
+      <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="width:130px">Status</th>
+          <th>Address</th>
+          <th style="text-align:center;width:90px">Bedroom</th>
+          <th style="text-align:center;width:90px">Bath</th>
+          <th style="text-align:right;width:120px">CMHA Rent</th>
+          <th style="text-align:right;width:120px">Tenant Rent</th>
+          <th>📝 Pending Note</th>
+          <th style="width:110px;text-align:center"></th>
+        </tr></thead>
+        ${pendingRows}
+      </table></div>
+    </div>`;
+    return;
+  }
+
   let body;
   if(available.length === 0){
-    body = `<tbody><tr><td colspan="6"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No available units</div>All properties are currently rented for ${mLabel}.</div></td></tr></tbody>`;
+    body = `<tbody><tr><td colspan="7"><div style="padding:40px 20px;text-align:center;color:var(--muted)"><div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">No available units</div>All properties are currently rented for ${mLabel}.</div></td></tr></tbody>`;
   } else {
     body = '<tbody>' + available.map(p => {
       const mp = getMonthProp(p);
-      return `<tr>
-        <td>${statusBadge(mp.status)}</td>
+      const isPending = !!p.pendingRent;
+      // Green highlight so users immediately see a Vacant row that's
+      // actually spoken-for (deposit paid / paperwork in flight).
+      const rowBg = isPending ? 'background:rgba(74,222,128,.10);border-left:3px solid #4ade80' : '';
+      const pendingCell = editable
+        ? `<input type="checkbox" ${isPending?'checked':''} title="${isPending?'This unit is Pending Rent — click to remove':'Mark as Pending Rent (has a tenant / paperwork in progress)'}" onchange="toggleAvailablePending('${p.id}',this.checked)" style="accent-color:#4ade80;width:16px;height:16px;cursor:pointer">`
+        : (isPending?'<span style="color:#4ade80;font-weight:700">🕐</span>':'<span style="color:var(--muted2)">—</span>');
+      return `<tr style="${rowBg}">
+        <td>${statusBadge(mp.status)}${isPending?' <span style="display:inline-block;padding:1px 6px;border-radius:8px;background:rgba(74,222,128,.18);color:#4ade80;font-size:9px;font-weight:700;margin-left:4px;vertical-align:middle">🕐 PENDING</span>':''}</td>
         <td style="font-weight:500">${escapeHtml(p.addr || '')}</td>
         <td style="text-align:center">${pill(p.bedroom, BR_COLORS)}</td>
         <td style="text-align:center">${pill(p.bath, BA_COLORS, ' BA')}</td>
         <td class="money" style="font-family:var(--mono);text-align:right">${mp.cmha ? fmt(mp.cmha) : '<span style="color:var(--muted2)">—</span>'}</td>
         <td class="money" style="font-family:var(--mono);text-align:right">${mp.tenantPortion ? fmt(mp.tenantPortion) : '<span style="color:var(--muted2)">—</span>'}</td>
+        <td style="text-align:center">${pendingCell}</td>
       </tr>`;
     }).join('') + '</tbody>';
   }
@@ -15197,9 +15302,10 @@ function renderAvailableView(){
 
   el.innerHTML = `
     <div class="table-card">
+      ${tabBar}
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
         <div style="font-size:12px;color:var(--muted)">
-          <strong style="color:var(--text)">${available.length}</strong> of ${availableAll.length} available unit${availableAll.length===1?'':'s'} · ${mLabel}
+          <strong style="color:var(--text)">${available.length}</strong> of ${availableAll.length} available unit${availableAll.length===1?'':'s'} · ${mLabel} · <span style="color:#4ade80">🕐 ${pendingList.length} pending</span>
         </div>
       </div>
       <div style="display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">${filterButtons}</div>
@@ -15207,12 +15313,13 @@ function renderAvailableView(){
         <table style="width:100%;border-collapse:collapse">
           <thead>
             <tr>
-              <th style="width:130px">Status</th>
+              <th style="width:150px">Status</th>
               <th>Address</th>
               <th style="text-align:center;width:90px">Bedroom</th>
               <th style="text-align:center;width:90px">Bath</th>
               <th style="text-align:right;width:120px">CMHA Rent</th>
               <th style="text-align:right;width:120px">Tenant Rent</th>
+              <th style="text-align:center;width:90px" title="Mark as Pending Rent (someone committed but paperwork/deposit still in progress)">🕐 Pending</th>
             </tr>
           </thead>
           ${body}
