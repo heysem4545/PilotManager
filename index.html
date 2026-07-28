@@ -258,7 +258,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .ftab{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
 .ftab:hover{color:var(--text);background:var(--surface2)}
 .ftab.active{background:var(--surface3);color:var(--text);border-color:var(--border2)}
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--accent-dim) transparent}
+.tbl-wrap::-webkit-scrollbar{height:12px;background:var(--surface2)}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--accent-dim);border-radius:6px;border:2px solid var(--surface2)}
+.tbl-wrap::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer}
 thead th:hover{color:var(--text)}
@@ -11826,7 +11829,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-15';
+const APP_VERSION='2026-07-27-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
