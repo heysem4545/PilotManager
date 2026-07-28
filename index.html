@@ -11868,7 +11868,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-01';
+const APP_VERSION='2026-07-28-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15107,17 +15107,35 @@ async function renderLeasingDashboardView(opts){
   if(includeAnnouncement) loadLeasingAnnouncement();
 }
 
+// Which non-rented status bucket the Available Units tab is
+// currently filtered by. 'all' shows every non-RENTED property.
+let availableFilter = 'all';
+
+function setAvailableFilter(f){
+  availableFilter = f;
+  renderAvailableView();
+}
+
 function renderAvailableView(){
   const el = document.getElementById('availableView');
   const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mLabel = MNAMES[activeMonth] + ' ' + activeYear;
 
-  // Filter: Vacant, Construction, Unknown, Moving Process, empty/unset status
-  const available = properties.filter(p => {
+  // Base pool: every property whose active-month status is not RENTED.
+  const availableAll = properties.filter(p => {
     const mp = getMonthProp(p);
     const s = (mp.status || '').toUpperCase();
     return s === 'VACANT' || s === 'CONSTRUCTION' || s === 'UNKNOWN' || s === 'MOVING PROCESS' || !s;
   }).sort((a,b) => (a.rowIndex||0) - (b.rowIndex||0));
+
+  // Apply the active status filter.
+  const available = availableFilter === 'all'
+    ? availableAll
+    : availableAll.filter(p => {
+        const s = (getMonthProp(p).status || '').toUpperCase();
+        if(availableFilter === 'NO_STATUS') return !s;
+        return s === availableFilter;
+      });
 
   const statusBadge = (s) => {
     const key = (s || '').toUpperCase();
@@ -15153,25 +15171,38 @@ function renderAvailableView(){
     }).join('') + '</tbody>';
   }
 
-  // Summary counts
-  const counts = {};
-  available.forEach(p => {
-    const s = getMonthProp(p).status || 'No Status';
-    counts[s] = (counts[s] || 0) + 1;
-  });
-  const countPills = Object.entries(counts).map(([s,n]) => {
-    const color = SC[s.toUpperCase()] || 'var(--muted)';
-    return `<span style="font-size:11px;color:${color};font-weight:500">${n} ${BL[s.toUpperCase()]||s}</span>`;
-  }).join('<span style="color:var(--muted2)"> · </span>');
+  // Bucket counts computed over the FULL pool so the filter tabs
+  // stay meaningful (tab shows how many rows you'd land on).
+  const bucketCount = key => availableAll.filter(p => {
+    const s = (getMonthProp(p).status || '').toUpperCase();
+    if(key === 'all') return true;
+    if(key === 'NO_STATUS') return !s;
+    return s === key;
+  }).length;
+  const filterButtons = [
+    {key:'all',            label:'All'},
+    {key:'VACANT',         label:'Vacant'},
+    {key:'CONSTRUCTION',   label:'Construction'},
+    {key:'MOVING PROCESS', label:'Moving'},
+    {key:'UNKNOWN',        label:'Unknown'},
+    {key:'NO_STATUS',      label:'⚠ No Status'}
+  ].map(f => {
+    const cnt = bucketCount(f.key);
+    const active = availableFilter === f.key;
+    const color = SC[f.key] || (f.key==='NO_STATUS'?'var(--red)':'var(--muted)');
+    const bg = active ? (color+'22') : 'var(--surface2)';
+    const border = active ? color : 'var(--border2)';
+    return `<button class="ftab ${active?'active':''}" onclick="setAvailableFilter('${f.key}')" style="font-size:11px;padding:6px 12px;background:${bg};color:${active?color:'var(--text)'};border:1px solid ${border};border-radius:6px;cursor:pointer;font-weight:${active?'700':'500'}">${f.label} (${cnt})</button>`;
+  }).join('');
 
   el.innerHTML = `
     <div class="table-card">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
         <div style="font-size:12px;color:var(--muted)">
-          <strong style="color:var(--text)">${available.length}</strong> available unit${available.length===1?'':'s'} · ${mLabel}
+          <strong style="color:var(--text)">${available.length}</strong> of ${availableAll.length} available unit${availableAll.length===1?'':'s'} · ${mLabel}
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${countPills}</div>
       </div>
+      <div style="display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">${filterButtons}</div>
       <div class="tbl-wrap">
         <table style="width:100%;border-collapse:collapse">
           <thead>
