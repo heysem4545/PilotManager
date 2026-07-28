@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-17';
+const APP_VERSION='2026-07-28-18';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15314,17 +15314,31 @@ async function updateAvailablePendingField(propId, field, value){
   const allowed = ['pendingRentTenantName','pendingRentTenantPhone','pendingRentDeposit','pendingRentType','pendingRentPackageDate','pendingRentElectric','pendingRentGas','pendingRentScreeningNote','pendingRentNote'];
   if(!allowed.includes(field)) return;
   const v = value == null ? '' : value;
+  const prev = p[field];
+
+  // Optimistic local update FIRST so the ⏱ Days pill + row tint
+  // react instantly, before waiting for the Firestore round-trip.
+  // (Waiting for the await meant that if the properties snapshot
+  // listener replaced the array in the meantime, our mutation on
+  // the old reference was lost and the pill kept its old color
+  // until page refresh.)
+  p[field] = v;
+  const needsRerender = (field === 'pendingRentPackageDate' || field === 'pendingRentType');
+  if(needsRerender) renderAvailableView();
+
   try{
     await db.collection('properties').doc(propId).update({[field]:v, updatedAt:new Date()});
-    p[field] = v;
-    // Fields that change other cells or row color need a re-render:
-    //   package date → ⏱ Days column + row tint
-    //   type         → colored pill in read-only mode
-    // Plain text/money/notes are edit-in-place, no re-render needed.
-    if(field === 'pendingRentPackageDate' || field === 'pendingRentType'){
-      renderAvailableView();
-    }
-  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+    // Re-find p in case the properties listener replaced the array
+    // during the await, and make sure the freshest reference also
+    // carries the write. Belt and braces.
+    const pNow = properties.find(x=>x.id===propId);
+    if(pNow) pNow[field] = v;
+  }catch(e){
+    // Revert on failure so the UI doesn't lie.
+    p[field] = prev;
+    if(needsRerender) renderAvailableView();
+    toast('Error: '+(e.message||'unknown'));
+  }
 }
 
 function renderAvailableView(){
