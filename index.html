@@ -11826,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-09';
+const APP_VERSION='2026-07-27-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12829,26 +12829,42 @@ async function renderDocumentsView(){
 let _docPickerActive = null; // {docId, input, popup}
 
 function openDocPropPicker(docId, input){
+  // If a picker for this same row is already open, keep it — the
+  // click that would have reopened it was actually the user
+  // clicking away or typing more filter text.
+  if(_docPickerActive && _docPickerActive.docId===docId) return;
   closeDocPropPicker();
   const popup = document.createElement('div');
   popup.className = 'doc-prop-popup';
   const rect = input.getBoundingClientRect();
   popup.style.cssText = `position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;width:${Math.max(rect.width,240)}px;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10000;padding:4px`;
+  // Event delegation for row selection — one listener on the
+  // popup instead of inline onclick strings that break when a
+  // property ID has a quote or backslash. Uses mousedown so it
+  // beats the outside-click close handler.
+  popup.addEventListener('mousedown', e => {
+    const row = e.target.closest('[data-prop-id]');
+    if(!row) return;
+    e.preventDefault();
+    e.stopPropagation();
+    selectDocProp(docId, row.getAttribute('data-prop-id'));
+  });
   document.body.appendChild(popup);
   _docPickerActive = {docId, input, popup, term:''};
   renderDocPropPickerOptions();
-  // Select all text in the input on open so the user can type-over
-  // whatever address is currently showing.
   setTimeout(()=>{ input.select(); }, 0);
-  // Close on outside click.
+  // Close on click outside both the popup and the anchor input.
+  // Use 'click' (fires after mouseup) instead of 'mousedown' so
+  // the popup's own mousedown handler wins when the user selects
+  // a row.
   setTimeout(()=>{
     const handler = e => {
       if(!popup.contains(e.target) && e.target !== input){
         closeDocPropPicker();
-        document.removeEventListener('mousedown', handler);
+        document.removeEventListener('click', handler);
       }
     };
-    document.addEventListener('mousedown', handler);
+    document.addEventListener('click', handler);
   }, 50);
 }
 
@@ -12870,7 +12886,9 @@ function renderDocPropPickerOptions(){
     if(!term) return true;
     return (p.addr||'').toLowerCase().includes(term);
   });
-  const row = (label, valueId, isGeneral) => `<div onclick="selectDocProp('${_docPickerActive.docId}','${valueId||''}',this)" style="padding:8px 12px;font-size:12px;cursor:pointer;border-radius:5px;color:var(--text);${isGeneral?'font-weight:600;border-bottom:1px solid var(--border2);margin-bottom:4px':''}" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">${label}</div>`;
+  // data-prop-id (empty for General) is read by the popup's
+  // delegated mousedown listener in openDocPropPicker.
+  const row = (label, valueId, isGeneral) => `<div data-prop-id="${valueId||''}" style="padding:8px 12px;font-size:12px;cursor:pointer;border-radius:5px;color:var(--text);${isGeneral?'font-weight:600;border-bottom:1px solid var(--border2);margin-bottom:4px':''}" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">${label}</div>`;
   let html = '';
   // 'General' always at top unless the search term explicitly hides it.
   if(!term || 'general'.includes(term)) html += row('🌐 General', '', true);
