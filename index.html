@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-16';
+const APP_VERSION='2026-07-28-17';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15317,6 +15317,13 @@ async function updateAvailablePendingField(propId, field, value){
   try{
     await db.collection('properties').doc(propId).update({[field]:v, updatedAt:new Date()});
     p[field] = v;
+    // Fields that change other cells or row color need a re-render:
+    //   package date → ⏱ Days column + row tint
+    //   type         → colored pill in read-only mode
+    // Plain text/money/notes are edit-in-place, no re-render needed.
+    if(field === 'pendingRentPackageDate' || field === 'pendingRentType'){
+      renderAvailableView();
+    }
   }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
