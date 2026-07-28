@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-15';
+const APP_VERSION='2026-07-28-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15404,7 +15404,32 @@ function renderAvailableView(){
       </select>`;
     };
 
-    const COLSPAN = 16;
+    const COLSPAN = 17;
+
+    // Age tier from the Package Sent date. Used to color both the
+    // dedicated "Days" cell and the whole row so overdue packages
+    // pop visually. Buckets: 0-15 = green, 16-30 = orange, 31+ = dark red.
+    const daysSince = (dateStr) => {
+      if(!dateStr) return null;
+      const d = new Date(dateStr + 'T00:00:00');
+      if(isNaN(d)) return null;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      return Math.floor((today - d) / (1000*60*60*24));
+    };
+    const dayTier = (n) => {
+      if(n == null) return {label:'—',text:'var(--muted2)',bg:'transparent',row:'rgba(74,222,128,.06)'};
+      if(n <= 15)  return {label:n+'d',text:'#0d3b1a',text2:'#166534',bg:'rgba(74,222,128,.25)',row:'rgba(74,222,128,.06)'};
+      if(n <= 30)  return {label:n+'d',text:'#7c2d12',text2:'#c2410c',bg:'rgba(249,115,22,.25)',row:'rgba(249,115,22,.10)'};
+      return                {label:n+'d',text:'#450a0a',text2:'#991b1b',bg:'rgba(153,27,27,.30)',row:'rgba(153,27,27,.14)'};
+    };
+    const daysCell = (p) => {
+      const n = daysSince(p.pendingRentPackageDate);
+      const t = dayTier(n);
+      const val = n == null ? '—' : (n + ' day' + (n===1?'':'s'));
+      const badgeText = t.text2 || t.text;
+      return `<span style="display:inline-block;padding:3px 10px;border-radius:12px;background:${t.bg};color:${badgeText};font-weight:700;font-size:11px;font-family:var(--mono)">${val}</span>`;
+    };
     const pendingRows = pendingList.length === 0
       ? `<tbody><tr><td colspan="${COLSPAN}"><div style="padding:40px 20px;text-align:center;color:var(--muted)">
           <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px">🕐 No pending-rent houses yet</div>
@@ -15415,7 +15440,8 @@ function renderAvailableView(){
           const removeBtn = editable
             ? `<button title="Remove from Pending Rent" onclick="toggleAvailablePending('${p.id}',false)" style="background:none;border:1px solid rgba(245,112,106,.45);color:var(--red);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">✕ Remove</button>`
             : '';
-          return `<tr style="background:rgba(74,222,128,.06)">
+          const tier = dayTier(daysSince(p.pendingRentPackageDate));
+          return `<tr style="background:${tier.row}">
             <td>${statusBadge(mp.status)}</td>
             <td style="font-weight:500">${escapeHtml(p.addr || '')}</td>
             <td style="text-align:center">${pill(p.bedroom, BR_COLORS)}</td>
@@ -15427,6 +15453,7 @@ function renderAvailableView(){
             <td style="text-align:right">${moneyCell(p,'pendingRentDeposit','$0')}</td>
             <td style="text-align:center">${typeCell(p)}</td>
             <td>${dateCell(p,'pendingRentPackageDate')}</td>
+            <td style="text-align:center">${daysCell(p)}</td>
             <td>${textCell(p,'pendingRentElectric','Acct #','120px')}</td>
             <td>${textCell(p,'pendingRentGas','Acct #','120px')}</td>
             <td>${textCell(p,'pendingRentScreeningNote','Screening note','160px')}</td>
@@ -15440,7 +15467,7 @@ function renderAvailableView(){
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
         <strong style="color:var(--text)">${pendingList.length}</strong> pending-rent house${pendingList.length===1?'':'s'} · Someone has committed but paperwork/deposit/etc. is still in progress.
       </div>
-      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2100px">
+      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2200px">
         <thead><tr>
           <th style="width:130px">Status</th>
           <th style="min-width:180px">Address</th>
@@ -15453,6 +15480,7 @@ function renderAvailableView(){
           <th style="text-align:right;width:110px">💵 Deposit</th>
           <th style="text-align:center;width:110px">🏷 Type</th>
           <th style="width:150px">📦 Package Sent</th>
+          <th style="text-align:center;width:90px" title="Days since package was sent · 0–15 green · 16–30 orange · 31+ dark red">⏱ Days</th>
           <th style="min-width:130px">⚡ Electric #</th>
           <th style="min-width:130px">🔥 Gas #</th>
           <th style="min-width:170px">🔍 Screening Note</th>
