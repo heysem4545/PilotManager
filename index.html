@@ -1079,6 +1079,10 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="8" rx="1"/><path d="M5 5.5h6M5 7.5h4"/><circle cx="8" cy="13" r="1.5"/><path d="M6.7 12.2l-1 2 1.5-.6 1 .9.5-2"/></svg>
         Certificates
       </button>
+      <button class="nav-item" id="nav-documents" onclick="showView('documents')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/><path d="M5 8h6M5 10h6M5 12h4"/></svg>
+        Documents Tracking
+      </button>
       <button class="nav-item" id="nav-dailyLog" onclick="showView('dailyLog')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/><path d="M5 2v4"/><path d="M11 2v4"/><path d="M5 9h2M5 11h4"/></svg>
         Daily Log
@@ -1262,6 +1266,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
       <div id="tenantLeaseView" style="display:none"></div>
       <div id="inspectionsView" style="display:none"></div>
       <div id="certificatesView" style="display:none"></div>
+      <div id="documentsView" style="display:none"></div>
       <div id="callLogView" style="display:none"></div>
       <div id="backupsView" style="display:none"></div>
       <div id="constructionView" style="display:none"></div>
@@ -11821,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-06';
+const APP_VERSION='2026-07-27-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12666,6 +12671,245 @@ async function loadCertificates(){
     console.error('loadCertificates', e);
     certificatesCache = {};
   }
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENTS TRACKING
+// Simple per-doc log. Rows are stored in Firestore under
+// 'documentsTracking'. Each row: docReceivedDate, propertyId
+// (empty = general / not tied to a house), pdfUrl/pdfPath/
+// pdfName, about, action, status (in-progress / done / risk).
+// Risk status paints the whole row red so admins spot it.
+// ─────────────────────────────────────────────
+let documentsCache = [];
+const DOC_STATUSES = [
+  {v:'in-progress', label:'⏳ In Progress', color:'var(--amber)', bg:'rgba(245,158,11,.15)'},
+  {v:'done',        label:'✓ Done',         color:'#4ade80',      bg:'rgba(74,222,128,.15)'},
+  {v:'risk',        label:'⚠ Risk',         color:'var(--red)',   bg:'rgba(245,112,106,.15)'}
+];
+
+async function loadDocuments(){
+  try{
+    const snap = await db.collection('documentsTracking').orderBy('docReceivedDate','desc').get();
+    documentsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){
+    // Fallback for docs without the sort field yet
+    try{
+      const snap = await db.collection('documentsTracking').get();
+      documentsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      documentsCache.sort((a,b)=>(b.docReceivedDate||'').localeCompare(a.docReceivedDate||''));
+    }catch(e2){ console.error('loadDocuments', e2); documentsCache = []; }
+  }
+}
+
+async function renderDocumentsView(){
+  const el = document.getElementById('documentsView');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>';
+  await loadDocuments();
+
+  const editable = canEdit();
+  const sortedProps = [...properties].sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
+  const inputCss = 'font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none';
+
+  const propOpts = (selected) => {
+    let opts = `<option value="" ${!selected?'selected':''}>🌐 General</option>`;
+    sortedProps.forEach(p=>{
+      opts += `<option value="${p.id}" ${selected===p.id?'selected':''}>${escapeHtml(p.addr||'(no address)')}</option>`;
+    });
+    return opts;
+  };
+
+  const statusCounts = DOC_STATUSES.reduce((acc,s)=>{ acc[s.v] = documentsCache.filter(d=>(d.status||'in-progress')===s.v).length; return acc; }, {});
+  const totalCount = documentsCache.length;
+
+  const rowsHtml = documentsCache.length===0
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:12px">${editable?'No documents yet. Click <strong>+ Add Document</strong> to log the first one.':'No documents yet.'}</td></tr>`
+    : documentsCache.map(d=>{
+        const status = d.status || 'in-progress';
+        const isRisk = status === 'risk';
+        const rowBg = isRisk ? 'background:rgba(245,112,106,.10);border-left:3px solid var(--red)' : '';
+        const statusInfo = DOC_STATUSES.find(s=>s.v===status) || DOC_STATUSES[0];
+        const propName = d.propertyId ? (sortedProps.find(p=>p.id===d.propertyId)?.addr || '(unknown)') : '🌐 General';
+
+        // PDF / image display + upload / delete controls.
+        const pdfCell = d.pdfUrl
+          ? `<div style="display:flex;align-items:center;gap:6px">
+              <a href="${escapeAttr(d.pdfUrl)}" target="_blank" rel="noopener" title="${escapeAttr(d.pdfName||'Open file')}" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">📎 ${escapeHtml(d.pdfName||'file')}</a>
+              ${editable?`<button title="Replace file" onclick="document.getElementById('docPdfInput-${d.id}').click()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px">↻</button>
+              <button title="Delete file" onclick="deleteDocumentPdf('${d.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button>
+              <input type="file" id="docPdfInput-${d.id}" accept="application/pdf,image/*" style="display:none" onchange="uploadDocumentPdf('${d.id}',this)">`:''}
+            </div>`
+          : editable
+            ? `<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="document.getElementById('docPdfInput-${d.id}').click()">📎 Attach</button>
+               <input type="file" id="docPdfInput-${d.id}" accept="application/pdf,image/*" style="display:none" onchange="uploadDocumentPdf('${d.id}',this)">`
+            : '<span style="color:var(--muted2);font-size:11px">—</span>';
+
+        const dateCell = editable
+          ? `<input type="date" value="${d.docReceivedDate||''}" style="${inputCss};width:135px;color-scheme:${document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'}" onchange="updateDocField('${d.id}','docReceivedDate',this.value)">`
+          : `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(d.docReceivedDate||'—')}</span>`;
+
+        const propertyCell = editable
+          ? `<select style="${inputCss};max-width:200px;cursor:pointer" onchange="updateDocField('${d.id}','propertyId',this.value)">${propOpts(d.propertyId||'')}</select>`
+          : `<span style="font-size:12px;font-weight:500">${escapeHtml(propName)}</span>`;
+
+        const aboutCell = editable
+          ? `<input type="text" value="${escapeAttr(d.about||'')}" placeholder="What is this document…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','about',this.value)">`
+          : `<span style="font-size:12px">${escapeHtml(d.about||'—')}</span>`;
+
+        const actionCell = editable
+          ? `<input type="text" value="${escapeAttr(d.action||'')}" placeholder="What action to take…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','action',this.value)">`
+          : `<span style="font-size:12px">${escapeHtml(d.action||'—')}</span>`;
+
+        const statusCell = editable
+          ? `<select style="${inputCss};background:${statusInfo.bg};color:${statusInfo.color};font-weight:600;border-color:${statusInfo.color}55;cursor:pointer" onchange="updateDocField('${d.id}','status',this.value)">
+              ${DOC_STATUSES.map(s=>`<option value="${s.v}" ${status===s.v?'selected':''}>${s.label}</option>`).join('')}
+            </select>`
+          : `<span style="display:inline-block;padding:3px 8px;border-radius:10px;background:${statusInfo.bg};border:1px solid ${statusInfo.color}55;color:${statusInfo.color};font-size:11px;font-weight:600">${statusInfo.label}</span>`;
+
+        const delBtn = (editable && isAdmin())
+          ? `<button class="btn btn-ghost btn-sm" title="Delete row" onclick="deleteDocument('${d.id}')" style="padding:3px 7px;font-size:12px;color:var(--red)">🗑</button>`
+          : '';
+
+        return `<tr style="${rowBg}">
+          <td style="vertical-align:top">${dateCell}</td>
+          <td style="vertical-align:top">${propertyCell}</td>
+          <td style="vertical-align:top;text-align:center">${pdfCell}</td>
+          <td style="vertical-align:top">${aboutCell}</td>
+          <td style="vertical-align:top">${actionCell}</td>
+          <td style="vertical-align:top">${statusCell}</td>
+          <td style="vertical-align:top;text-align:center">${delBtn}</td>
+        </tr>`;
+      }).join('');
+
+  el.innerHTML = `<div class="table-card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--muted)">Track incoming documents, tie them to a property (or leave General), and note the required follow-up action.</div>
+      <div style="flex:1"></div>
+      ${editable?`<button class="btn btn-primary btn-sm" onclick="addDocument()" style="font-size:12px;padding:6px 14px">+ Add Document</button>`:''}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalCount}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">Total</div>
+      </div>
+      ${DOC_STATUSES.map(s=>`<div style="background:var(--surface);border:1px solid var(--border2);border-left:3px solid ${s.color};border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:${s.color}">${statusCounts[s.v]||0}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">${s.label.replace(/^[^\s]+\s/,'')}</div>
+      </div>`).join('')}
+    </div>
+    <div class="tbl-wrap"><table style="width:100%">
+      <thead><tr>
+        <th style="width:150px">📅 Doc Received</th>
+        <th style="width:220px">🏠 Property</th>
+        <th style="width:170px;text-align:center">📎 PDF / Image</th>
+        <th>ℹ About</th>
+        <th>⚡ Action</th>
+        <th style="width:150px">📌 Status</th>
+        <th style="width:50px"></th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>
+  </div>`;
+}
+
+async function addDocument(){
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  try{
+    const now = new Date();
+    const uid = (currentUser && currentUser.uid) || null;
+    const name = (currentUser && (currentUser.name || currentUser.email)) || 'unknown';
+    const data = {
+      docReceivedDate: now.toISOString().slice(0,10),
+      propertyId: '',
+      pdfUrl: '', pdfPath: '', pdfName: '',
+      about: '',
+      action: '',
+      status: 'in-progress',
+      createdAt: now,
+      createdByUid: uid,
+      createdByName: name
+    };
+    const ref = await db.collection('documentsTracking').add(data);
+    documentsCache.unshift({id:ref.id, ...data});
+    renderDocumentsView();
+  }catch(e){ toast('Failed: '+(e.message||'error')); }
+}
+
+async function updateDocField(id, field, value){
+  const d = documentsCache.find(x=>x.id===id);
+  if(!d) return;
+  try{
+    const updates = {[field]: value, updatedAt:new Date()};
+    await db.collection('documentsTracking').doc(id).update(updates);
+    d[field] = value;
+    // Re-render when status or property changes so row color / label
+    // update; typing into about/action doesn't need a full re-render.
+    if(field==='status' || field==='propertyId') renderDocumentsView();
+  }catch(e){ toast('Failed: '+(e.message||'error')); }
+}
+
+async function uploadDocumentPdf(id, input){
+  const file = input.files && input.files[0];
+  input.value = ''; // let the user re-pick the same file later
+  if(!file){ return; }
+  if(file.size > 25 * 1024 * 1024){ toast('File too large (max 25 MB)'); return; }
+  toast('Uploading…');
+  try{
+    const safeName = (file.name || 'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `documents/${id}/${Date.now()}_${safeName}`;
+    const ref = firebase.storage().ref(path);
+    await ref.put(file, {contentType: file.type || 'application/octet-stream'});
+    const url = await ref.getDownloadURL();
+    // If replacing an existing file, delete the old one first (best-effort).
+    const d = documentsCache.find(x=>x.id===id);
+    if(d && d.pdfPath){
+      try{ await firebase.storage().ref(d.pdfPath).delete(); }
+      catch(err){ console.warn('old file delete', err); }
+    }
+    const updates = {
+      pdfUrl: url,
+      pdfPath: path,
+      pdfName: file.name || safeName,
+      updatedAt: new Date()
+    };
+    await db.collection('documentsTracking').doc(id).update(updates);
+    if(d) Object.assign(d, updates);
+    toast('File uploaded');
+    renderDocumentsView();
+  }catch(e){ toast('Upload failed: '+(e.message||'unknown')); }
+}
+
+async function deleteDocumentPdf(id){
+  if(!confirm('Remove this file?')) return;
+  const d = documentsCache.find(x=>x.id===id);
+  if(!d) return;
+  try{
+    if(d.pdfPath){
+      try{ await firebase.storage().ref(d.pdfPath).delete(); }
+      catch(err){ console.warn('storage delete', err); }
+    }
+    const updates = {pdfUrl:'', pdfPath:'', pdfName:'', updatedAt:new Date()};
+    await db.collection('documentsTracking').doc(id).update(updates);
+    Object.assign(d, updates);
+    toast('File removed');
+    renderDocumentsView();
+  }catch(e){ toast('Failed: '+(e.message||'error')); }
+}
+
+async function deleteDocument(id){
+  if(!isAdmin()){ toast('Admin only'); return; }
+  if(!confirm('Delete this document row? The attached file will also be removed.')) return;
+  const d = documentsCache.find(x=>x.id===id);
+  try{
+    if(d && d.pdfPath){
+      try{ await firebase.storage().ref(d.pdfPath).delete(); }
+      catch(err){ console.warn('storage delete', err); }
+    }
+    await db.collection('documentsTracking').doc(id).delete();
+    documentsCache = documentsCache.filter(x=>x.id!==id);
+    renderDocumentsView();
+  }catch(e){ toast('Failed: '+(e.message||'error')); }
 }
 
 async function renderCertificatesView(){
@@ -13944,7 +14188,7 @@ function showView(v){
     team:'teamView', activity:'activityView', myPayments:'myPaymentsView', tasks:'tasksView', sosRequests:'sosRequestsView', meetings:'meetingsView',
     legal:'legalView', maintenance:'maintenanceView', technician:'technicianView', notices:'noticesView',
     leads:'leadsView', available:'availableView', leasingDashboard:'leasingDashboardView', utility:'utilityView',
-    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView',
+    tenants:'tenantsView', tenantLease:'tenantLeaseView', dailyLog:'dailyLogView', expenses:'expensesView', notifications:'notificationsView', innovation:'innovationView', inspections:'inspectionsView', certificates:'certificatesView', documents:'documentsView',
     callLog:'callLogView', backups:'backupsView',
     construction:'constructionView',
     constProjects:'constProjectsView',
@@ -13977,7 +14221,7 @@ function showView(v){
     legal:'Legal Cases', maintenance:'Maintenance Records', technician:'Technician',
     leads:'Leads', leasingDashboard:'Leasing Dashboard',
     available:'Available Units', utility:'Utility Tracking',
-    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker', certificates:'Property Certificates',
+    tenants:'Tenant Info', tenantLease:'Tenant & Lease', dailyLog:'Daily Log', expenses:'Expenses', notifications:'Notifications', innovation:'Innovation', inspections:'Inspection Tracker', certificates:'Property Certificates', documents:'Documents Tracking',
     callLog:'Call Log', backups:'Backups',
     construction:'Construction Expense Tracking',
     constProjects:'Construction Projects',
@@ -14045,6 +14289,7 @@ function showView(v){
   if(v==='tenantLease') renderTenantLeaseView();
   if(v==='available') renderAvailableView();
   if(v==='leads'){ renderLeadsView(); markLeadsViewed(); }
+  if(v==='documents') renderDocumentsView();
   if(v==='leasingDashboard') renderLeasingDashboardView();
   if(v==='backups') renderBackupsView();
   if(v==='inspections') renderInspectionsView();
