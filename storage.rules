@@ -21,6 +21,19 @@ service firebase.storage {
       allow read, write: if request.auth != null;
     }
 
+    // Documents Tracking attachments (PDF or image) — uploaded from
+    // the Documents Tracking section. Any authenticated user can
+    // read/write; the section's front-end gates delete to admins.
+    match /documents/{docId}/{filename} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Collection notices (30-day / 3-day notice photos) — uploaded
+    // from the Collection Houses tab per property.
+    match /collectionNotices/{propertyId}/{kind}/{filename} {
+      allow read, write: if request.auth != null;
+    }
+
     // Default deny everything else.
     match /{allPaths=**} {
       allow read, write: if false;
