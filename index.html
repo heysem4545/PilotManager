@@ -11826,7 +11826,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-27-13';
+const APP_VERSION='2026-07-27-14';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12758,13 +12758,20 @@ async function renderDocumentsView(){
             <datalist id="docPropDl_${d.id}"><option value="🌐 General">${sortedProps.map(p=>`<option value="${escapeAttr(p.addr||'')}">`).join('')}</datalist>`
           : `<span style="font-size:12px;font-weight:500">${escapeHtml(propName)}</span>`;
 
+        // About / Action can hold multi-sentence text — attach the
+        // shared hover popup (showLmTip) so users can read the full
+        // string without expanding the column.
         const aboutCell = editable
-          ? `<input type="text" value="${escapeAttr(d.about||'')}" placeholder="What is this document…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','about',this.value)">`
-          : `<span style="font-size:12px">${escapeHtml(d.about||'—')}</span>`;
+          ? `<input type="text" value="${escapeAttr(d.about||'')}" placeholder="What is this document…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','about',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()">`
+          : (d.about
+              ? `<span style="font-size:12px;cursor:help;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-full="${escapeAttr(d.about)}" onmouseenter="showLmTip(this,this.dataset.full)" onmouseleave="hideLmTip()">${escapeHtml(d.about)}</span>`
+              : `<span style="font-size:12px">—</span>`);
 
         const actionCell = editable
-          ? `<input type="text" value="${escapeAttr(d.action||'')}" placeholder="What action to take…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','action',this.value)">`
-          : `<span style="font-size:12px">${escapeHtml(d.action||'—')}</span>`;
+          ? `<input type="text" value="${escapeAttr(d.action||'')}" placeholder="What action to take…" style="${inputCss};width:100%" onblur="updateDocField('${d.id}','action',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()">`
+          : (d.action
+              ? `<span style="font-size:12px;cursor:help;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-full="${escapeAttr(d.action)}" onmouseenter="showLmTip(this,this.dataset.full)" onmouseleave="hideLmTip()">${escapeHtml(d.action)}</span>`
+              : `<span style="font-size:12px">—</span>`);
 
         const statusCell = editable
           ? `<select style="${inputCss};background:${statusInfo.bg};color:${statusInfo.color};font-weight:600;border-color:${statusInfo.color}55;cursor:pointer" onchange="updateDocField('${d.id}','status',this.value)">
