@@ -11868,7 +11868,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-06';
+const APP_VERSION='2026-07-28-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15373,7 +15373,7 @@ function renderAvailableView(){
       </div>
       <div style="display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">${filterButtons}</div>
       <div class="tbl-wrap">
-        <table style="width:100%;border-collapse:collapse">
+        <table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:900px">
           <thead>
             <tr>
               <th style="width:150px">Status</th>
