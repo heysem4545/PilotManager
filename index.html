@@ -8019,12 +8019,15 @@ function startAssignedTaskBadge(){
   });
 }
 
-// Convert vertical wheel input to horizontal scroll on wide multi-
-// part tables (Call Log, Leads, Inspection Tracker). Without this
-// the user had to click into the table first before their mouse
-// wheel / trackpad scroll would move the columns left/right —
-// awkward the moment you land on the section. One capture-phase
-// listener handles every wide .tbl-wrap in the app.
+// Convert vertical wheel input to horizontal scroll on any wide
+// table (Call Log, Leads, Inspection Tracker, Available Units,
+// Pending Rent, Utility Tracking, etc.). Without this the user
+// had to click into the table first before their mouse wheel /
+// trackpad scroll would move the columns left/right — awkward
+// the moment you land on the section. One capture-phase listener
+// handles every .tbl-wrap in the app, and the overflow check
+// below keeps narrow (non-overflowing) tables untouched so page
+// scroll still works normally there.
 function startWideTableWheelToHorizontal(){
   if(window._wideTableWheelHooked) return;
   window._wideTableWheelHooked = true;
@@ -8034,11 +8037,10 @@ function startWideTableWheelToHorizontal(){
     if(e.shiftKey) return;
     if(Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
     if(!e.target || !e.target.closest) return;
-    // Only act on wraps that actually host a wide table.
     const wrap = e.target.closest('.tbl-wrap');
     if(!wrap) return;
-    if(!wrap.querySelector(':scope > table.call-log-tbl')) return;
-    // Skip if there's nothing to scroll horizontally.
+    // Skip if there's nothing to scroll horizontally — narrow tables
+    // still get normal vertical page scrolling.
     if(wrap.scrollWidth <= wrap.clientWidth + 1) return;
     // Skip if the wheel event landed inside an input/select/textarea
     // — those elements might need vertical wheel for their own use
@@ -11868,7 +11870,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-07';
+const APP_VERSION='2026-07-28-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
