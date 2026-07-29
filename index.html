@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3884,9 +3884,9 @@ async function renderCollectionLegalCases(){
     const notice3PicName=(p&&p.notice3PicName)||'';
     return `<tr id="lc-row-${safeId}">
       <td><span class="lc-chevron" id="lc-chev-${safeId}" onclick="toggleLegalDetail('${safeId}')" style="cursor:pointer;margin-right:6px"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></span><strong style="font-size:12px">${escapeHtml(c.addr||'')}</strong></td>
-      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice30Date||'—')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(fmtMDY(c.notice30Date)||'—')}</td>
       <td style="text-align:center">${renderNoticePicCellLegal(c.propertyId,'notice30',notice30PicUrl,notice30PicName,editable)}</td>
-      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(c.notice3Date||'—')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${escapeHtml(fmtMDY(c.notice3Date)||'—')}</td>
       <td style="text-align:center">${renderNoticePicCellLegal(c.propertyId,'notice3',notice3PicUrl,notice3PicName,editable)}</td>
       <td style="text-align:center">${c.vawa?'<span style="color:var(--accent);font-weight:600">Yes</span>':'<span style="color:var(--muted)">No</span>'}</td>
       <td><input type="text" value="${escapeAttr(lawyerName)}" placeholder="Lawyer name" ${dis} style="font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--font);width:130px" onblur="updatePropertyField('${c.propertyId}','lawyerName',this.value)"></td>
@@ -9362,7 +9362,7 @@ function renderDepositArchived(el, tabsHtml){
     return `<tr>
       <td style="font-size:11px;color:var(--muted);font-family:var(--mono);width:30px">${i+1}</td>
       <td style="font-weight:500;color:var(--text);min-width:180px">${escapeHtml(d.addr||'')}</td>
-      <td style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(d.archivedDate||'')}</td>
+      <td style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(fmtMDY(d.archivedDate))}</td>
       ${cell(d.deposit1Amount||0, d.deposit1Note||'', d.deposit1Date||'')}
       ${cell(d.deposit2Amount||0, d.deposit2Note||'', d.deposit2Date||'')}
       ${cell(d.deposit3Amount||0, d.deposit3Note||'', d.deposit3Date||'')}
@@ -12012,7 +12012,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-04';
+const APP_VERSION='2026-07-29-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12452,7 +12452,7 @@ async function renderMyPaymentsView(){
       }).join('');
       html+=`<tr>
         <td style="font-weight:500">${escapeHtml(p.payTo||'')}</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(p.dueDate||'—')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(fmtMDY(p.dueDate)||'—')}</td>
         ${cells}
         <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Edit" onclick="editMyPayment('${p.id}')">✎</button> <button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteMyPayment('${p.id}')">🗑</button></td>
       </tr>`;
@@ -12942,7 +12942,7 @@ async function renderDocumentsView(){
 
         const dateCell = editable
           ? `<input type="date" value="${d.docReceivedDate||''}" style="${inputCss};width:135px;color-scheme:${document.documentElement.getAttribute('data-theme')==='light'?'light':'dark'}" onchange="updateDocField('${d.id}','docReceivedDate',this.value)">`
-          : `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(d.docReceivedDate||'—')}</span>`;
+          : `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${escapeHtml(fmtMDY(d.docReceivedDate)||'—')}</span>`;
 
         // Native HTML5 combobox — same pattern the Call Log tab
         // uses for its property input. Typing filters the datalist
@@ -13573,6 +13573,17 @@ function fmtLegalDate(v){
 function escapeHtml(s){
   if(s==null) return '';
   return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Convert a stored ISO date (YYYY-MM-DD) to the US display format
+// MM/DD/YYYY. Non-ISO / empty inputs pass through unchanged so
+// legacy free-text notes ('N/A', '—', etc.) still render as typed.
+function fmtMDY(iso){
+  if(!iso) return '';
+  const s = String(iso).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(!m) return s;
+  return `${m[2]}/${m[3]}/${m[1]}`;
 }
 
 async function renderLegalView(){
@@ -15704,7 +15715,7 @@ function renderAvailableView(){
     };
     const dateCell = (p, field) => {
       const v = p[field] || '';
-      if(!editable) return `<span style="font-size:11px;color:var(--text)">${escapeHtml(v||'—')}</span>`;
+      if(!editable) return `<span style="font-size:11px;color:var(--text)">${escapeHtml(fmtMDY(v)||'—')}</span>`;
       return `<input type="date" value="${escapeAttr(v)}" onchange="updateAvailablePendingField('${p.id}','${field}',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:135px">`;
     };
     const typeCell = (p) => {
@@ -16570,7 +16581,7 @@ function renderMyMeetingTodosTab(){
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
                 ${effectiveUserFilter!=='me' && t.assignedName ? `<span>👤 ${escapeHtml(t.assignedName)}</span>` : ''}
-                ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 Due ${escapeHtml(t.dueDate)}${overdue?' · OVERDUE':''}</span>`:'<span style="color:var(--muted2)">📅 No due date</span>'}
+                ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 Due ${escapeHtml(fmtMDY(t.dueDate))}${overdue?' · OVERDUE':''}</span>`:'<span style="color:var(--muted2)">📅 No due date</span>'}
                 ${statusPill(t)}
                 ${t.notes?`<span style="color:var(--text);font-style:italic">📝 ${escapeHtml(t.notes)}</span>`:''}
               </div>
@@ -17854,7 +17865,7 @@ function renderMtgLogTodos(mtg){
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
         ${t.assignedName?`<span>👤 ${escapeHtml(t.assignedName)}</span>`:''}
-        ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 ${escapeHtml(t.dueDate)}${overdue?' · OVERDUE':''}</span>`:''}
+        ${t.dueDate?`<span style="color:${overdue?'var(--red)':'var(--muted)'};font-weight:${overdue?'700':'500'}">📅 ${escapeHtml(fmtMDY(t.dueDate))}${overdue?' · OVERDUE':''}</span>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:11px;color:var(--muted2);flex-shrink:0">📝</span>
