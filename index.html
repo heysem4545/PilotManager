@@ -12011,7 +12011,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-28-18';
+const APP_VERSION='2026-07-29-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14946,7 +14946,19 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
   }
   grid += `</div>`;
 
-  // Right side — flat list of every appointment in this month.
+  // Right side — flat list of every appointment in this month, with
+  // per-appointment leasing-agent controls (confirmed → showed →
+  // background check → approved/denied). Fields live on the callLog
+  // doc so the same values are visible from the Call Log tab too.
+  const stat = c => (c.applicationStatus || '').toLowerCase();
+  const sums = {
+    total:     monthLeads.length,
+    confirmed: monthLeads.filter(c => c.appointmentConfirmed).length,
+    showed:    monthLeads.filter(c => c.appointmentShown).length,
+    bgSent:    monthLeads.filter(c => c.bgCheckSent).length,
+    approved:  monthLeads.filter(c => stat(c) === 'approved').length,
+    denied:    monthLeads.filter(c => stat(c) === 'denied').length
+  };
   const list = monthLeads.length===0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No appointments this month.</div>`
     : monthLeads
@@ -14958,30 +14970,75 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
           const isPast = !isNaN(d) && d < new Date(today.toDateString());
           const isOwn = c.leadSource==='self';
           const sourceColor = isOwn ? '#4ade80' : '#a78bfa';
-          const stripColor = isTodayItem ? 'var(--accent)' : isPast ? 'var(--muted2)' : sourceColor;
+          const st = stat(c);
+          // Colored left strip: today > status > age > source.
+          const stripColor = isTodayItem ? 'var(--accent)'
+            : st === 'approved' ? '#4ade80'
+            : st === 'denied' ? '#f5706a'
+            : isPast ? 'var(--muted2)' : sourceColor;
           const badge = isOwn
             ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(74,222,128,.15);color:#4ade80;font-weight:700">🎯 Own</span>`
             : `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(167,139,250,.15);color:#a78bfa;font-weight:700">📞 Call Log</span>`;
+          const statusBadge = st === 'approved'
+            ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(74,222,128,.18);color:#4ade80;font-weight:700">✔ APPROVED</span>`
+            : st === 'denied'
+              ? `<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(245,112,106,.18);color:#f5706a;font-weight:700">✖ DENIED</span>`
+              : '';
           const propLabel = c.property || c.propertyAddress || '';
-          return `<div onclick="${openLeadFromCalendar(c.id)}" style="display:flex;gap:10px;padding:8px 10px;border:1px solid var(--border2);border-left:3px solid ${stripColor};border-radius:6px;margin-bottom:6px;cursor:pointer;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-            <div style="min-width:52px;text-align:center;padding-top:2px">
-              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${DNAMES[d.getDay()]||''}</div>
-              <div style="font-size:16px;font-weight:700;color:${isTodayItem?'var(--accent)':'var(--text)'};line-height:1">${d.getDate()||'—'}</div>
-              <div style="font-size:9px;color:var(--muted);margin-top:1px">${fmtTime(c.appointmentTime)||''}</div>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHtml(c.name||'(no name)')}</div>
-                ${badge}
+          // Row background subtly tints on final status.
+          const cardBg = st === 'approved' ? 'rgba(74,222,128,.05)' : st === 'denied' ? 'rgba(245,112,106,.05)' : '';
+          // stopPropagation on the controls so clicking them doesn't
+          // bubble up to the card's openLeadFromCalendar handler.
+          const stop = 'event.stopPropagation()';
+          const cbCss = 'accent-color:#a78bfa;width:14px;height:14px;cursor:pointer';
+          const lblCss = 'display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text);cursor:pointer';
+          return `<div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--border2);border-left:3px solid ${stripColor};border-radius:6px;margin-bottom:6px;background:${cardBg};transition:background .12s">
+            <div onclick="${openLeadFromCalendar(c.id)}" style="display:flex;gap:10px;padding:8px 10px;cursor:pointer" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+              <div style="min-width:52px;text-align:center;padding-top:2px">
+                <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${DNAMES[d.getDay()]||''}</div>
+                <div style="font-size:16px;font-weight:700;color:${isTodayItem?'var(--accent)':'var(--text)'};line-height:1">${d.getDate()||'—'}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:1px">${fmtTime(c.appointmentTime)||''}</div>
               </div>
-              ${propLabel?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🏠 ${escapeHtml(propLabel)}</div>`:''}
-              ${c.number?`<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px">📞 ${escapeHtml(c.number)}</div>`:''}
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHtml(c.name||'(no name)')}</div>
+                  ${badge}${statusBadge}
+                </div>
+                ${propLabel?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🏠 ${escapeHtml(propLabel)}</div>`:''}
+                ${c.number?`<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px">📞 ${escapeHtml(c.number)}</div>`:''}
+              </div>
+            </div>
+            <div onclick="${stop}" style="display:flex;flex-direction:column;gap:6px;padding:6px 10px 8px 62px;border-top:1px dashed var(--border2)">
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <label style="${lblCss}" onclick="${stop}">
+                  <input type="checkbox" ${c.appointmentConfirmed?'checked':''} style="${cbCss}" onchange="updateLeadField('${c.id}','appointmentConfirmed',this.checked)"> ✅ Confirmed
+                </label>
+                <label style="${lblCss}" onclick="${stop}">
+                  <input type="checkbox" ${c.appointmentShown?'checked':''} style="${cbCss}" onchange="updateLeadField('${c.id}','appointmentShown',this.checked)"> 👀 Showed
+                </label>
+                <label style="${lblCss}" onclick="${stop}">
+                  <input type="checkbox" ${c.bgCheckSent?'checked':''} style="${cbCss}" onchange="updateLeadField('${c.id}','bgCheckSent',this.checked)"> 🔗 Sent BG link
+                </label>
+              </div>
+              <textarea placeholder="Showing notes…" onclick="${stop}" onblur="updateLeadField('${c.id}','appointmentNotes',this.value)" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;width:100%;resize:vertical;min-height:32px;max-height:120px">${escapeHtml(c.appointmentNotes||'')}</textarea>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase">Status</span>
+                <select onclick="${stop}" onchange="updateLeadField('${c.id}','applicationStatus',this.value)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+                  <option value="" ${!c.applicationStatus?'selected':''}>— Pending —</option>
+                  <option value="Approved" ${st==='approved'?'selected':''}>✔ Approved</option>
+                  <option value="Denied" ${st==='denied'?'selected':''}>✖ Denied</option>
+                </select>
+              </div>
             </div>
           </div>`;
         }).join('');
 
+  const pill = (label, count, color) => `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;background:${color}18;border:1px solid ${color}44;font-size:11px;color:var(--text)">
+    <span style="font-weight:600;color:${color}">${label}</span>
+    <strong style="font-size:13px;color:var(--text)">${count}</strong>
+  </div>`;
   return `<div class="table-card" style="padding:16px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(-1)" style="padding:4px 10px">‹</button>
       <div style="font-size:15px;font-weight:700;color:var(--text);min-width:150px;text-align:center">${MNAMES[m]} ${y}</div>
       <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(1)" style="padding:4px 10px">›</button>
@@ -14994,8 +15051,16 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
         <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
           <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#a78bfa"></span> 📞 Call Log <strong style="color:var(--text)">${monthLeads.filter(c=>c.leadSource!=='self').length}</strong>
         </span>
-        <span style="font-size:11px;color:var(--muted);border-left:1px solid var(--border);padding-left:10px">${monthLeads.length} total · ${escapeHtml(activeFirst||'—')}</span>
+        <span style="font-size:11px;color:var(--muted);border-left:1px solid var(--border);padding-left:10px">${escapeHtml(activeFirst||'—')}</span>
       </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
+      ${pill('📅 Total', sums.total, '#a78bfa')}
+      ${pill('✅ Confirmed', sums.confirmed, '#60a5fa')}
+      ${pill('👀 Showed', sums.showed, '#facc15')}
+      ${pill('🔗 BG Sent', sums.bgSent, '#f59e0b')}
+      ${pill('✔ Approved', sums.approved, '#4ade80')}
+      ${pill('✖ Denied', sums.denied, '#f5706a')}
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start">
       <div>${grid}</div>
