@@ -1689,6 +1689,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <option value="Paperwork">Paperwork</option>
           <option value="Maintenance Follow Up">Maintenance Follow Up</option>
           <option value="Appointment">Appointment</option>
+          <option value="General">General</option>
         </select>
       </div>
       <div class="fg"><label>Status</label>
@@ -12011,7 +12012,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-01';
+const APP_VERSION='2026-07-29-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18205,7 +18206,7 @@ async function renderCallLogView(skipLoad){
         return `<select style="${iss}" onchange="updateCallLogField('${c.id}','${fld}',this.value)">${options}</select>`;
       };
       const dirOpts = ['Inbound','Outbound'].map(o=>`<option value="${o}"${(c.direction||'Inbound')===o?' selected':''}>${o==='Inbound'?'📥':'📤'} ${o}</option>`).join('');
-      const reasonOpts = ['Maintenance','For Rent','Payments','Paperwork','Maintenance Follow Up','Appointment'].map(o=>`<option value="${o}"${(c.reason||'')===o?' selected':''}>${o}</option>`).join('');
+      const reasonOpts = ['Maintenance','For Rent','Payments','Paperwork','Maintenance Follow Up','Appointment','General'].map(o=>`<option value="${o}"${(c.reason||'')===o?' selected':''}>${o}</option>`).join('');
       const statusOpts2 = ['Completed','Needs Attention','Emergency'].map(o=>`<option value="${o}"${(c.status||'Completed')===o?' selected':''}>${o==='Completed'?'✅':o==='Emergency'?'🚨':'⚠️'} ${o}</option>`).join('');
       return `<tr>
         <td><input type="date" value="${c.date||''}" style="${is};width:125px" onchange="logCallChange('${c.id}','date',this.value,'${escapeAttr(c.date||'')}');updateCallLogField('${c.id}','date',this.value)"></td>
