@@ -12012,7 +12012,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-03';
+const APP_VERSION='2026-07-29-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14906,11 +14906,12 @@ function openAgentApptModal(existing){
   const today = new Date();
   const defaultDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const a = existing || {};
+  const rec = a.recurrence || '';
   const modal = document.createElement('div');
   modal.className = 'overlay open';
   modal.id = 'agentApptModal';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
-  modal.innerHTML = `<div class="modal" style="width:480px;max-width:96vw">
+  modal.innerHTML = `<div class="modal" style="width:540px;max-width:96vw">
     <div class="modal-title"><span>${existing?'Edit':'+ Add'} Personal Appointment</span><button class="modal-close" onclick="document.getElementById('agentApptModal').remove()">×</button></div>
     <div style="display:flex;flex-direction:column;gap:10px;padding:4px 2px">
       <div>
@@ -14919,7 +14920,7 @@ function openAgentApptModal(existing){
       </div>
       <div style="display:grid;grid-template-columns:1fr 130px;gap:10px">
         <div>
-          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Date</label>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${rec?'Starts on':'Date'}</label>
           <input type="date" id="agentApptDate" value="${escapeAttr(a.date||defaultDate)}" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
         </div>
         <div>
@@ -14927,13 +14928,30 @@ function openAgentApptModal(existing){
           <input type="time" id="agentApptTime" value="${escapeAttr(a.time||'12:00')}" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
         </div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔁 Repeat</label>
+          <select id="agentApptRecurrence" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
+            <option value="" ${rec===''?'selected':''}>None (one-time)</option>
+            <option value="daily" ${rec==='daily'?'selected':''}>Every day</option>
+            <option value="weekly" ${rec==='weekly'?'selected':''}>Every week (same weekday)</option>
+            <option value="biweekly" ${rec==='biweekly'?'selected':''}>Every 2 weeks</option>
+            <option value="monthly" ${rec==='monthly'?'selected':''}>Every month (same date)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Until (optional)</label>
+          <input type="date" id="agentApptRecurrenceEnd" value="${escapeAttr(a.recurrenceEnd||'')}" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);padding:0 2px;font-style:italic">Pick a repeat option (e.g. Every week + a Tuesday date = every Tuesday). Edits update the whole series. Leave "Until" blank for indefinite.</div>
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Notes (optional)</label>
         <textarea id="agentApptNotes" placeholder="Where · with whom · anything to remember" style="width:100%;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px;resize:vertical;min-height:60px">${escapeHtml(a.notes||'')}</textarea>
       </div>
     </div>
     <div class="modal-foot">
-      ${existing?`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(245,112,106,.3)" onclick="deleteAgentAppt('${existing.id}')">Delete</button><div style="flex:1"></div>`:''}
+      ${existing?`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(245,112,106,.3)" onclick="deleteAgentAppt('${existing.id}')">Delete${rec?' series':''}</button><div style="flex:1"></div>`:''}
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('agentApptModal').remove()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="saveAgentAppt('${existing?existing.id:''}')">Save</button>
     </div>
@@ -14947,12 +14965,16 @@ async function saveAgentAppt(existingId){
   const date = document.getElementById('agentApptDate')?.value || '';
   const time = document.getElementById('agentApptTime')?.value || '';
   const notes = (document.getElementById('agentApptNotes')?.value || '').trim();
+  const recurrence = document.getElementById('agentApptRecurrence')?.value || '';
+  const recurrenceEnd = document.getElementById('agentApptRecurrenceEnd')?.value || '';
   if(!title){ toast('Enter a title'); return; }
   if(!date){ toast('Pick a date'); return; }
+  if(recurrenceEnd && recurrenceEnd < date){ toast('"Until" must be on or after the start date'); return; }
   const assignedToUid = leadsActiveUserUid || currentUser.uid;
   const data = {
     assignedToUid,
     date, time, title, notes,
+    recurrence, recurrenceEnd,
     updatedAt: new Date()
   };
   try{
@@ -14983,6 +15005,55 @@ function editAgentAppt(id){
   if(a) openAgentApptModal(a);
 }
 
+// Expand a recurring appointment into concrete occurrences that fall
+// inside the given YYYY-MM month window. Returns an array of virtual
+// occurrence objects that carry the parent's fields but with the
+// occurrence date. One-time appointments (recurrence empty) return
+// themselves if in-range.
+function expandAgentApptForMonth(appt, monthKey){
+  if(!appt || !appt.date) return [];
+  const monthStart = monthKey + '-01';
+  // Last day of the visible month.
+  const [y, m] = monthKey.split('-').map(x=>parseInt(x,10));
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const monthEnd = `${monthKey}-${String(daysInMonth).padStart(2,'0')}`;
+  const stop = appt.recurrenceEnd || '';
+  const rec = appt.recurrence || '';
+
+  const inMonth = d => d >= monthStart && d <= monthEnd;
+  const beforeStop = d => !stop || d <= stop;
+  const mkOccurrence = date => ({
+    ...appt,
+    date,
+    _seriesId: appt.id,
+    _isOccurrence: rec ? true : false
+  });
+
+  if(!rec){
+    return inMonth(appt.date) ? [mkOccurrence(appt.date)] : [];
+  }
+
+  // Walk from the appointment's start date forward, stepping by
+  // recurrence unit, until we're past the month end. Bail out safely
+  // at 400 iterations to prevent runaway loops on bad data.
+  const out = [];
+  const startD = new Date(appt.date + 'T00:00:00');
+  if(isNaN(startD)) return [];
+  const iter = new Date(startD);
+  for(let i = 0; i < 400; i++){
+    const iso = `${iter.getFullYear()}-${String(iter.getMonth()+1).padStart(2,'0')}-${String(iter.getDate()).padStart(2,'0')}`;
+    if(iso > monthEnd) break;
+    if(iso >= monthStart && beforeStop(iso)) out.push(mkOccurrence(iso));
+    if(rec === 'daily')    iter.setDate(iter.getDate() + 1);
+    else if(rec === 'weekly')   iter.setDate(iter.getDate() + 7);
+    else if(rec === 'biweekly') iter.setDate(iter.getDate() + 14);
+    else if(rec === 'monthly')  iter.setMonth(iter.getMonth() + 1);
+    else break;
+    if(stop && iso > stop) break;
+  }
+  return out;
+}
+
 // Build the calendar body for the Leads section. Renders a
 // standard month grid + a right-hand list of every appointment in
 // the active month. Each entry links back to the lead's row on the
@@ -14999,11 +15070,12 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
     return typeof d === 'string' && d.slice(0,7) === monthKey;
   });
   // Agent personal appointments for the active user + this month.
-  const monthAppts = agentApptsCache.filter(a => (
-    a.assignedToUid === activeUid
-    && typeof a.date === 'string'
-    && a.date.slice(0,7) === monthKey
-  ));
+  // Recurring entries are expanded into virtual per-day occurrences
+  // so 'every Tuesday' shows up on each Tuesday even though only
+  // one Firestore doc exists.
+  const monthAppts = agentApptsCache
+    .filter(a => a.assignedToUid === activeUid)
+    .flatMap(a => expandAgentApptForMonth(a, monthKey));
   // Group leads by day-of-month.
   const byDay = {};
   monthLeads.forEach(c => {
@@ -15059,8 +15131,9 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
       ${items.slice(0,3).map(item => {
         if(item.kind === 'appt'){
           const a = item.a;
-          return `<div onclick="editAgentAppt('${a.id}')" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(34,211,238,.14);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr('🗓 Personal — '+(a.title||'')+' — '+fmtTime(a.time||''))}">
-            <span style="color:#22d3ee;font-weight:600">🗓 ${escapeHtml(fmtTime(a.time)||'—')}</span> ${escapeHtml(a.title||'(no title)')}
+          const rIcon = a.recurrence ? '🔁 ' : '';
+          return `<div onclick="editAgentAppt('${a.id}')" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(34,211,238,.14);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr((a.recurrence?'🔁 Recurring — ':'')+'🗓 Personal — '+(a.title||'')+' — '+fmtTime(a.time||''))}">
+            <span style="color:#22d3ee;font-weight:600">${rIcon}🗓 ${escapeHtml(fmtTime(a.time)||'—')}</span> ${escapeHtml(a.title||'(no title)')}
           </div>`;
         }
         const c = item.c;
@@ -15115,6 +15188,7 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHtml(a.title||'(no title)')}</div>
                 <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(34,211,238,.18);color:#22d3ee;font-weight:700">🗓 Personal</span>
+                ${a.recurrence?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700" title="Recurs ${escapeAttr(a.recurrence)}${a.recurrenceEnd?' until '+a.recurrenceEnd:''}">🔁 ${escapeHtml(a.recurrence)}</span>`:''}
               </div>
               ${a.notes?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:pre-wrap">${escapeHtml(a.notes)}</div>`:''}
             </div>
