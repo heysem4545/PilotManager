@@ -12012,7 +12012,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-05';
+const APP_VERSION='2026-07-29-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14798,7 +14798,7 @@ async function renderLeadsView(skipLoad){
         <td class="lead-own-hide" style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('stepScript')}"></td>
         <td style="cursor:pointer" onclick="openLeadNote('${c.id}')" title="${escapeAttr(c.notes||'Click to edit')}">${notesPreview}</td>
         <td class="lead-own-hide" style="font-size:11px;color:var(--muted)">${assignedBy?renderUserBadge(assignedBy):'<span class="cl-empty-val">—</span>'}</td>
-        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('followUp')}"></td>
+        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('followUp')};hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
         <td>${mkSel('proofVoucher',['','Received','No Proof'],c.proofVoucher)}</td>
         <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="${uf('proofNote')}"></td>
         <td><input type="text" value="${escapeAttr(c.landlordName||'')}" placeholder="—" style="${is};width:100px" onblur="${uf('landlordName')}"></td>
@@ -14812,7 +14812,7 @@ async function renderLeadsView(skipLoad){
         <td><input type="time" value="${c.appointmentTime||''}" style="${is};width:100px" onchange="${uf('appointmentTime')}"></td>
         <td>${mkSel('verifyAppt',['','Confirmed','No Answer'],c.verifyAppt)}</td>
         <td>${mkSel('showingStatus',['','Completed','No Show','Canceled'],c.showingStatus)}</td>
-        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('comments')}"></td>
+        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('comments')};hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
         <td style="text-align:center"><input type="checkbox" ${c.turboScreening?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('turboScreening')}"></td>
         <td><input type="text" value="${escapeAttr(c.anyNotes||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('anyNotes')}"></td>
         <td>${mkSel('moveForward',['','Yes','Risk','No'],c.moveForward)}</td>
@@ -18473,9 +18473,9 @@ async function renderCallLogView(skipLoad){
         <td>${renderCallNotesCell(c, editable)}</td>
         <td>${addedByDisp}</td>
         <td>${assignDropdown}</td>
-        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','followUp',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','followUp',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
         <td>${mkSel('proofVoucher',['','Received','No Proof'],c.proofVoucher)}</td>
-        <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','proofNote',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.proofNote||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','proofNote',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
         <td><input type="text" value="${escapeAttr(c.landlordName||'')}" placeholder="—" style="${is};width:100px" onblur="updateCallLogField('${c.id}','landlordName',this.value)"></td>
         <td><input type="tel" value="${escapeAttr(c.landlordNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','landlordNumber',this.value)"></td>
         <td><input type="tel" value="${escapeAttr(c.workplaceNumber||'')}" placeholder="📞" style="${isn};width:100px" onblur="updateCallLogField('${c.id}','workplaceNumber',this.value)"></td>
@@ -18487,7 +18487,7 @@ async function renderCallLogView(skipLoad){
         <td><input type="time" value="${c.appointmentTime||''}" style="${is};width:100px" onchange="updateCallLogField('${c.id}','appointmentTime',this.value)"></td>
         <td>${mkSel('verifyAppt',['','Confirmed','No Answer'],c.verifyAppt)}</td>
         <td>${mkSel('showingStatus',['','Completed','No Show','Canceled'],c.showingStatus)}</td>
-        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="updateCallLogField('${c.id}','comments',this.value)"></td>
+        <td><input type="text" value="${escapeAttr(c.comments||'')}" placeholder="📝" style="${is};width:120px" onblur="updateCallLogField('${c.id}','comments',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
         <td style="text-align:center"><input type="checkbox" ${c.turboScreening?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','turboScreening',this.checked)"></td>
         <td><input type="text" value="${escapeAttr(c.anyNotes||'')}" placeholder="📝" style="${is};width:120px" onblur="updateCallLogField('${c.id}','anyNotes',this.value)"></td>
         <td>${mkSel('moveForward',['','Yes','Risk','No'],c.moveForward)}</td>
