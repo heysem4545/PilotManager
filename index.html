@@ -12012,7 +12012,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-02';
+const APP_VERSION='2026-07-29-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14711,6 +14711,7 @@ async function renderLeadsView(skipLoad){
 
   // Calendar sub-tab short-circuits the rest of the render.
   if(leadsSubTab === 'calendar'){
+    startAgentApptsListener();
     el.innerHTML = tabBar + subTabBar + renderLeadsCalendarBody(userAllLeads, activeUid, activeFirst);
     return;
   }
@@ -14872,6 +14873,116 @@ function leadsCalToday(){
   renderLeadsView(true);
 }
 
+// ─── Agent appointments (personal / office / lunch / meeting) ───
+// Non-lead appointments an agent wants pinned to their calendar
+// tab — lunch meetings, doctor visits, office runs, etc. Live in
+// their own Firestore collection so they never mix into callLog
+// data and don't affect the lead pipeline summary.
+//   agentAppointments/<docId> {
+//     assignedToUid, date:'YYYY-MM-DD', time:'HH:MM',
+//     title, notes, createdAt, createdBy
+//   }
+let agentApptsCache = [];
+let agentApptsUnsub = null;
+
+function startAgentApptsListener(){
+  if(agentApptsUnsub) return;
+  agentApptsUnsub = db.collection('agentAppointments').onSnapshot(snap=>{
+    agentApptsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(currentView === 'leads' && leadsSubTab === 'calendar') renderLeadsView(true);
+  }, err => console.warn('agentApptsListener', err?.message));
+}
+
+async function loadAgentAppointments(){
+  try{
+    const snap = await db.collection('agentAppointments').get();
+    agentApptsCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){ console.warn('loadAgentAppointments', e?.message); }
+}
+
+function openAgentApptModal(existing){
+  const el = document.getElementById('agentApptModal');
+  if(el) el.remove();
+  const today = new Date();
+  const defaultDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const a = existing || {};
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'agentApptModal';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:480px;max-width:96vw">
+    <div class="modal-title"><span>${existing?'Edit':'+ Add'} Personal Appointment</span><button class="modal-close" onclick="document.getElementById('agentApptModal').remove()">×</button></div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 2px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Title</label>
+        <input type="text" id="agentApptTitle" value="${escapeAttr(a.title||'')}" placeholder="Lunch meeting · Doctor visit · Office run…" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px" autofocus>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 130px;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Date</label>
+          <input type="date" id="agentApptDate" value="${escapeAttr(a.date||defaultDate)}" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Time</label>
+          <input type="time" id="agentApptTime" value="${escapeAttr(a.time||'12:00')}" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Notes (optional)</label>
+        <textarea id="agentApptNotes" placeholder="Where · with whom · anything to remember" style="width:100%;font-size:12px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px;resize:vertical;min-height:60px">${escapeHtml(a.notes||'')}</textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${existing?`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(245,112,106,.3)" onclick="deleteAgentAppt('${existing.id}')">Delete</button><div style="flex:1"></div>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('agentApptModal').remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveAgentAppt('${existing?existing.id:''}')">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('agentApptTitle')?.focus(), 60);
+}
+
+async function saveAgentAppt(existingId){
+  const title = (document.getElementById('agentApptTitle')?.value || '').trim();
+  const date = document.getElementById('agentApptDate')?.value || '';
+  const time = document.getElementById('agentApptTime')?.value || '';
+  const notes = (document.getElementById('agentApptNotes')?.value || '').trim();
+  if(!title){ toast('Enter a title'); return; }
+  if(!date){ toast('Pick a date'); return; }
+  const assignedToUid = leadsActiveUserUid || currentUser.uid;
+  const data = {
+    assignedToUid,
+    date, time, title, notes,
+    updatedAt: new Date()
+  };
+  try{
+    if(existingId){
+      await db.collection('agentAppointments').doc(existingId).update(data);
+    } else {
+      data.createdAt = new Date();
+      data.createdBy = currentUser?.name || currentUser?.email || '';
+      await db.collection('agentAppointments').add(data);
+    }
+    document.getElementById('agentApptModal')?.remove();
+    toast(existingId?'Appointment updated':'Appointment added');
+    // Listener re-renders automatically.
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+}
+
+async function deleteAgentAppt(id){
+  if(!confirm('Delete this appointment?')) return;
+  try{
+    await db.collection('agentAppointments').doc(id).delete();
+    document.getElementById('agentApptModal')?.remove();
+    toast('Appointment deleted');
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+}
+
+function editAgentAppt(id){
+  const a = agentApptsCache.find(x=>x.id===id);
+  if(a) openAgentApptModal(a);
+}
+
 // Build the calendar body for the Leads section. Renders a
 // standard month grid + a right-hand list of every appointment in
 // the active month. Each entry links back to the lead's row on the
@@ -14887,15 +14998,27 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
     const d = c.appointmentDate || '';
     return typeof d === 'string' && d.slice(0,7) === monthKey;
   });
-  // Group by day-of-month.
+  // Agent personal appointments for the active user + this month.
+  const monthAppts = agentApptsCache.filter(a => (
+    a.assignedToUid === activeUid
+    && typeof a.date === 'string'
+    && a.date.slice(0,7) === monthKey
+  ));
+  // Group leads by day-of-month.
   const byDay = {};
   monthLeads.forEach(c => {
     const day = parseInt((c.appointmentDate||'').slice(8,10), 10);
     if(!day) return;
-    (byDay[day] = byDay[day] || []).push(c);
+    (byDay[day] = byDay[day] || []).push({kind:'lead', c, time:c.appointmentTime||''});
+  });
+  // Add agent appointments to the same day buckets.
+  monthAppts.forEach(a => {
+    const day = parseInt((a.date||'').slice(8,10), 10);
+    if(!day) return;
+    (byDay[day] = byDay[day] || []).push({kind:'appt', a, time:a.time||''});
   });
   // Sort each day's list by time.
-  Object.values(byDay).forEach(list => list.sort((a,b) => (a.appointmentTime||'').localeCompare(b.appointmentTime||'')));
+  Object.values(byDay).forEach(list => list.sort((x,y) => (x.time||'').localeCompare(y.time||'')));
 
   // Grid geometry.
   const daysInMonth = new Date(y, m+1, 0).getDate();
@@ -14933,7 +15056,14 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
         <span style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'};font-size:11px">${d}</span>
         ${hasItems?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700">${items.length}</span>`:''}
       </div>
-      ${items.slice(0,3).map(c => {
+      ${items.slice(0,3).map(item => {
+        if(item.kind === 'appt'){
+          const a = item.a;
+          return `<div onclick="editAgentAppt('${a.id}')" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(34,211,238,.14);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr('🗓 Personal — '+(a.title||'')+' — '+fmtTime(a.time||''))}">
+            <span style="color:#22d3ee;font-weight:600">🗓 ${escapeHtml(fmtTime(a.time)||'—')}</span> ${escapeHtml(a.title||'(no title)')}
+          </div>`;
+        }
+        const c = item.c;
         const isOwn=c.leadSource==='self';
         const chipBg=isOwn?'rgba(74,222,128,.14)':'rgba(167,139,250,.12)';
         const chipColor=isOwn?'#4ade80':'#a78bfa';
@@ -14960,13 +15090,38 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
     approved:  monthLeads.filter(c => stat(c) === 'approved').length,
     denied:    monthLeads.filter(c => stat(c) === 'denied').length
   };
-  const list = monthLeads.length===0
+  // Combined chronological list: leads + agent appointments.
+  const combined = [
+    ...monthLeads.map(c => ({kind:'lead', c, date:c.appointmentDate||'', time:c.appointmentTime||''})),
+    ...monthAppts.map(a => ({kind:'appt', a, date:a.date||'', time:a.time||''}))
+  ].sort((x,y) => (x.date||'').localeCompare(y.date||'') || (x.time||'').localeCompare(y.time||''));
+
+  const list = combined.length===0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No appointments this month.</div>`
-    : monthLeads
-        .slice()
-        .sort((a,b) => (a.appointmentDate||'').localeCompare(b.appointmentDate||'') || (a.appointmentTime||'').localeCompare(b.appointmentTime||''))
-        .map(c => {
-          const d = new Date((c.appointmentDate||'')+'T00:00:00');
+    : combined.map(item => {
+        if(item.kind === 'appt'){
+          const a = item.a;
+          const d = new Date((a.date||'')+'T00:00:00');
+          const isTodayItem = !isNaN(d) && d.toDateString()===today.toDateString();
+          const isPast = !isNaN(d) && d < new Date(today.toDateString());
+          const strip = isTodayItem ? 'var(--accent)' : isPast ? 'var(--muted2)' : '#22d3ee';
+          return `<div onclick="editAgentAppt('${a.id}')" style="display:flex;gap:10px;padding:8px 10px;border:1px solid var(--border2);border-left:3px solid ${strip};border-radius:6px;margin-bottom:6px;cursor:pointer;background:rgba(34,211,238,.05);transition:background .12s" onmouseover="this.style.background='rgba(34,211,238,.10)'" onmouseout="this.style.background='rgba(34,211,238,.05)'">
+            <div style="min-width:52px;text-align:center;padding-top:2px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${DNAMES[d.getDay()]||''}</div>
+              <div style="font-size:16px;font-weight:700;color:${isTodayItem?'var(--accent)':'var(--text)'};line-height:1">${d.getDate()||'—'}</div>
+              <div style="font-size:9px;color:var(--muted);margin-top:1px">${fmtTime(a.time)||''}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHtml(a.title||'(no title)')}</div>
+                <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(34,211,238,.18);color:#22d3ee;font-weight:700">🗓 Personal</span>
+              </div>
+              ${a.notes?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:pre-wrap">${escapeHtml(a.notes)}</div>`:''}
+            </div>
+          </div>`;
+        }
+        const c = item.c;
+        const d = new Date((c.appointmentDate||'')+'T00:00:00');
           const isTodayItem = !isNaN(d) && d.toDateString()===today.toDateString();
           const isPast = !isNaN(d) && d < new Date(today.toDateString());
           const isOwn = c.leadSource==='self';
@@ -15044,6 +15199,7 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
       <div style="font-size:15px;font-weight:700;color:var(--text);min-width:150px;text-align:center">${MNAMES[m]} ${y}</div>
       <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(1)" style="padding:4px 10px">›</button>
       <button class="btn btn-ghost btn-sm" onclick="leadsCalToday()" style="padding:4px 12px;font-size:11px">Today</button>
+      <button class="btn btn-primary btn-sm" onclick="openAgentApptModal()" style="padding:4px 12px;font-size:11px" title="Add a personal / office appointment (lunch, doctor, meeting…) — separate from lead appointments">+ Personal Appt</button>
       <div style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">

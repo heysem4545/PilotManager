@@ -258,5 +258,12 @@ service cloud.firestore {
     match /documentsTracking/{docId} {
       allow read, write: if request.auth != null;
     }
+
+    // Agent Appointments — non-lead personal / office appointments an
+    // agent pins to their Leads Calendar tab (lunch meetings, doctor
+    // visits, office runs, etc). Any authenticated user can read/write.
+    match /agentAppointments/{apptId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
