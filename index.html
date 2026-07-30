@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-09';
+const APP_VERSION='2026-07-29-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18784,7 +18784,7 @@ function openQuickFillCallLog(existingId){
   modal.innerHTML = `<div class="modal" style="width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
     <div class="modal-title" style="display:flex;align-items:center;gap:10px">
       <span>🚀 ${existingId?'Quick Edit':'Quick Fill'} — Call Log</span>
-      <span style="font-size:11px;font-weight:400;color:var(--muted)">Tab to move · arrows for dropdowns · Ctrl+Enter to save</span>
+      <span style="font-size:11px;font-weight:400;color:var(--muted)">↓ / Enter → next field · ↑ → previous · Ctrl+Enter → save</span>
       <div style="flex:1"></div>
       <button class="modal-close" onclick="document.getElementById('quickCallModal').remove()">×</button>
     </div>
@@ -18858,14 +18858,56 @@ function openQuickFillCallLog(existingId){
   </div>`;
   document.body.appendChild(modal);
 
-  // Ctrl+Enter shortcut submits from anywhere in the form.
+  // Excel-style keyboard flow so users can Down / Up / Enter their
+  // way through every field without touching the mouse:
+  //   Enter         → next field  (skips <textarea>, since Enter
+  //                   there means new-line; use Tab or Ctrl+Enter
+  //                   from a textarea instead)
+  //   ArrowDown     → next field  (skipped on <select>, textarea,
+  //                   and date/time/number inputs where the arrow
+  //                   has native meaning we shouldn't break)
+  //   ArrowUp       → prev field  (same skip rules)
+  //   Tab / Shift+Tab still work natively.
+  //   Ctrl / Cmd+Enter → save
+  //   Escape        → close
+  const fieldSel = '[data-field]';
+  const moveFocus = (currentEl, delta) => {
+    const list = Array.from(modal.querySelectorAll(fieldSel));
+    const i = list.indexOf(currentEl);
+    if(i < 0) return;
+    const next = list[Math.max(0, Math.min(list.length - 1, i + delta))];
+    if(!next) return;
+    next.focus();
+    // For text inputs, place the cursor at the end so the user can
+    // immediately append rather than overwrite.
+    if(next.tagName === 'INPUT' && (next.type === 'text' || next.type === 'tel' || next.type === 'email' || next.type === 'search')){
+      const v = next.value || '';
+      try{ next.setSelectionRange(v.length, v.length); }catch(_){}
+    }
+  };
   modal.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ modal.remove(); return; }
     if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
       e.preventDefault();
       submitQuickFillCallLog(existingId||'', false);
+      return;
     }
-    if(e.key === 'Escape'){
-      modal.remove();
+    const el = e.target;
+    if(!el || !el.matches || !el.matches(fieldSel)) return;
+    const tag = el.tagName;
+    const type = (el.type || '').toLowerCase();
+    if(e.key === 'Enter' && !e.shiftKey){
+      if(tag === 'TEXTAREA') return;
+      e.preventDefault();
+      moveFocus(el, +1);
+      return;
+    }
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      if(tag === 'SELECT') return;                                            // cycles options natively
+      if(tag === 'TEXTAREA') return;                                          // moves the cursor
+      if(type === 'date' || type === 'time' || type === 'number') return;      // nudges the value
+      e.preventDefault();
+      moveFocus(el, e.key === 'ArrowDown' ? +1 : -1);
     }
   });
 
