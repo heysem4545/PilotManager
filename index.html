@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-10';
+const APP_VERSION='2026-07-29-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14843,8 +14843,7 @@ async function renderLeadsView(skipLoad){
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
           <thead>
           <tr>
-            <th colspan="${leadsSubTab==='own'?18:22}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
-            <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
+            <th colspan="${leadsSubTab==='own'?25:29}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log &amp; Follow Up</th>
             <th colspan="8" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 4 — Screening</th>
             <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 5 — Move In</th>
@@ -14853,7 +14852,7 @@ async function renderLeadsView(skipLoad){
             <th>Date</th><th class="lead-own-hide">Direction</th><th>Property</th><th class="lead-own-hide">Reason</th><th>Status</th><th>Name</th><th>Number</th>
             <th>✉ Email</th><th>🏠 Bedroom</th><th>💳 Tenant</th><th>📣 Source</th><th>⚖ Eviction</th><th>💲 Income</th><th>🐾 Pets</th><th>👨‍👩‍👧 Members</th><th>📝 Why Leaving</th><th>⏳ How Long</th><th>📅 Move Date</th><th>🕐 Showing</th><th class="lead-own-hide">✅ Script</th>
             <th>Notes</th><th class="lead-own-hide">Assigned By</th>
-            <th style="border-top:2px solid var(--blue)">🔄 Follow Up</th><th style="border-top:2px solid var(--blue)">📄 Proof</th><th style="border-top:2px solid var(--blue)">📝 Proof Note</th><th style="border-top:2px solid var(--blue)">🏠 Landlord</th><th style="border-top:2px solid var(--blue)">📞 Landlord #</th><th style="border-top:2px solid var(--blue)">💼 Work #</th><th style="border-top:2px solid var(--blue)">📊 Status</th>
+            <th>🔄 Follow Up</th><th>📄 Proof</th><th>📝 Proof Note</th><th>🏠 Landlord</th><th>📞 Landlord #</th><th>💼 Work #</th><th>📊 Status</th>
             <th style="border-top:2px solid var(--purple)">💳 Tenant</th><th style="border-top:2px solid var(--purple)">🤳 Selfie</th><th style="border-top:2px solid var(--purple)">🕐 Arrival</th><th style="border-top:2px solid var(--purple)">📅 Appt Date</th><th style="border-top:2px solid var(--purple)">🕑 Appt Time</th><th style="border-top:2px solid var(--purple)">📞 Verify</th><th style="border-top:2px solid var(--purple)">🏠 Showing</th><th style="border-top:2px solid var(--purple)">💬 Comments</th>
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🔍 Turbo</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">📝 Notes</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🚀 Forward</th>
             <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease Start</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease End</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">✍ Signed</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">💰 Deposit</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">⚡ Electric</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔥 Gas</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔑 Key</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📋 Move In</th>
@@ -18614,8 +18613,7 @@ async function renderCallLogView(skipLoad){
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
           <thead>
           <tr>
-            <th colspan="23" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log</th>
-            <th colspan="7" style="text-align:center;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📂 PART 2 — Follow Up</th>
+            <th colspan="30" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log &amp; Follow Up</th>
             <th colspan="8" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 3 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 4 — Screening</th>
             <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 5 — Move In</th>
@@ -18645,13 +18643,13 @@ async function renderCallLogView(skipLoad){
             <th>Notes</th>
             <th>Added By</th>
             <th>Assign To</th>
-            <th style="border-top:2px solid var(--blue)">🔄 Follow Up</th>
-            <th style="border-top:2px solid var(--blue)">📄 Proof Voucher</th>
-            <th style="border-top:2px solid var(--blue)">📝 Proof Note</th>
-            <th style="border-top:2px solid var(--blue)">🏠 Landlord Name</th>
-            <th style="border-top:2px solid var(--blue)">📞 Landlord #</th>
-            <th style="border-top:2px solid var(--blue)">💼 Workplace #</th>
-            <th style="border-top:2px solid var(--blue)">📊 Status</th>
+            <th>🔄 Follow Up</th>
+            <th>📄 Proof Voucher</th>
+            <th>📝 Proof Note</th>
+            <th>🏠 Landlord Name</th>
+            <th>📞 Landlord #</th>
+            <th>💼 Workplace #</th>
+            <th>📊 Status</th>
             <th style="border-top:2px solid var(--purple)">💳 Tenant Type</th>
             <th style="border-top:2px solid var(--purple)">🤳 Selfie</th>
             <th style="border-top:2px solid var(--purple)">🕐 Arrival Time</th>
@@ -18816,14 +18814,14 @@ function openQuickFillCallLog(existingId){
         ${row('Showing Pref',   showPrefSel)}
         ${row('Step Script',    chk('stepScript', c.stepScript))}
 
-        ${sectionOpen('📋 CMHA / Verification (Part 2)')}
+        ${sectionOpen('📋 Follow Up / CMHA Verification')}
         ${row('Proof Voucher',  proofSel)}
         ${row('Proof Note',     txt('proofNote', c.proofNote, 'text'))}
         ${row('Landlord Name',  txt('landlordName', c.landlordName, 'text'))}
         ${row('Landlord #',     txt('landlordNumber', c.landlordNumber, 'tel'))}
         ${row('Workplace #',    txt('workplaceNumber', c.workplaceNumber, 'tel'))}
-        ${row('Part-2 Status',  part2Sel)}
-        ${row('Tenant Type 2',  tenant2Sel)}
+        ${row('Follow-up Status',  part2Sel)}
+        ${row('Tenant Type (verify)', tenant2Sel)}
         ${row('Selfie',         chk('selfie', c.selfie))}
 
         ${sectionOpen('🕐 Appointment / Showing')}
