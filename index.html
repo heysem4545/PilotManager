@@ -2734,6 +2734,7 @@ auth.onAuthStateChanged(async (firebaseUser) => {
   startMeetingTodoBadge();
   startLeadsBadge();
   startWideTableWheelToHorizontal();
+  startNotePreviewGlobal();
 
   // Start a real-time subscription on the user's doc so role / permission
   // changes propagate instantly to all active sessions.
@@ -12012,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-06';
+const APP_VERSION='2026-07-29-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -16953,6 +16954,55 @@ function showLmTip(el, text){
 function hideLmTip(){
   const tip=document.getElementById('lmTooltip');
   if(tip) tip.style.display='none';
+}
+
+// Auto-attach the showLmTip hover popup to EVERY text input /
+// textarea in the app that holds truncated content. One capture-
+// phase listener catches focusin / mouseover so we don't have to
+// wire up on{enter,leave,input} on hundreds of individual inputs.
+// showLmTip itself already gates on actual overflow (scrollWidth
+// vs clientWidth), so short values stay quiet — this just makes
+// the behavior universal instead of opt-in.
+function startNotePreviewGlobal(){
+  if(window._notePreviewHooked) return;
+  window._notePreviewHooked = true;
+
+  // Only apply to input[type=text] and <textarea>. Skip <select>,
+  // number/tel/email/date/time — those are their own picker widgets.
+  const isNoteish = el => {
+    if(!el || !el.tagName) return false;
+    const tag = el.tagName;
+    if(tag === 'TEXTAREA') return true;
+    if(tag !== 'INPUT') return false;
+    const t = (el.type || 'text').toLowerCase();
+    return t === 'text' || t === 'search' || t === 'tel' || t === 'email';
+  };
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target;
+    if(!isNoteish(el)) return;
+    showLmTip(el, el.value);
+  }, true);
+
+  document.addEventListener('mouseout', e => {
+    const el = e.target;
+    if(!isNoteish(el)) return;
+    // Don't hide if the cursor just moved into a child (inputs
+    // don't really have children, but be safe with relatedTarget).
+    if(e.relatedTarget && el.contains && el.contains(e.relatedTarget)) return;
+    hideLmTip();
+  }, true);
+
+  // Keep the tip in sync as the user types.
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if(!isNoteish(el)) return;
+    // Only refresh if the tip is currently visible (i.e. the field
+    // is being hovered) so we don't pop the tip mid-typing on an
+    // untouched field.
+    const tip = document.getElementById('lmTooltip');
+    if(tip && tip.style.display !== 'none') showLmTip(el, el.value);
+  }, true);
 }
 
 function renderLmTodoList(){
