@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-07';
+const APP_VERSION='2026-07-29-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14912,11 +14912,12 @@ async function loadAgentAppointments(){
   }catch(e){ console.warn('loadAgentAppointments', e?.message); }
 }
 
-function openAgentApptModal(existing){
+function openAgentApptModal(existing, preset){
   const el = document.getElementById('agentApptModal');
   if(el) el.remove();
   const today = new Date();
-  const defaultDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const defaultDate = (preset && preset.date) || todayStr;
   const a = existing || {};
   const rec = a.recurrence || '';
   const modal = document.createElement('div');
@@ -14924,7 +14925,7 @@ function openAgentApptModal(existing){
   modal.id = 'agentApptModal';
   modal.onclick = e => { if(e.target === modal) modal.remove(); };
   modal.innerHTML = `<div class="modal" style="width:540px;max-width:96vw">
-    <div class="modal-title"><span>${existing?'Edit':'+ Add'} Personal Appointment</span><button class="modal-close" onclick="document.getElementById('agentApptModal').remove()">×</button></div>
+    <div class="modal-title"><span>${existing?'Edit':'+ Add'} Event</span><button class="modal-close" onclick="document.getElementById('agentApptModal').remove()">×</button></div>
     <div style="display:flex;flex-direction:column;gap:10px;padding:4px 2px">
       <div>
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Title</label>
@@ -15135,16 +15136,18 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
         ? 'border:1px solid rgba(167,139,250,.35)'
         : 'border:1px solid var(--border)';
     const bg = hasItems ? 'rgba(167,139,250,.06)' : 'var(--surface)';
+    const dayIso = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     grid += `<div style="background:${bg};${border};border-radius:8px;padding:6px;min-height:88px;font-size:10px;overflow:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:4px">
         <span style="font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':'var(--text)'};font-size:11px">${d}</span>
-        ${hasItems?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700">${items.length}</span>`:''}
+        <button onclick="event.stopPropagation();openAgentApptModal(null,{date:'${dayIso}'})" title="Add event on this day" style="width:16px;height:16px;line-height:14px;padding:0;font-size:12px;font-weight:700;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);color:var(--muted);cursor:pointer;text-align:center" onmouseover="this.style.background='var(--accent)';this.style.color='#fff';this.style.borderColor='var(--accent)'" onmouseout="this.style.background='var(--surface2)';this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+</button>
+        ${hasItems?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700">${items.length}</span>`:'<span style="width:14px"></span>'}
       </div>
       ${items.slice(0,3).map(item => {
         if(item.kind === 'appt'){
           const a = item.a;
           const rIcon = a.recurrence ? '🔁 ' : '';
-          return `<div onclick="editAgentAppt('${a.id}')" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(34,211,238,.14);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr((a.recurrence?'🔁 Recurring — ':'')+'🗓 Personal — '+(a.title||'')+' — '+fmtTime(a.time||''))}">
+          return `<div onclick="event.stopPropagation();editAgentAppt('${a.id}')" style="cursor:pointer;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:rgba(34,211,238,.14);color:var(--text);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr((a.recurrence?'🔁 Recurring — ':'')+'🗓 Event — '+(a.title||'')+' — '+fmtTime(a.time||''))}">
             <span style="color:#22d3ee;font-weight:600">${rIcon}🗓 ${escapeHtml(fmtTime(a.time)||'—')}</span> ${escapeHtml(a.title||'(no title)')}
           </div>`;
         }
@@ -15199,7 +15202,7 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHtml(a.title||'(no title)')}</div>
-                <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(34,211,238,.18);color:#22d3ee;font-weight:700">🗓 Personal</span>
+                <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(34,211,238,.18);color:#22d3ee;font-weight:700">🗓 Event</span>
                 ${a.recurrence?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(167,139,250,.18);color:#a78bfa;font-weight:700" title="Recurs ${escapeAttr(a.recurrence)}${a.recurrenceEnd?' until '+a.recurrenceEnd:''}">🔁 ${escapeHtml(a.recurrence)}</span>`:''}
               </div>
               ${a.notes?`<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:pre-wrap">${escapeHtml(a.notes)}</div>`:''}
@@ -15285,7 +15288,7 @@ function renderLeadsCalendarBody(userLeads, activeUid, activeFirst){
       <div style="font-size:15px;font-weight:700;color:var(--text);min-width:150px;text-align:center">${MNAMES[m]} ${y}</div>
       <button class="btn btn-ghost btn-sm" onclick="leadsCalNav(1)" style="padding:4px 10px">›</button>
       <button class="btn btn-ghost btn-sm" onclick="leadsCalToday()" style="padding:4px 12px;font-size:11px">Today</button>
-      <button class="btn btn-primary btn-sm" onclick="openAgentApptModal()" style="padding:4px 12px;font-size:11px" title="Add a personal / office appointment (lunch, doctor, meeting…) — separate from lead appointments">+ Personal Appt</button>
+      <button class="btn btn-primary btn-sm" onclick="openAgentApptModal()" style="padding:4px 12px;font-size:11px" title="Add a non-lead event on this calendar (lunch, leasing meeting, doctor, office run…) — separate from lead appointments">+ Add Event</button>
       <div style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
