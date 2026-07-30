@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-08';
+const APP_VERSION='2026-07-29-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18421,7 +18421,8 @@ async function renderCallLogView(skipLoad){
   const editable = canEdit() || (currentUser && currentUser.role === 'admin') || true;
   const isAdmin = currentUser && currentUser.role === 'admin';
 
-  const addBtn = `<button class="btn btn-primary btn-sm" onclick="openCallLogAdd()">+ Add Call</button>`;
+  const addBtn = `<button class="btn btn-primary btn-sm" onclick="openQuickFillCallLog()" title="Keyboard-friendly quick-fill for every column (Tab to move, arrows for dropdowns)">🚀 Quick Fill</button>
+    <button class="btn btn-ghost btn-sm" onclick="openCallLogAdd()" style="margin-left:6px" title="Basic add (Date, Property, Reason, Status, Name, Number, Notes)">+ Add Call</button>`;
 
   // Filter calls by free-text search against the most useful fields.
   const q = callLogSearch.trim().toLowerCase();
@@ -18727,6 +18728,205 @@ function openCallLogAdd(){
   document.getElementById('deleteCallLogBtn').style.display = 'none';
   clearCallLogForm();
   document.getElementById('callLogModal').classList.add('open');
+}
+
+// ─── Quick-Fill (keyboard-friendly comprehensive entry) ───
+// A single modal listing every column with label|input rows so an
+// agent taking a call can Tab / arrow-key through every field
+// without touching the mouse, then Save mirrors everything back
+// into a single callLog doc. Also supports "Save & Add Another"
+// so the same modal stays open for the next call.
+function openQuickFillCallLog(existingId){
+  const old = document.getElementById('quickCallModal');
+  if(old) old.remove();
+  const c = existingId ? (callLogData.find(x=>x.id===existingId) || {}) : {};
+  const today = new Date();
+  const defDate = c.date || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const propList = [...properties]
+    .sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0))
+    .map(p=>`<option value="${escapeAttr(p.addr||'')}">`)
+    .join('');
+
+  // Small helpers to keep the field grid readable.
+  const opt = (v, cur, label) => `<option value="${escapeAttr(v)}" ${cur===v?'selected':''}>${escapeHtml(label!=null?label:v||'—')}</option>`;
+  const sel = (id, cur, options) => `<select id="qf_${id}" data-field="${id}" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">${options}</select>`;
+  const txt = (id, cur, type, placeholder, extra) => `<input id="qf_${id}" data-field="${id}" type="${type||'text'}" value="${escapeAttr(cur||'')}" ${placeholder?`placeholder="${escapeAttr(placeholder)}"`:''} style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none" ${extra||''}>`;
+  const chk = (id, cur) => `<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer"><input id="qf_${id}" data-field="${id}" data-checkbox="1" type="checkbox" ${cur?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer"> <span style="color:var(--muted);font-size:11px">check if yes</span></label>`;
+  const area = (id, cur, ph) => `<textarea id="qf_${id}" data-field="${id}" placeholder="${escapeAttr(ph||'')}" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;resize:vertical;min-height:56px">${escapeHtml(cur||'')}</textarea>`;
+
+  const sectionOpen = (title, tint) => `<div style="grid-column:1 / -1;margin:14px 0 2px;padding:6px 10px;background:${tint||'var(--surface2)'};border-radius:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)">${title}</div>`;
+
+  // Enum lists (kept in sync with the row renderer above).
+  const optsFrom = (arr, cur) => arr.map(v => opt(v, cur, v)).join('');
+  const dirSel      = sel('direction',      c.direction||'Inbound', optsFrom(['Inbound','Outbound'], c.direction||'Inbound'));
+  const reasonSel   = sel('reason',         c.reason||'',           opt('', c.reason||'', '— select —') + optsFrom(['Maintenance','For Rent','Payments','Paperwork','Maintenance Follow Up','Appointment','General'], c.reason));
+  const statusSel   = sel('status',         c.status||'Completed',  optsFrom(['Completed','Needs Attention','Emergency'], c.status||'Completed'));
+  const bedroomSel  = sel('bedroom',        c.bedroom||'',          opt('', c.bedroom||'', '—') + optsFrom(['1BR','2BR','3BR','4BR','5BR','6BR','UP+'], c.bedroom));
+  const tenantSel   = sel('tenantType',     c.tenantType||'',       opt('', c.tenantType||'', '—') + optsFrom(['Cash','CMHA'], c.tenantType));
+  const sourceSel   = sel('source',         c.source||'',           opt('', c.source||'', '—') + optsFrom(['Brochure','Sign','Referral','Affordable','Zillow','Facebook','Turbo Tenant','Other','Unknown','CMHA Office'], c.source));
+  const evictionSel = sel('anyEviction',    c.anyEviction||'',      opt('', c.anyEviction||'', '—') + optsFrom(['Yes','No'], c.anyEviction));
+  const petsSel     = sel('pets',           c.pets||'',             opt('', c.pets||'', '—') + optsFrom(['Dog','Dogs','Cat','Cats'], c.pets));
+  const membersSel  = sel('liveMembers',    c.liveMembers||'',      opt('', c.liveMembers||'', '—') + optsFrom(['1 Kid','2 Kids','3 Kids','4 Kids','5 Kids','6 Kids','UP+'], c.liveMembers));
+  const showPrefSel = sel('showingPref',    c.showingPref||'',      opt('', c.showingPref||'', '—') + optsFrom(['9-12','12-2','2-4','Evening'], c.showingPref));
+  const proofSel    = sel('proofVoucher',   c.proofVoucher||'',     opt('', c.proofVoucher||'', '—') + optsFrom(['Received','No Proof'], c.proofVoucher));
+  const part2Sel    = sel('part2Status',    c.part2Status||'',      opt('', c.part2Status||'', '—') + optsFrom(['Pending','Lost'], c.part2Status));
+  const tenant2Sel  = sel('tenantType2',    c.tenantType2||'',      opt('', c.tenantType2||'', '—') + optsFrom(['Cash','CMHA'], c.tenantType2));
+  const verifySel   = sel('verifyAppt',     c.verifyAppt||'',       opt('', c.verifyAppt||'', '—') + optsFrom(['Confirmed','No Answer'], c.verifyAppt));
+  const showStSel   = sel('showingStatus',  c.showingStatus||'',    opt('', c.showingStatus||'', '—') + optsFrom(['Completed','No Show','Canceled'], c.showingStatus));
+  const moveFwdSel  = sel('moveForward',    c.moveForward||'',      opt('', c.moveForward||'', '—') + optsFrom(['Yes','Risk','No'], c.moveForward));
+
+  const row = (label, control, hint) => `<div style="font-size:11px;color:var(--muted);text-align:right;padding-top:8px;font-weight:600">${escapeHtml(label)}${hint?`<div style="font-weight:400;font-size:9px;color:var(--muted2);margin-top:2px">${escapeHtml(hint)}</div>`:''}</div><div>${control}</div>`;
+
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'quickCallModal';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-title" style="display:flex;align-items:center;gap:10px">
+      <span>🚀 ${existingId?'Quick Edit':'Quick Fill'} — Call Log</span>
+      <span style="font-size:11px;font-weight:400;color:var(--muted)">Tab to move · arrows for dropdowns · Ctrl+Enter to save</span>
+      <div style="flex:1"></div>
+      <button class="modal-close" onclick="document.getElementById('quickCallModal').remove()">×</button>
+    </div>
+    <div id="qfBody" style="flex:1;overflow-y:auto;padding:4px 2px">
+      <div style="display:grid;grid-template-columns:150px 1fr;gap:8px 12px;align-items:center">
+        ${sectionOpen('📞 Call basics')}
+        ${row('Date',           txt('date', defDate, 'date'))}
+        ${row('Direction',      dirSel)}
+        ${row('Property',       txt('propertyAddress', c.propertyAddress||'', 'text', '🔍 Type address', 'list="qfPropList"'))}
+        ${row('Reason',         reasonSel)}
+        ${row('Status',         statusSel)}
+        ${row('Caller Name',    txt('name', c.name, 'text', 'Caller name'))}
+        ${row('Phone',          txt('number', c.number, 'tel', '(555) 123-4567'))}
+        ${row('Email',          txt('email', c.email, 'email', 'name@example.com'))}
+        ${row('Notes',          area('notes', c.notes, 'Call details, follow-ups…'))}
+        <datalist id="qfPropList">${propList}</datalist>
+
+        ${sectionOpen('🎯 Prospect (For-Rent calls)')}
+        ${row('Bedroom',        bedroomSel)}
+        ${row('Tenant Type',    tenantSel)}
+        ${row('Source',         sourceSel)}
+        ${row('Any Eviction',   evictionSel)}
+        ${row('Income ($)',     txt('income', c.income, 'text', '$ / month'))}
+        ${row('Pets',           petsSel)}
+        ${row('Live Members',   membersSel)}
+        ${row('Why Leaving',    txt('whyLeaving', c.whyLeaving, 'text', 'Reason'))}
+        ${row('How Long Stayed',txt('howLongStayed', c.howLongStayed, 'text', 'e.g. 2 years'))}
+        ${row('When to Move',   txt('whenToMove', c.whenToMove, 'date'))}
+        ${row('Showing Pref',   showPrefSel)}
+        ${row('Step Script',    chk('stepScript', c.stepScript))}
+
+        ${sectionOpen('📋 CMHA / Verification (Part 2)')}
+        ${row('Proof Voucher',  proofSel)}
+        ${row('Proof Note',     txt('proofNote', c.proofNote, 'text'))}
+        ${row('Landlord Name',  txt('landlordName', c.landlordName, 'text'))}
+        ${row('Landlord #',     txt('landlordNumber', c.landlordNumber, 'tel'))}
+        ${row('Workplace #',    txt('workplaceNumber', c.workplaceNumber, 'tel'))}
+        ${row('Part-2 Status',  part2Sel)}
+        ${row('Tenant Type 2',  tenant2Sel)}
+        ${row('Selfie',         chk('selfie', c.selfie))}
+
+        ${sectionOpen('🕐 Appointment / Showing')}
+        ${row('Arrival Time',   txt('arrivalTime', c.arrivalTime, 'time'))}
+        ${row('Appt Date',      txt('appointmentDate', c.appointmentDate, 'date'))}
+        ${row('Appt Time',      txt('appointmentTime', c.appointmentTime, 'time'))}
+        ${row('Verify Appt',    verifySel)}
+        ${row('Showing Status', showStSel)}
+        ${row('Turbo Screening',chk('turboScreening', c.turboScreening))}
+        ${row('Comments',       txt('comments', c.comments, 'text'))}
+        ${row('Any Notes',      txt('anyNotes', c.anyNotes, 'text'))}
+        ${row('Follow-up',      txt('followUp', c.followUp, 'text'))}
+
+        ${sectionOpen('🔑 Lease / Move-in')}
+        ${row('Move Forward',   moveFwdSel)}
+        ${row('Lease Effective',txt('leaseEffective', c.leaseEffective, 'date'))}
+        ${row('Lease Expire',   txt('leaseExpire', c.leaseExpire, 'date'))}
+        ${row('Lease Signed',   chk('leaseSigned', c.leaseSigned))}
+        ${row('Deposit Received',chk('depositReceived', c.depositReceived))}
+        ${row('Electric #',     txt('electricNumber', c.electricNumber, 'text'))}
+        ${row('Gas #',          txt('gasNumber', c.gasNumber, 'text'))}
+        ${row('Key Handle',     txt('keyHandle', c.keyHandle, 'text'))}
+        ${row('Move-in Paper Sign', chk('moveInPaperSign', c.moveInPaperSign))}
+      </div>
+    </div>
+    <div class="modal-foot" style="border-top:1px solid var(--border);padding-top:10px;margin-top:6px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('quickCallModal').remove()">Cancel</button>
+      <div style="flex:1"></div>
+      ${existingId?'':`<button class="btn btn-ghost btn-sm" onclick="submitQuickFillCallLog('${existingId||''}',true)" title="Save this entry and clear the form for the next call">Save &amp; Add Another</button>`}
+      <button class="btn btn-primary btn-sm" onclick="submitQuickFillCallLog('${existingId||''}',false)">Save (Ctrl+Enter)</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  // Ctrl+Enter shortcut submits from anywhere in the form.
+  modal.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+      e.preventDefault();
+      submitQuickFillCallLog(existingId||'', false);
+    }
+    if(e.key === 'Escape'){
+      modal.remove();
+    }
+  });
+
+  // Focus the first field so the user can start typing immediately.
+  setTimeout(()=>document.getElementById('qf_date')?.focus(), 50);
+}
+
+async function submitQuickFillCallLog(existingId, addAnother){
+  const modal = document.getElementById('quickCallModal');
+  if(!modal) return;
+  const inputs = modal.querySelectorAll('[data-field]');
+  const data = { updatedAt: new Date() };
+  inputs.forEach(el => {
+    const f = el.dataset.field;
+    if(el.dataset.checkbox === '1'){
+      data[f] = !!el.checked;
+    } else {
+      data[f] = (el.value || '').trim();
+    }
+  });
+  // Resolve property address → propertyId if it matches.
+  if(data.propertyAddress){
+    const p = properties.find(x => x.addr === data.propertyAddress);
+    if(p) data.propertyId = p.id;
+  }
+  try{
+    if(existingId){
+      await db.collection('callLog').doc(existingId).update(data);
+      toast('Call updated');
+      modal.remove();
+    } else {
+      data.createdAt = new Date();
+      data.createdBy = currentUser?.uid || '';
+      data.addedByName = currentUser?.name || currentUser?.email || '';
+      data.leadSource = 'callLog';
+      await db.collection('callLog').add(data);
+      toast(addAnother ? 'Saved · form ready for next call' : 'Call added');
+      if(addAnother){
+        // Wipe every input so the agent can dive into the next call
+        // without re-opening the modal. Keep the date pre-filled to
+        // today for convenience.
+        inputs.forEach(el => {
+          if(el.dataset.checkbox === '1') el.checked = false;
+          else if(el.type === 'select-one') el.selectedIndex = 0;
+          else el.value = '';
+        });
+        const dateEl = document.getElementById('qf_date');
+        if(dateEl){
+          const today = new Date();
+          dateEl.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        }
+        const dirEl = document.getElementById('qf_direction');
+        if(dirEl) dirEl.value = 'Inbound';
+        const stEl = document.getElementById('qf_status');
+        if(stEl) stEl.value = 'Completed';
+        setTimeout(()=>document.getElementById('qf_propertyAddress')?.focus(), 40);
+      } else {
+        modal.remove();
+      }
+    }
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
 function openLeadAdd(forUid){
