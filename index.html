@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-15';
+const APP_VERSION='2026-07-30-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18460,8 +18460,23 @@ async function renderCallLogView(skipLoad){
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l8 8M12 4l-8 8"/></svg>
         </button>` : ''}
       </div>`;
-      const addedBy = c.createdBy || c.updatedBy || '';
-      const addedByDisp = addedBy ? renderUserBadge(addedBy) : '<span class="cl-empty-val">—</span>';
+      // Prefer an explicit display name; older docs (esp. Quick Fill
+      // entries before this fix) stored the raw Firestore UID here.
+      // If the value looks like a UID (long alphanum), swap it for
+      // the user's real name via the users cache so the badge shows
+      // 'Dana Gainer' instead of 'f4yV5JWZWSgd…'.
+      let addedByLabel = c.addedByName || c.createdBy || c.updatedBy || '';
+      if(addedByLabel && /^[A-Za-z0-9]{20,}$/.test(addedByLabel)){
+        const u = users.find(x => x.uid === addedByLabel);
+        if(u) addedByLabel = u.name || u.email || addedByLabel;
+      }
+      // Fall back to the uid-tagged createdByUid if the label is
+      // still missing (very old docs).
+      if(!addedByLabel && c.createdByUid){
+        const u = users.find(x => x.uid === c.createdByUid);
+        if(u) addedByLabel = u.name || u.email || '';
+      }
+      const addedByDisp = addedByLabel ? renderUserBadge(addedByLabel) : '<span class="cl-empty-val">—</span>';
       // Assign To dropdown
       const assignOpts = users.map(u=>{
         const sel = (c.assignedToUid === u.uid) ? 'selected' : '';
@@ -18929,7 +18944,11 @@ async function submitQuickFillCallLog(existingId, addAnother){
       modal.remove();
     } else {
       data.createdAt = new Date();
-      data.createdBy = currentUser?.uid || '';
+      // Store the human-readable name as createdBy (matches the older
+      // basic Add-Call modal's shape) plus the UID separately, so the
+      // Added-By column never shows a raw Firestore UID.
+      data.createdBy = currentUser?.name || currentUser?.email || '';
+      data.createdByUid = currentUser?.uid || '';
       data.addedByName = currentUser?.name || currentUser?.email || '';
       data.leadSource = 'callLog';
       await db.collection('callLog').add(data);
