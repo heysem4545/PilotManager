@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-11';
+const APP_VERSION='2026-07-29-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18821,7 +18821,6 @@ function openQuickFillCallLog(existingId){
         ${row('Landlord #',     txt('landlordNumber', c.landlordNumber, 'tel'))}
         ${row('Workplace #',    txt('workplaceNumber', c.workplaceNumber, 'tel'))}
         ${row('Follow-up Status',  part2Sel)}
-        ${row('Tenant Type (verify)', tenant2Sel)}
         ${row('Selfie',         chk('selfie', c.selfie))}
 
         ${sectionOpen('🕐 Appointment / Showing')}
