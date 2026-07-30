@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-29-12';
+const APP_VERSION='2026-07-29-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18507,6 +18507,7 @@ async function renderCallLogView(skipLoad){
         <td><select style="${iss}" onchange="logCallChange('${c.id}','direction',this.value,'${escapeAttr(c.direction||'')}');updateCallLogField('${c.id}','direction',this.value)">${dirOpts}</select></td>
         <td><input type="text" list="clSharedPropList" value="${escapeAttr(c.propertyAddress||'')}" placeholder="🔍 Search…" style="${is};width:160px" onfocus="this.dataset.prev=this.value;this.value=''" onblur="if(!this.value)this.value=this.dataset.prev||'';logCallChange('${c.id}','propertyAddress',this.value,this.dataset.prev||'');updateCallLogField('${c.id}','propertyAddress',this.value)"></td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','reason',this.value,'${escapeAttr(c.reason||'')}');updateCallLogField('${c.id}','reason',this.value)"><option value="">—</option>${reasonOpts}</select></td>
+        <td>${renderCallNotesCell(c, editable)}</td>
         <td><select style="${iss}" onchange="logCallChange('${c.id}','status',this.value,'${escapeAttr(c.status||'')}');updateCallLogField('${c.id}','status',this.value)">${statusOpts2}</select></td>
         <td><input type="text" value="${escapeAttr(c.name||'')}" placeholder="Name" style="${is};width:100px" onblur="logCallChange('${c.id}','name',this.value,'${escapeAttr(c.name||'')}');updateCallLogField('${c.id}','name',this.value)"></td>
         <td><input type="tel" value="${escapeAttr(c.number||'')}" placeholder="📞" style="${isn};width:110px" onblur="logCallChange('${c.id}','number',this.value,'${escapeAttr(c.number||'')}');updateCallLogField('${c.id}','number',this.value)"></td>
@@ -18523,7 +18524,6 @@ async function renderCallLogView(skipLoad){
         <td><input type="date" value="${c.whenToMove||''}" style="${is};width:125px" onchange="updateCallLogField('${c.id}','whenToMove',this.value)"></td>
         <td>${mkSel('showingPref',['','9-12','12-2','2-4','Evening'],c.showingPref)}</td>
         <td style="text-align:center"><input type="checkbox" ${c.stepScript?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateCallLogField('${c.id}','stepScript',this.checked)"></td>
-        <td>${renderCallNotesCell(c, editable)}</td>
         <td>${addedByDisp}</td>
         <td>${assignDropdown}</td>
         <td><input type="text" value="${escapeAttr(c.followUp||'')}" placeholder="📝" style="${is};width:100px" onblur="updateCallLogField('${c.id}','followUp',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()"></td>
@@ -18624,6 +18624,7 @@ async function renderCallLogView(skipLoad){
             <th>Direction</th>
             <th>Property Address</th>
             <th>Call Reason</th>
+            <th>Notes</th>
             <th>Status</th>
             <th>Name</th>
             <th>Number</th>
@@ -18640,7 +18641,6 @@ async function renderCallLogView(skipLoad){
             <th>📅 Move Date</th>
             <th>🕐 Showing</th>
             <th>✅ Script</th>
-            <th>Notes</th>
             <th>Added By</th>
             <th>Assign To</th>
             <th>🔄 Follow Up</th>
