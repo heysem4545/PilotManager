@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-01-03';
+const APP_VERSION='2026-08-01-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15862,7 +15862,7 @@ function renderAvailableView(){
       </select>`;
     };
 
-    const COLSPAN = 20;
+    const COLSPAN = 18;
 
     // Age tier from the Package Sent date. Used to color both the
     // dedicated "Days" cell and the whole row so overdue packages
@@ -15907,8 +15907,6 @@ function renderAvailableView(){
             <td style="font-weight:500">${escapeHtml(p.addr || '')}</td>
             <td style="text-align:center">${pill(p.bedroom, BR_COLORS)}</td>
             <td style="text-align:center">${pill(p.bath, BA_COLORS, ' BA')}</td>
-            <td class="money" style="font-family:var(--mono);text-align:right">${mp.cmha ? fmt(mp.cmha) : '<span style="color:var(--muted2)">—</span>'}</td>
-            <td class="money" style="font-family:var(--mono);text-align:right">${mp.tenantPortion ? fmt(mp.tenantPortion) : '<span style="color:var(--muted2)">—</span>'}</td>
             <td>${textCell(p,'pendingRentTenantName','Tenant name','140px')}</td>
             <td>${textCell(p,'pendingRentTenantPhone','555-555-5555','130px')}</td>
             <td style="text-align:right">${moneyCell(p,'pendingRentDeposit','$0')}</td>
@@ -15933,14 +15931,12 @@ function renderAvailableView(){
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
         <strong style="color:var(--text)">${pendingList.length}</strong> pending-rent house${pendingList.length===1?'':'s'} · Someone has committed but paperwork/deposit/etc. is still in progress.
       </div>
-      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2420px">
+      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2220px">
         <thead><tr>
           <th style="width:130px">Status</th>
           <th style="min-width:180px">Address</th>
           <th style="text-align:center;width:80px">BR</th>
           <th style="text-align:center;width:80px">BA</th>
-          <th style="text-align:right;width:100px">CMHA Rent</th>
-          <th style="text-align:right;width:100px">Tenant Rent</th>
           <th style="min-width:150px">👤 Tenant Name</th>
           <th style="min-width:140px">📞 Tenant #</th>
           <th style="text-align:right;width:110px">💵 Deposit</th>
