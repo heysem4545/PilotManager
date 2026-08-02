@@ -12041,7 +12041,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-01-08';
+const APP_VERSION='2026-08-02-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15015,6 +15015,26 @@ async function saveAgentAppt(existingId){
     recurrence, recurrenceEnd,
     updatedAt: new Date()
   };
+  // Cross-check against the agent's other appointments — leads AND
+  // other personal events — before saving. Only fires when the event
+  // has a time (all-day events skip). Recurring series only check the
+  // first occurrence (start date) since checking every future date
+  // would be noisy for weekly meetings.
+  if(time){
+    const conflicts = findApptConflicts(assignedToUid, date, time, null)
+      .filter(c => !(c.kind === 'appt' && existingId && c.title === title)); // don't warn against ourselves on edit
+    if(conflicts.length){
+      const users = (typeof allUsersCache !== 'undefined' ? allUsersCache : []) || [];
+      const u = users.find(x => x.uid === assignedToUid);
+      const agentLabel = u ? (u.name || u.email || 'This agent') : 'This agent';
+      const [hh,mm] = time.split(':').map(x=>parseInt(x,10));
+      const ap = hh>=12?'PM':'AM';
+      const h12 = hh===0?12:hh>12?hh-12:hh;
+      const proposed = `${fmtMDY(date)||date} at ${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+      const ok = await warnApptConflict(conflicts, agentLabel, proposed);
+      if(!ok) return; // user cancelled — leave modal open
+    }
+  }
   try{
     if(existingId){
       await db.collection('agentAppointments').doc(existingId).update(data);
@@ -19323,6 +19343,30 @@ async function submitQuickFillCallLog(existingId, addAnother){
   if(data.propertyAddress){
     const p = properties.find(x => x.addr === data.propertyAddress);
     if(p) data.propertyId = p.id;
+  }
+  // Appointment collision check (same-agent, ±1 hour). If the
+  // record ends up with both a date and time, check against every
+  // other appointment on that agent's calendar and let the user
+  // Cancel or Save Anyway. For new leads assignedToUid isn't set
+  // yet — fall back to the current user (the agent making the
+  // entry) so the check still runs.
+  if(data.appointmentDate && data.appointmentTime){
+    const c = existingId ? callLogData.find(x=>x.id===existingId) : null;
+    const uid = (c && c.assignedToUid) || currentUser?.uid || '';
+    if(uid){
+      const conflicts = findApptConflicts(uid, data.appointmentDate, data.appointmentTime, existingId||null);
+      if(conflicts.length){
+        const users = (typeof allUsersCache !== 'undefined' ? allUsersCache : []) || [];
+        const u = users.find(x => x.uid === uid);
+        const agentLabel = u ? (u.name || u.email || 'This agent') : 'This agent';
+        const [hh,mm] = data.appointmentTime.split(':').map(x=>parseInt(x,10));
+        const ap = hh>=12?'PM':'AM';
+        const h12 = hh===0?12:hh>12?hh-12:hh;
+        const proposed = `${fmtMDY(data.appointmentDate)||data.appointmentDate} at ${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+        const ok = await warnApptConflict(conflicts, agentLabel, proposed);
+        if(!ok) return; // user cancelled — leave the modal open so they can adjust
+      }
+    }
   }
   try{
     if(existingId){
