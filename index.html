@@ -12041,7 +12041,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-01-07';
+const APP_VERSION='2026-08-01-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15360,7 +15360,160 @@ function openLeadFromCalendar(callId){
   }, 120);
 }
 
+// Given an assignedTo agent + a proposed appointment date/time,
+// return every other appointment (from Call Log leads AND personal
+// agentAppointments) that falls within ±1 hour and would clash
+// with it. Empty array means the slot is clean.
+function findApptConflicts(uid, date, time, excludeCallId){
+  if(!uid || !date || !time) return [];
+  const target = new Date(`${date}T${time}:00`);
+  if(isNaN(target)) return [];
+  const oneHrMs = 60 * 60 * 1000;
+  const out = [];
+  const fmtTime12 = t => {
+    if(!t || !/^\d{2}:\d{2}/.test(t)) return t || '';
+    const [hh, mm] = t.split(':').map(x => parseInt(x,10));
+    const ap = hh >= 12 ? 'PM' : 'AM';
+    const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+    return `${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+  };
+
+  // Other lead appointments assigned to the same agent.
+  (typeof callLogData !== 'undefined' ? callLogData : []).forEach(c => {
+    if(c.id === excludeCallId) return;
+    if(c.assignedToUid !== uid) return;
+    if(!c.appointmentDate || !c.appointmentTime) return;
+    const other = new Date(`${c.appointmentDate}T${c.appointmentTime}:00`);
+    if(isNaN(other)) return;
+    const diffMin = Math.round((other - target) / 60000);
+    if(Math.abs(diffMin) <= 60){
+      out.push({
+        kind: 'lead',
+        title: c.name || '(no name)',
+        subtitle: c.propertyAddress || c.property || '',
+        date: c.appointmentDate,
+        time: fmtTime12(c.appointmentTime),
+        diffMin
+      });
+    }
+  });
+
+  // Personal / office appointments for the same agent — expand
+  // recurring ones for the target month so 'every Tuesday' hits.
+  const monthKey = date.slice(0,7);
+  (typeof agentApptsCache !== 'undefined' ? agentApptsCache : []).forEach(a => {
+    if(a.assignedToUid !== uid) return;
+    if(!a.time) return;
+    const occs = (typeof expandAgentApptForMonth === 'function')
+      ? expandAgentApptForMonth(a, monthKey)
+      : [{...a}];
+    occs.forEach(occ => {
+      if(!occ.date || !occ.time) return;
+      const other = new Date(`${occ.date}T${occ.time}:00`);
+      if(isNaN(other)) return;
+      const diffMin = Math.round((other - target) / 60000);
+      if(Math.abs(diffMin) <= 60){
+        out.push({
+          kind: 'appt',
+          title: a.title || '(no title)',
+          subtitle: a.notes || '',
+          date: occ.date,
+          time: fmtTime12(occ.time),
+          diffMin
+        });
+      }
+    });
+  });
+
+  // Sort earliest → latest.
+  return out.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+}
+
+// Modal warning shown before saving an appointment that overlaps.
+// Resolves true when the user picks 'Save Anyway' — nothing (false)
+// on Cancel / backdrop close so the caller can skip the write.
+function warnApptConflict(conflicts, agentLabel, proposed){
+  return new Promise(resolve => {
+    const old = document.getElementById('apptConflictModal');
+    if(old) old.remove();
+    const rows = conflicts.map(c => {
+      const when = fmtMDY(c.date) || c.date;
+      const pill = c.kind === 'appt'
+        ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(34,211,238,.18);color:#22d3ee;font-weight:700">🗓 Personal</span>'
+        : '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(167,139,250,.15);color:#a78bfa;font-weight:700">📞 Lead</span>';
+      const rel = c.diffMin === 0 ? 'same time'
+        : c.diffMin > 0 ? `+${c.diffMin} min after` : `${Math.abs(c.diffMin)} min before`;
+      return `<div style="display:flex;gap:10px;padding:10px;border:1px solid var(--border2);border-left:3px solid var(--amber);border-radius:6px;background:var(--surface2);margin-bottom:6px">
+        <div style="min-width:60px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text);font-weight:700">${escapeHtml(c.time)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${escapeHtml(c.title)}</div>
+            ${pill}
+            <span style="font-size:10px;color:var(--amber);font-weight:600">${rel}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">${escapeHtml(when)}${c.subtitle?' · '+escapeHtml(c.subtitle):''}</div>
+        </div>
+      </div>`;
+    }).join('');
+    const modal = document.createElement('div');
+    modal.className = 'overlay open';
+    modal.id = 'apptConflictModal';
+    modal.onclick = e => { if(e.target === modal){ resolve(false); modal.remove(); } };
+    modal.innerHTML = `<div class="modal" style="width:520px;max-width:96vw">
+      <div class="modal-title"><span>⚠️ Time conflict</span><button class="modal-close" onclick="document.getElementById('apptConflictModal').remove()">×</button></div>
+      <div style="padding:6px 2px 12px;font-size:13px;color:var(--text);line-height:1.55">
+        <div style="padding:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:8px;margin-bottom:12px">
+          Hey — ${escapeHtml(agentLabel || 'this agent')} already has ${conflicts.length===1?'an appointment':conflicts.length+' appointments'} within an hour of the one you're saving${proposed?` (${escapeHtml(proposed)})`:''}. Overlapping showings often mean one gets missed.
+        </div>
+        ${rows}
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;font-style:italic">Click <strong style="color:var(--accent)">Save Anyway</strong> if you meant to double-book — the new appointment will still be created as a reminder.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost btn-sm" id="apptConflictCancel">Cancel</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" id="apptConflictOk">Save Anyway</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('apptConflictCancel').onclick = ()=>{ modal.remove(); resolve(false); };
+    document.getElementById('apptConflictOk').onclick     = ()=>{ modal.remove(); resolve(true); };
+    setTimeout(()=>document.getElementById('apptConflictCancel')?.focus(), 60);
+  });
+}
+
 async function updateLeadField(callId, field, value){
+  // Appointment collision check: if the write sets date OR time
+  // and both end up populated for a lead, look for other appts on
+  // the same agent's calendar (leads + personal events) within
+  // ±1 hour. Warn but don't block — user can Save Anyway.
+  if(field === 'appointmentDate' || field === 'appointmentTime'){
+    const c = (typeof callLogData !== 'undefined' ? callLogData : []).find(x => x.id === callId);
+    const newDate = field === 'appointmentDate' ? value : (c?.appointmentDate || '');
+    const newTime = field === 'appointmentTime' ? value : (c?.appointmentTime || '');
+    const uid = c?.assignedToUid;
+    if(uid && newDate && newTime && (value || '').trim()){
+      const conflicts = findApptConflicts(uid, newDate, newTime, callId);
+      if(conflicts.length){
+        const users = (typeof allUsersCache !== 'undefined' ? allUsersCache : []) || [];
+        const u = users.find(x => x.uid === uid);
+        const agentLabel = u ? (u.name || u.email || 'This agent') : 'This agent';
+        const proposed = `${fmtMDY(newDate)||newDate} at ${(() => {
+          const [hh,mm]=newTime.split(':').map(x=>parseInt(x,10));
+          const ap=hh>=12?'PM':'AM';const h12=hh===0?12:hh>12?hh-12:hh;
+          return `${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+        })()}`;
+        const ok = await warnApptConflict(conflicts, agentLabel, proposed);
+        if(!ok){
+          // User backed out — re-render so the inline input flips
+          // back to the previously-saved value (we never wrote the
+          // new one to Firestore).
+          if(typeof renderLeadsView === 'function') renderLeadsView(true);
+          if(typeof renderCallLogView === 'function' && (typeof currentView === 'string') && currentView === 'callLog') renderCallLogView(true);
+          return;
+        }
+      }
+    }
+  }
   try{
     await db.collection('callLog').doc(callId).update({
       [field]: value,
