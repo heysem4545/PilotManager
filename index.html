@@ -8202,6 +8202,14 @@ function startWideTableWheelToHorizontal(){
     // Skip if there's nothing to scroll horizontally — narrow tables
     // still get normal vertical page scrolling.
     if(wrap.scrollWidth <= wrap.clientWidth + 1) return;
+    // TALL tables (many rows extending beyond the viewport) belong
+    // to page scroll — a user wheeling down on Dana's 50-row Leads
+    // table wants to see row 25, not pan sideways one column at a
+    // time. Only convert vertical wheel to horizontal when the wrap
+    // itself fits inside the viewport vertically; otherwise leave
+    // vertical wheel alone. Shift+wheel still pans horizontally
+    // anywhere (browser native).
+    if(wrap.getBoundingClientRect().height > window.innerHeight * 0.9) return;
     // Skip if the wheel event landed inside an input/select/textarea
     // — those elements might need vertical wheel for their own use
     // (e.g. selects showing an open dropdown), and preventing default
@@ -8210,9 +8218,7 @@ function startWideTableWheelToHorizontal(){
     if(t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA') return;
     // Only consume the wheel when we can actually scroll horizontally
     // in the wheel's direction. Once the wrap has hit its left or
-    // right edge, let the event fall through to the page so users
-    // can still scroll DOWN to see more rows (bug: leads / call-log
-    // sections lost vertical scroll because we always preventDefault'd).
+    // right edge, let the event fall through to page scroll.
     const maxLeft = wrap.scrollWidth - wrap.clientWidth;
     const scrollingRight = e.deltaY > 0;
     const canScrollHoriz = scrollingRight
@@ -12041,7 +12047,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-01';
+const APP_VERSION='2026-08-02-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
