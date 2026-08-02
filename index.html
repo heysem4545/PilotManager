@@ -27,6 +27,8 @@
   --amber:#f5c96a;--amber-dim:rgba(245,201,106,0.1);
   --blue:#6ab8f5;--blue-dim:rgba(106,184,245,0.1);
   --purple:#b56af5;--purple-dim:rgba(181,106,245,0.1);
+  --pink:#f56ab8;--pink-dim:rgba(245,106,184,0.1);
+  --teal:#5be3d0;--teal-dim:rgba(91,227,208,0.1);
   --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
 }
 [data-theme="light"]{
@@ -38,6 +40,8 @@
   --amber:#b8860b;--amber-dim:rgba(184,134,11,0.1);
   --blue:#1a73c7;--blue-dim:rgba(26,115,199,0.1);
   --purple:#8b3cc7;--purple-dim:rgba(139,60,199,0.1);
+  --pink:#c73c8b;--pink-dim:rgba(199,60,139,0.1);
+  --teal:#0e8a76;--teal-dim:rgba(14,138,118,0.1);
 }
 [data-theme="light"] ::-webkit-scrollbar-track{background:var(--surface2)}
 [data-theme="light"] ::-webkit-scrollbar-thumb{background:var(--surface3)}
@@ -283,6 +287,8 @@ tbody tr:hover td{background:rgba(255,255,255,.02)}
 .b-eviction{background:var(--red-dim);color:var(--red)}.b-eviction::before{background:var(--red)}
 .b-moving{background:var(--blue-dim);color:var(--blue)}.b-moving::before{background:var(--blue)}
 .b-construction{background:var(--purple-dim);color:var(--purple)}.b-construction::before{background:var(--purple)}
+.b-turn-over{background:var(--pink-dim);color:var(--pink)}.b-turn-over::before{background:var(--pink)}
+.b-almost-ready{background:var(--teal-dim);color:var(--teal)}.b-almost-ready::before{background:var(--teal)}
 .b-unknown{background:var(--surface3);color:var(--muted)}.b-unknown::before{background:var(--muted)}
 .money{font-family:var(--mono);font-size:12px}
 .m-pos{color:var(--accent)}.m-neg{color:var(--red)}.m-muted{color:var(--muted)}
@@ -1335,6 +1341,8 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <option value="EVICTION">Eviction</option>
           <option value="MOVING PROCESS">Moving Process</option>
           <option value="CONSTRUCTION">Construction</option>
+          <option value="TURN OVER">Turn Over</option>
+          <option value="ALMOST READY">Almost Ready</option>
         </select>
       </div>
     </div>
@@ -2320,9 +2328,12 @@ function monthKey(y,m){return `${y}-${String(m+1).padStart(2,'0')}`;}
 function activeKey(){return monthKey(activeYear,activeMonth);}
 let monthData = {}; // monthData[propertyId][monthKey] = {status,cmhaPaid,tenantPaid}
 
-const SC={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)',UNKNOWN:'var(--muted)'};
-const BC={RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction',UNKNOWN:'b-unknown'};
-const BL={RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction',UNKNOWN:'Unknown'};
+const SC={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)','TURN OVER':'var(--pink)','ALMOST READY':'var(--teal)',UNKNOWN:'var(--muted)'};
+const BC={RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction','TURN OVER':'b-turn-over','ALMOST READY':'b-almost-ready',UNKNOWN:'b-unknown'};
+const BL={RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction','TURN OVER':'Turn Over','ALMOST READY':'Almost Ready',UNKNOWN:'Unknown'};
+// Canonical list of every non-rented status. Anywhere we care about
+// 'is this unit available to rent?' should union with 'no status'.
+const NON_RENTED_STATUSES = ['VACANT','EVICTION','CONSTRUCTION','MOVING PROCESS','TURN OVER','ALMOST READY'];
 const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const CUR_MONTH=3;
 
@@ -3211,8 +3222,10 @@ function calcTotalsForKey(key){
   const evictionIncome = properties.filter(p=>gmp(p).status==='EVICTION').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const constructionIncome = properties.filter(p=>gmp(p).status==='CONSTRUCTION').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const movingIncome = properties.filter(p=>gmp(p).status==='MOVING PROCESS').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
-  const totalPotential = vacantIncome+evictionIncome+constructionIncome+movingIncome;
-  return {rent, coll, rented, realBal, totalPotential};
+  const turnoverIncome = properties.filter(p=>gmp(p).status==='TURN OVER').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const almostReadyIncome = properties.filter(p=>gmp(p).status==='ALMOST READY').reduce((s,p)=>{const mp=gmp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const totalPotential = vacantIncome+evictionIncome+constructionIncome+movingIncome+turnoverIncome+almostReadyIncome;
+  return {rent, coll, rented, realBal, totalPotential, vacantIncome, evictionIncome, constructionIncome, movingIncome, turnoverIncome, almostReadyIncome};
 }
 
 function prevMonthKey(){
@@ -3255,9 +3268,11 @@ function calcTotals(){
   const evictionIncome=properties.filter(p=>getMonthProp(p).status==='EVICTION').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const constructionIncome=properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
   const movingIncome=properties.filter(p=>getMonthProp(p).status==='MOVING PROCESS').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
-  const totalPotential=vacantIncome+evictionIncome+constructionIncome+movingIncome;
+  const turnoverIncome=properties.filter(p=>getMonthProp(p).status==='TURN OVER').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const almostReadyIncome=properties.filter(p=>getMonthProp(p).status==='ALMOST READY').reduce((s,p)=>{const mp=getMonthProp(p);return s+(mp.cmha||0)+(mp.tenantPortion||0);},0);
+  const totalPotential=vacantIncome+evictionIncome+constructionIncome+movingIncome+turnoverIncome+almostReadyIncome;
   return{rent,coll,cmha,tp,rented,realBal,cmhaBal,tenantBal,cmhaBehind,tenantBehind,
-         vacantIncome,evictionIncome,constructionIncome,movingIncome,totalPotential};
+         vacantIncome,evictionIncome,constructionIncome,movingIncome,turnoverIncome,almostReadyIncome,totalPotential};
 }
 
 // ─────────────────────────────────────────────
@@ -3414,9 +3429,9 @@ async function renderMetrics(){
       return `<div class="mc g"><div class="mc-lbl">Total Collected</div><div class="mc-val g" style="font-size:22px">${fmt(t.coll)}${compBadge(t.coll,pt.coll,true)}</div><div class="mc-sub">${collRate}% collection rate · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.coll)}</div><div class="mc-split"><span class="cs">CMHA ${fmt(t.cmha)} · ${properties.filter(p=>getMonthProp(p).cmhaPaid>0).length} prop · <strong>${cmhaRate}%</strong></span></div><div class="mc-split"><span class="ts">Tenant ${fmt(t.tp)} · ${properties.filter(p=>getMonthProp(p).tenantPaid>0).length} prop · <strong>${tenantRate}%</strong></span></div></div>`;
     })()}
     <div class="mc r"><div class="mc-lbl">Balance due <span style="font-size:9px;font-weight:400;color:var(--muted)">(rented only)</span></div><div class="mc-val r">${fmt(t.realBal)}${compBadge(t.realBal,pt.realBal,false)}</div><div class="mc-sub">${t.cmhaBehind+t.tenantBehind} properties behind · ${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.realBal)}</div><div class="mc-split"><span class="cs" style="background:var(--red-dim);color:var(--red)">CMHA ${fmt(Math.max(0,t.cmhaBal))} · ${t.cmhaBehind} behind</span></div><div class="mc-split"><span class="tr" style="background:var(--red-dim);color:var(--red)">Tenant ${fmt(Math.max(0,t.tenantBal))} · ${t.tenantBehind} behind</span></div></div>
-    <div class="mc a"><div class="mc-lbl">⚡ Potential Income</div><div class="mc-val a">${fmt(t.totalPotential)}<span style="font-size:12px;font-weight:400">/mo</span></div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.totalPotential)}</div><div class="mc-sub">${properties.filter(p=>['VACANT','EVICTION','CONSTRUCTION','MOVING PROCESS'].includes((getMonthProp(p).status||'').toUpperCase())).length} non-rented units</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${fmt(t.vacantIncome)} (${properties.filter(p=>getMonthProp(p).status==='VACANT').length})</span><span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${fmt(t.evictionIncome)} (${properties.filter(p=>getMonthProp(p).status==='EVICTION').length})</span><span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${fmt(t.constructionIncome)} (${properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').length})</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${fmt(t.movingIncome)} (${properties.filter(p=>(getMonthProp(p).status||'').toUpperCase()==='MOVING PROCESS').length})</span></div></div>
+    <div class="mc a"><div class="mc-lbl">⚡ Potential Income</div><div class="mc-val a">${fmt(t.totalPotential)}<span style="font-size:12px;font-weight:400">/mo</span></div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${fmt(pt.totalPotential)}</div><div class="mc-sub">${properties.filter(p=>NON_RENTED_STATUSES.includes((getMonthProp(p).status||'').toUpperCase())).length} non-rented units</div><div class="mc-split" style="flex-wrap:wrap;gap:3px"><span class="cs" style="background:var(--amber-dim);color:var(--amber)">Vacant ${fmt(t.vacantIncome)} (${properties.filter(p=>getMonthProp(p).status==='VACANT').length})</span><span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${fmt(t.evictionIncome)} (${properties.filter(p=>getMonthProp(p).status==='EVICTION').length})</span><span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${fmt(t.constructionIncome)} (${properties.filter(p=>getMonthProp(p).status==='CONSTRUCTION').length})</span><span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${fmt(t.movingIncome)} (${properties.filter(p=>(getMonthProp(p).status||'').toUpperCase()==='MOVING PROCESS').length})</span><span class="cs" style="background:var(--pink-dim);color:var(--pink)">Turn Over ${fmt(t.turnoverIncome||0)} (${properties.filter(p=>getMonthProp(p).status==='TURN OVER').length})</span><span class="cs" style="background:var(--teal-dim);color:var(--teal)">Almost Ready ${fmt(t.almostReadyIncome||0)} (${properties.filter(p=>getMonthProp(p).status==='ALMOST READY').length})</span></div></div>
     <div class="mc g"><div class="mc-lbl">Occupancy</div><div class="mc-val g" style="font-size:26px">${occ}%${compBadge(occ,prevOcc,true,true)}</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-top:6px">${t.rented} of ${properties.length} units</div><div class="mc-sub">${mLabel}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">${prevLabel}: ${prevOcc}%</div>${(()=>{
-      const sc={'RENTED':0,'VACANT':0,'EVICTION':0,'MOVING PROCESS':0,'CONSTRUCTION':0};
+      const sc={'RENTED':0,'VACANT':0,'EVICTION':0,'MOVING PROCESS':0,'CONSTRUCTION':0,'TURN OVER':0,'ALMOST READY':0};
       let unknown=0;
       properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else unknown++;});
       return `<div class="mc-split" style="flex-wrap:wrap;gap:3px">
@@ -3425,6 +3440,8 @@ async function renderMetrics(){
         <span class="cs" style="background:var(--red-dim);color:var(--red)">Eviction ${sc.EVICTION}</span>
         <span class="cs" style="background:var(--blue-dim);color:var(--blue)">Moving ${sc['MOVING PROCESS']}</span>
         <span class="cs" style="background:var(--purple-dim);color:var(--purple)">Construction ${sc.CONSTRUCTION}</span>
+        <span class="cs" style="background:var(--pink-dim);color:var(--pink)">Turn Over ${sc['TURN OVER']}</span>
+        <span class="cs" style="background:var(--teal-dim);color:var(--teal)">Almost Ready ${sc['ALMOST READY']}</span>
         ${unknown?`<span class="cs" style="background:var(--surface3);color:var(--muted)">Unknown ${unknown}</span>`:''}
       </div>`;
     })()}</div>
@@ -3489,7 +3506,7 @@ async function renderMetrics(){
 
 function renderStatusBars(){
   const counts={};
-  ['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].forEach(s=>counts[s]=0);
+  ['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','TURN OVER','ALMOST READY'].forEach(s=>counts[s]=0);
   properties.forEach(p=>{const mp=getMonthProp(p);counts[mp.status]=(counts[mp.status]||0)+1;});
   const max=Math.max(...Object.values(counts))||1;
   document.getElementById('statusBars').innerHTML=Object.entries(counts).map(([s,n])=>`
@@ -3675,10 +3692,10 @@ async function loadLeasingAnnouncement(){
 function renderFilterTabs(){
   const el=document.getElementById('filterTabs');
   el.style.display='';
-  const sc={RENTED:0,VACANT:0,EVICTION:0,CONSTRUCTION:0,'MOVING PROCESS':0,NO_STATUS:0};
+  const sc={RENTED:0,VACANT:0,EVICTION:0,CONSTRUCTION:0,'MOVING PROCESS':0,'TURN OVER':0,'ALMOST READY':0,NO_STATUS:0};
   let balCount=0;
   properties.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(sc[s]!==undefined)sc[s]++;else if(!s)sc.NO_STATUS++;const mp=getMonthProp(p);if(mp.balance>0)balCount++;});
-  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented ('+sc.RENTED+')'},{k:'VACANT',l:'Vacant ('+sc.VACANT+')'},{k:'EVICTION',l:'Eviction ('+sc.EVICTION+')'},{k:'MOVING PROCESS',l:'Moving ('+sc['MOVING PROCESS']+')'},{k:'CONSTRUCTION',l:'Construction ('+sc.CONSTRUCTION+')'},{k:'NO_STATUS',l:'⚠ No Status ('+sc.NO_STATUS+')'},{k:'balance',l:'Has Balance ('+balCount+')'}];
+  const tabs=[{k:'all',l:'All ('+properties.length+')'},{k:'RENTED',l:'Rented ('+sc.RENTED+')'},{k:'VACANT',l:'Vacant ('+sc.VACANT+')'},{k:'EVICTION',l:'Eviction ('+sc.EVICTION+')'},{k:'MOVING PROCESS',l:'Moving ('+sc['MOVING PROCESS']+')'},{k:'CONSTRUCTION',l:'Construction ('+sc.CONSTRUCTION+')'},{k:'TURN OVER',l:'Turn Over ('+sc['TURN OVER']+')'},{k:'ALMOST READY',l:'Almost Ready ('+sc['ALMOST READY']+')'},{k:'NO_STATUS',l:'⚠ No Status ('+sc.NO_STATUS+')'},{k:'balance',l:'Has Balance ('+balCount+')'}];
   el.innerHTML=tabs.map(t=>`<button class="ftab ${t.k===currentFilter?'active':''}" style="${t.k==='NO_STATUS'&&sc.NO_STATUS>0?'color:var(--red);font-weight:700':''}" onclick="setFilter('${t.k}')">${t.l}</button>`).join('');
 }
 
@@ -3747,7 +3764,7 @@ function renderCollectionMonthlyView(){
   list.sort((a,b)=>(a.rowIndex||0)-(b.rowIndex||0));
 
   // Status counts and filter
-  const statusCounts={all:list.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0};
+  const statusCounts={all:list.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0,'TURN OVER':0,'ALMOST READY':0};
   list.forEach(p=>{const s=(getMonthProp(p).status||'').toUpperCase();if(statusCounts[s]!==undefined)statusCounts[s]++;});
   const filtered=collMonthlyStatusFilter==='all'?list:list.filter(p=>(getMonthProp(p).status||'')===collMonthlyStatusFilter);
 
@@ -3760,7 +3777,7 @@ function renderCollectionMonthlyView(){
     const collected=cmhaPaid+tPaid;
     const rate=(cmha+tp)>0?Math.round(collected/(cmha+tp)*100):0;
     const st=mp.status||'';
-    const badge=st?`<span class="badge ${({RENTED:'b-rented',VACANT:'b-vacant',EVICTION:'b-eviction','MOVING PROCESS':'b-moving',CONSTRUCTION:'b-construction'})[st]||'b-unknown'}">${({RENTED:'Rented',VACANT:'Vacant',EVICTION:'Eviction','MOVING PROCESS':'Moving',CONSTRUCTION:'Construction'})[st]||st}</span>`:'';
+    const badge=st?`<span class="badge ${BC[st]||'b-unknown'}">${BL[st]||st}</span>`:'';
     return `<tr style="${p.sentToCollection?'background:rgba(74,222,128,0.06)':''}">
       <td style="text-align:center;padding:4px 2px"><input type="checkbox" ${p.sentToCollection?'checked':''} style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer" onchange="toggleCollection('${p.id}',this.checked)" title="Send to Collection Houses"></td>
       <td><div class="addr-main">${p.addr||''}</div><div class="addr-sub">${p.unit||''}</div></td>
@@ -3779,8 +3796,8 @@ function renderCollectionMonthlyView(){
   contentEl.innerHTML=monthBarHtml+`
     <div class="table-card">
       <div style="padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${filtered.length} properties with balance</div>
-      <div class="ftabs" style="padding:8px 16px;border-bottom:1px solid var(--border)">${['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION'].map(s=>{
-        const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s.charAt(0)+s.slice(1).toLowerCase();
+      <div class="ftabs" style="padding:8px 16px;border-bottom:1px solid var(--border)">${['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','TURN OVER','ALMOST READY'].map(s=>{
+        const label=s==='all'?'All':(BL[s]||s);
         return `<button class="ftab ${collMonthlyStatusFilter===s?'active':''}" onclick="collMonthlyStatusFilter='${s}';renderCollectionMonthlyView()">${label} (${statusCounts[s]||0})</button>`;
       }).join('')}</div>
       <div class="tbl-wrap">
@@ -4262,7 +4279,7 @@ async function renderBalancesOnly(){
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
   // Status filter
-  const statusCounts={all:rows.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0,NO_STATUS:0};
+  const statusCounts={all:rows.length,RENTED:0,VACANT:0,EVICTION:0,'MOVING PROCESS':0,CONSTRUCTION:0,'TURN OVER':0,'ALMOST READY':0,NO_STATUS:0};
   rows.forEach(r=>{
     if(r.status&&statusCounts[r.status]!==undefined) statusCounts[r.status]++;
     else if(!r.status) statusCounts.NO_STATUS++;
@@ -4274,8 +4291,8 @@ async function renderBalancesOnly(){
     return{cmhaBal:cmhaT,tenantBal:tenantT};
   });
 
-  const filterTabs=['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','NO_STATUS'].map(s=>{
-    const label=s==='all'?'All':s==='MOVING PROCESS'?'Moving':s==='NO_STATUS'?'⚠ No Status':s.charAt(0)+s.slice(1).toLowerCase();
+  const filterTabs=['all','RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','TURN OVER','ALMOST READY','NO_STATUS'].map(s=>{
+    const label=s==='all'?'All':s==='NO_STATUS'?'⚠ No Status':(BL[s]||s);
     const cnt=statusCounts[s]||0;
     return `<button class="ftab ${allBalancesStatusFilter===s?'active':''}" style="${s==='NO_STATUS'&&cnt>0?'color:var(--red);font-weight:700':''}" onclick="allBalancesStatusFilter='${s}';renderBalancesOnly()">${label} (${cnt})</button>`;
   }).join('');
@@ -9540,8 +9557,8 @@ function inlineEditStatus(propId, cell){
   if(existing)existing.remove();
   
   const mp=getMonthProp(properties.find(x=>x.id===propId));
-  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','UNKNOWN'];
-  const colors={RENTED:'var(--accent)',VACANT:'var(--amber)',EVICTION:'var(--red)','MOVING PROCESS':'var(--blue)',CONSTRUCTION:'var(--purple)',UNKNOWN:'var(--muted)'};
+  const statuses=['RENTED','VACANT','EVICTION','MOVING PROCESS','CONSTRUCTION','TURN OVER','ALMOST READY','UNKNOWN'];
+  const colors=SC;
   
   const popup=document.createElement('div');
   popup.id='statusPopup';
@@ -12024,7 +12041,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-01-06';
+const APP_VERSION='2026-08-01-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15391,7 +15408,7 @@ async function renderLeasingDashboardView(opts){
 
   // Per-month status counts via getMonthProp — matches the main dashboard's
   // numbers exactly. Anything without a status falls into UNKNOWN.
-  const counts = {RENTED:0, VACANT:0, EVICTION:0, 'MOVING PROCESS':0, CONSTRUCTION:0, UNKNOWN:0};
+  const counts = {RENTED:0, VACANT:0, EVICTION:0, 'MOVING PROCESS':0, CONSTRUCTION:0, 'TURN OVER':0, 'ALMOST READY':0, UNKNOWN:0};
   props.forEach(p => {
     const mp = (typeof getMonthProp === 'function') ? getMonthProp(p) : p;
     const s = mp.status || 'UNKNOWN';
@@ -15468,6 +15485,8 @@ async function renderLeasingDashboardView(opts){
         ${chip('Eviction', counts.EVICTION, '#ef4444')}
         ${chip('Moving', counts['MOVING PROCESS'], '#60a5fa')}
         ${chip('Construction', counts.CONSTRUCTION, '#a78bfa')}
+        ${counts['TURN OVER'] > 0 ? chip('Turn Over', counts['TURN OVER'], '#f56ab8') : ''}
+        ${counts['ALMOST READY'] > 0 ? chip('Almost Ready', counts['ALMOST READY'], '#5be3d0') : ''}
         ${counts.UNKNOWN > 0 ? chip('Unknown', counts.UNKNOWN, '#9ca3af') : ''}
       </div>
     </div>
@@ -15787,7 +15806,7 @@ function renderAvailableView(){
   const availableAll = properties.filter(p => {
     const mp = getMonthProp(p);
     const s = (mp.status || '').toUpperCase();
-    return s === 'VACANT' || s === 'CONSTRUCTION' || s === 'UNKNOWN' || s === 'MOVING PROCESS' || !s;
+    return s === 'VACANT' || s === 'CONSTRUCTION' || s === 'UNKNOWN' || s === 'MOVING PROCESS' || s === 'TURN OVER' || s === 'ALMOST READY' || !s;
   }).sort((a,b) => (a.rowIndex||0) - (b.rowIndex||0));
 
   // Apply the active status filter.
@@ -16073,6 +16092,8 @@ function renderAvailableView(){
     {key:'VACANT',         label:'Vacant'},
     {key:'CONSTRUCTION',   label:'Construction'},
     {key:'MOVING PROCESS', label:'Moving'},
+    {key:'TURN OVER',      label:'Turn Over'},
+    {key:'ALMOST READY',   label:'Almost Ready'},
     {key:'UNKNOWN',        label:'Unknown'},
     {key:'NO_STATUS',      label:'⚠ No Status'}
   ].map(f => {
