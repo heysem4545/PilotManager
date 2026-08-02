@@ -265,5 +265,14 @@ service cloud.firestore {
     match /agentAppointments/{apptId} {
       allow read, write: if request.auth != null;
     }
+
+    // Pending Rent Archive — snapshot of a property's pendingRent*
+    // fields taken when a user overwrites an existing deposit with a
+    // new tenant (so the old tenant's info isn't lost). Any
+    // authenticated user can read/create; delete admin-only via the
+    // front-end.
+    match /pendingRentArchive/{archId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

@@ -12013,7 +12013,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-07-30-01';
+const APP_VERSION='2026-08-01-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15615,6 +15615,75 @@ async function updateAvailablePendingNote(propId, note){
 // name, phone, deposit, type, package-sent date, utility account
 // numbers, screening note, etc.). All fields live on the property
 // doc under `pendingRent*` keys so they travel with the property.
+// Snapshot every pendingRent* field on a property into the
+// pendingRentArchive collection and clear them off the property so
+// the row is ready for a fresh tenant. Called when a user confirms
+// they want to overwrite an existing deposit with a new tenant's
+// numbers.
+const PENDING_RENT_FIELDS = ['pendingRentTenantName','pendingRentTenantPhone','pendingRentDeposit','pendingRentType','pendingRentPackageDate','pendingRentElectric','pendingRentGas','pendingRentScreeningNote','pendingRentNote','pendingRentAt'];
+
+async function archivePendingRent(p, reason){
+  if(!p) return null;
+  const archive = {
+    propertyId: p.id,
+    propertyAddress: p.addr || '',
+    archivedAt: new Date(),
+    archivedBy: currentUser?.name || currentUser?.email || '',
+    archivedReason: reason || 'replaced-by-new-tenant'
+  };
+  PENDING_RENT_FIELDS.forEach(f => { archive[f] = p[f] || ''; });
+  const ref = await db.collection('pendingRentArchive').add(archive);
+  return ref.id;
+}
+
+async function clearPendingRentFields(propId){
+  const updates = { updatedAt: new Date() };
+  PENDING_RENT_FIELDS.forEach(f => { updates[f] = ''; });
+  await db.collection('properties').doc(propId).update(updates);
+  const p = properties.find(x=>x.id===propId);
+  if(p) PENDING_RENT_FIELDS.forEach(f => { p[f] = ''; });
+}
+
+// Warn dialog: 'This house already has a deposit from X — archive and
+// start fresh?'. Resolves true if the user confirms, false otherwise.
+function confirmOverwritePendingRent(p, newDeposit){
+  return new Promise(resolve => {
+    const existing = document.getElementById('depositWarnModal');
+    if(existing) existing.remove();
+    const oldTenant = p.pendingRentTenantName || '(no name on file)';
+    const oldDep = p.pendingRentDeposit || '—';
+    const modal = document.createElement('div');
+    modal.className = 'overlay open';
+    modal.id = 'depositWarnModal';
+    modal.onclick = e => { if(e.target === modal){ resolve(false); modal.remove(); } };
+    modal.innerHTML = `<div class="modal" style="width:520px;max-width:96vw">
+      <div class="modal-title"><span>⚠️ Deposit already on file</span><button class="modal-close" onclick="document.getElementById('depositWarnModal').remove()">×</button></div>
+      <div style="padding:6px 2px 12px;font-size:13px;color:var(--text);line-height:1.55">
+        <div style="padding:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:8px;margin-bottom:12px">
+          <div style="font-weight:600;color:#f59e0b;margin-bottom:4px">🏠 ${escapeHtml(p.addr||'(no address)')}</div>
+          <div style="font-size:12px;color:var(--text)">
+            This house already has a deposit of <strong style="color:#f59e0b">$${escapeHtml(String(oldDep))}</strong> on file from
+            <strong style="color:#f59e0b">${escapeHtml(oldTenant)}</strong>.
+          </div>
+          ${p.pendingRentPackageDate?`<div style="font-size:11px;color:var(--muted);margin-top:6px">📦 Package sent: ${escapeHtml(fmtMDY(p.pendingRentPackageDate)||p.pendingRentPackageDate)}</div>`:''}
+        </div>
+        <div>You're about to replace it with <strong>$${escapeHtml(String(newDeposit))}</strong> — probably a new tenant.</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">If you click <strong style="color:#4ade80">Yes, Archive Old</strong>, the current tenant's record will be moved to the Pending Rent Archive and all fields on this row will be cleared for the new tenant. The new deposit will then be saved.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost btn-sm" id="depWarnCancel">Cancel (keep old)</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" id="depWarnConfirm" style="background:#4ade80;border-color:#4ade80;color:#0d0d10">Yes, Archive Old</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('depWarnCancel').onclick = ()=>{ modal.remove(); resolve(false); };
+    document.getElementById('depWarnConfirm').onclick = ()=>{ modal.remove(); resolve(true); };
+    // Default focus on Cancel so an accidental Enter doesn't overwrite.
+    setTimeout(()=>document.getElementById('depWarnCancel')?.focus(), 60);
+  });
+}
+
 async function updateAvailablePendingField(propId, field, value){
   if(!canEdit()) return;
   const p = properties.find(x=>x.id===propId);
@@ -15623,6 +15692,32 @@ async function updateAvailablePendingField(propId, field, value){
   if(!allowed.includes(field)) return;
   const v = value == null ? '' : value;
   const prev = p[field];
+
+  // Deposit-collision guard: if the user is trying to enter a deposit
+  // on a house that already has a deposit on file (from a prior
+  // pending tenant), warn and offer to archive the old record before
+  // taking the new one. Only fires when the new value is non-empty
+  // AND actually differs from what's stored, so simple re-typing of
+  // the same number doesn't nag.
+  if(field === 'pendingRentDeposit' && v && String(v).trim() && String(v).trim() !== String(prev||'').trim() && String(prev||'').trim()){
+    const ok = await confirmOverwritePendingRent(p, v);
+    if(!ok){
+      // Revert — put the input back to the previous value.
+      renderAvailableView();
+      return;
+    }
+    // Archive the old record, wipe the row's pendingRent* fields,
+    // then fall through to write the new deposit.
+    try{
+      const archId = await archivePendingRent(p, 'replaced-by-new-tenant');
+      await clearPendingRentFields(propId);
+      toast(`Archived previous tenant · new deposit saved (arch ${archId?.slice(0,6)||''})`);
+    }catch(e){
+      toast('Archive failed: '+(e.message||'unknown'));
+      renderAvailableView();
+      return;
+    }
+  }
 
   // Optimistic local update FIRST so the ⏱ Days pill + row tint
   // react instantly, before waiting for the Firestore round-trip.
