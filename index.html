@@ -8191,6 +8191,17 @@ function startWideTableWheelToHorizontal(){
     // would trap the user.
     const t = e.target;
     if(t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA') return;
+    // Only consume the wheel when we can actually scroll horizontally
+    // in the wheel's direction. Once the wrap has hit its left or
+    // right edge, let the event fall through to the page so users
+    // can still scroll DOWN to see more rows (bug: leads / call-log
+    // sections lost vertical scroll because we always preventDefault'd).
+    const maxLeft = wrap.scrollWidth - wrap.clientWidth;
+    const scrollingRight = e.deltaY > 0;
+    const canScrollHoriz = scrollingRight
+      ? wrap.scrollLeft < maxLeft - 1
+      : wrap.scrollLeft > 1;
+    if(!canScrollHoriz) return;
     e.preventDefault();
     wrap.scrollLeft += e.deltaY;
   }, {passive:false});
@@ -12013,7 +12024,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-01-05';
+const APP_VERSION='2026-08-01-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
