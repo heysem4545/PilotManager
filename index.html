@@ -12441,7 +12441,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-09';
+const APP_VERSION='2026-08-03-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -19820,6 +19820,19 @@ function openQuickFillCallLog(existingId){
 async function submitQuickFillCallLog(existingId, addAnother){
   const modal = document.getElementById('quickCallModal');
   if(!modal) return;
+  // Re-entrancy guard — Ctrl+Enter spam or rapid button clicks used
+  // to file a Firestore .add() for every keystroke, which produced
+  // 8+ identical rows in a heartbeat. One save per invocation only.
+  if(modal._qfSubmitting){ return; }
+  modal._qfSubmitting = true;
+  const saveBtns = modal.querySelectorAll('button.btn-primary, button.btn-ghost');
+  saveBtns.forEach(b => { if(/Save/i.test(b.textContent||'')){ b.disabled = true; b.style.opacity = '0.6'; b.style.cursor = 'wait'; }});
+  const releaseLock = () => {
+    if(!modal || !modal.parentNode) return;
+    modal._qfSubmitting = false;
+    saveBtns.forEach(b => { b.disabled = false; b.style.opacity = ''; b.style.cursor = ''; });
+  };
+
   const inputs = modal.querySelectorAll('[data-field]');
   const data = { updatedAt: new Date() };
   inputs.forEach(el => {
@@ -19830,6 +19843,28 @@ async function submitQuickFillCallLog(existingId, addAnother){
       data[f] = (el.value || '').trim();
     }
   });
+
+  // Recent-duplicate guard — if the exact same address+name+phone
+  // was just added by this user in the last 30 seconds, ask the
+  // user to confirm before creating a second copy.
+  if(!existingId){
+    const now = Date.now();
+    const recent = (callLogData || []).find(c => {
+      if(c.createdByUid !== currentUser?.uid) return false;
+      if((c.propertyAddress||'').trim() !== data.propertyAddress) return false;
+      if((c.name||'').trim() !== data.name) return false;
+      if((c.number||'').trim() !== data.number) return false;
+      const ts = c.createdAt && c.createdAt.toMillis ? c.createdAt.toMillis()
+        : (c.createdAt ? new Date(c.createdAt).getTime() : 0);
+      return ts && (now - ts) < 30 * 1000;
+    });
+    if(recent){
+      if(!confirm(`You just added an identical call ${Math.round((now - (recent.createdAt.toMillis?recent.createdAt.toMillis():new Date(recent.createdAt).getTime()))/1000)} seconds ago (${recent.propertyAddress||'—'} · ${recent.name||'—'}). Save this one anyway?`)){
+        releaseLock();
+        return;
+      }
+    }
+  }
   // Resolve property address → propertyId if it matches.
   if(data.propertyAddress){
     const p = properties.find(x => x.addr === data.propertyAddress);
@@ -19855,7 +19890,7 @@ async function submitQuickFillCallLog(existingId, addAnother){
         const h12 = hh===0?12:hh>12?hh-12:hh;
         const proposed = `${fmtMDY(data.appointmentDate)||data.appointmentDate} at ${h12}:${String(mm).padStart(2,'0')} ${ap}`;
         const ok = await warnApptConflict(conflicts, agentLabel, proposed);
-        if(!ok) return; // user cancelled — leave the modal open so they can adjust
+        if(!ok){ releaseLock(); return; } // user cancelled — leave the modal open so they can adjust
       }
     }
   }
@@ -19894,11 +19929,15 @@ async function submitQuickFillCallLog(existingId, addAnother){
         const stEl = document.getElementById('qf_status');
         if(stEl) stEl.value = 'Completed';
         setTimeout(()=>document.getElementById('qf_propertyAddress')?.focus(), 40);
+        releaseLock(); // modal stayed open — re-enable Save for the next call
       } else {
         modal.remove();
       }
     }
-  }catch(e){ toast('Error: '+(e.message||'unknown')); }
+  }catch(e){
+    toast('Error: '+(e.message||'unknown'));
+    releaseLock();
+  }
 }
 
 function openLeadAdd(forUid){
