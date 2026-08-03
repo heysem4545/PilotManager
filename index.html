@@ -11118,6 +11118,7 @@ function renderTmDay(day, tasks, isGroup=false, readonly=false){
       <button class="tm-edit-btn" title="Edit task (full view)" onclick="openTaskEditModal(${day},${i})" style="background:none;border:1px solid var(--border2);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0" onmouseover="this.style.color='var(--text)';this.style.background='var(--surface3)'" onmouseout="this.style.color='var(--muted)';this.style.background='none'">
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>
       </button>
+      <button class="tm-del-btn" title="Delete this row (slides rows below it up)" onclick="tmDeleteRow(${day},${i})" style="background:none;border:1px solid var(--border2);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;font-size:14px;line-height:1;font-weight:700" onmouseover="this.style.color='var(--red)';this.style.background='rgba(245,112,106,.10)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.background='none';this.style.borderColor='var(--border2)'">×</button>
     </div>`;
   }).join('');
 
@@ -11366,6 +11367,44 @@ async function deleteTaskFromModal(){
   }
 }
 
+// Delete a single task row and slide every row below it up by one
+// index so no visual gap is left behind. Handles both filled rows
+// (has a Firestore doc) and blank ones (nothing to delete, just
+// re-render). Confirms if the row has task text.
+async function tmDeleteRow(day, rowIdx){
+  const key = tmActiveKey();
+  const targetUid = tmTargetUid() || currentUser.uid;
+  const isGroup = tmTab === 'group';
+  try{
+    // Find every task doc for this day so we can identify the one
+    // being deleted (if any) and every row we need to shift up.
+    let q = db.collection('tasks')
+      .where('monthKey','==',key)
+      .where('day','==',day);
+    if(!isGroup) q = q.where('uid','==',targetUid);
+    const snap = await q.get();
+    const docs = snap.docs.map(d => ({id:d.id, ref:d.ref, ...d.data()}));
+    const target = docs.find(d => (d.rowIdx||0) === rowIdx);
+
+    // If the row has text, confirm before nuking.
+    if(target && target.task && target.task.trim()){
+      if(!confirm(`Delete task "${target.task}"?`)) return;
+    }
+
+    const batch = db.batch();
+    if(target) batch.delete(target.ref);
+    // Every row with a HIGHER rowIdx slides up by one.
+    docs.forEach(d => {
+      if((d.rowIdx||0) > rowIdx) batch.update(d.ref, {rowIdx: (d.rowIdx||0) - 1, updatedAt: new Date()});
+    });
+    await batch.commit();
+    if(typeof renderTasksView === 'function') await renderTasksView();
+  }catch(e){
+    console.error('tmDeleteRow', e);
+    toast('Error: ' + (e.message || 'unknown'));
+  }
+}
+
 function tmAddRow(day){
   const cols=3;
   const weekStart=Math.floor((day-1)/cols)*cols+1;
@@ -11392,7 +11431,8 @@ function tmAddRow(day){
         <option value="notstarted" selected>Not Started</option>
         <option value="progressing">Progressing</option>
         <option value="done">✓ Done</option>
-      </select>`;
+      </select>
+      <button class="tm-del-btn" title="Delete this row" onclick="tmDeleteRow(${d},${newIdx})" style="background:none;border:1px solid var(--border2);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;font-size:14px;line-height:1;font-weight:700" onmouseover="this.style.color='var(--red)';this.style.background='rgba(245,112,106,.10)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.background='none';this.style.borderColor='var(--border2)'">×</button>`;
     body.appendChild(div);
     if(d===day) focusInput=div.querySelector('input');
   }
@@ -12158,7 +12198,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-13';
+const APP_VERSION='2026-08-03-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
