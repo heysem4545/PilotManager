@@ -12047,7 +12047,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-04';
+const APP_VERSION='2026-08-02-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15842,7 +15842,7 @@ async function updateAvailablePendingNote(propId, note){
 // the row is ready for a fresh tenant. Called when a user confirms
 // they want to overwrite an existing deposit with a new tenant's
 // numbers.
-const PENDING_RENT_FIELDS = ['pendingRentDesired','pendingRentTenantName','pendingRentTenantPhone','pendingRentDeposit','pendingRentType','pendingRentPackageDate','pendingRentCmhaOffer','pendingRentTenantOffer','pendingRentElectric','pendingRentGas','pendingRentScreeningNote','pendingRentNote','pendingRentAt'];
+const PENDING_RENT_FIELDS = ['pendingRentDesired','pendingRentTenantName','pendingRentTenantPhone','pendingRentDeposit','pendingRentProofUrl','pendingRentProofPath','pendingRentProofName','pendingRentType','pendingRentPackageDate','pendingRentCmhaOffer','pendingRentTenantOffer','pendingRentElectric','pendingRentGas','pendingRentScreeningNote','pendingRentNote','pendingRentAt'];
 
 async function archivePendingRent(p, reason){
   if(!p) return null;
@@ -15904,6 +15904,65 @@ function confirmOverwritePendingRent(p, newDeposit){
     // Default focus on Cancel so an accidental Enter doesn't overwrite.
     setTimeout(()=>document.getElementById('depWarnCancel')?.focus(), 60);
   });
+}
+
+// Upload a PDF / image as proof of the holding deposit. Mirrors
+// the Documents Tracking pdf uploader — extension-inferred
+// content-type, replaces the previous file on save, saves the
+// download URL back onto the property doc.
+async function uploadPendingRentProof(propId, input){
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file){ return; }
+  if(file.size === 0){ toast('That file is empty — pick a different one'); return; }
+  if(file.size > 25 * 1024 * 1024){ toast('File too large (max 25 MB)'); return; }
+  toast('Uploading…');
+  try{
+    const safeName = (file.name || 'proof').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const ext = (safeName.split('.').pop() || '').toLowerCase();
+    const extMap = {pdf:'application/pdf', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif'};
+    const contentType = extMap[ext] || file.type || 'application/octet-stream';
+    const path = `pendingRentProof/${propId}/${Date.now()}_${safeName}`;
+    const ref = firebase.storage().ref(path);
+    await ref.put(file, {contentType, contentDisposition: `inline; filename="${safeName}"`});
+    const url = await ref.getDownloadURL();
+    const p = properties.find(x=>x.id===propId);
+    // Replace-existing: best-effort delete of the prior file so
+    // the bucket doesn't grow orphans.
+    if(p && p.pendingRentProofPath){
+      try{ await firebase.storage().ref(p.pendingRentProofPath).delete(); }
+      catch(err){ console.warn('old proof delete', err); }
+    }
+    const updates = {
+      pendingRentProofUrl: url,
+      pendingRentProofPath: path,
+      pendingRentProofName: file.name || safeName,
+      updatedAt: new Date()
+    };
+    await db.collection('properties').doc(propId).update(updates);
+    if(p) Object.assign(p, updates);
+    toast('Proof attached');
+    renderAvailableView();
+  }catch(e){ toast('Upload failed: '+(e.message||'unknown')); }
+}
+
+async function deletePendingRentProof(propId){
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  if(!confirm('Remove the holding-deposit proof file?')) return;
+  const p = properties.find(x=>x.id===propId);
+  if(!p) return;
+  try{
+    if(p.pendingRentProofPath){
+      try{ await firebase.storage().ref(p.pendingRentProofPath).delete(); }
+      catch(err){ console.warn('storage delete', err); }
+    }
+    const updates = {pendingRentProofUrl:'', pendingRentProofPath:'', pendingRentProofName:'', updatedAt:new Date()};
+    await db.collection('properties').doc(propId).update(updates);
+    Object.assign(p, updates);
+    toast('Proof removed');
+    renderAvailableView();
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
 async function updateAvailablePendingField(propId, field, value){
@@ -16061,7 +16120,27 @@ function renderAvailableView(){
       </select>`;
     };
 
-    const COLSPAN = 19;
+    const COLSPAN = 20;
+
+    // 📎 Proof-of-holding-deposit cell. Same UX as the Documents
+    // Tracking pdf column — attach a PDF or image, view / download
+    // via the pill link, ↻ replaces, × deletes. File input is
+    // scoped to the property so multiple rows don't collide.
+    const proofCell = (p) => {
+      const has = !!p.pendingRentProofUrl;
+      const inputId = `pendingProofInput-${p.id}`;
+      if(has){
+        const viewLink  = `<a href="${escapeAttr(p.pendingRentProofUrl)}" target="_blank" rel="noopener" title="${escapeAttr(p.pendingRentProofName||'Open')}" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">📎 ${escapeHtml(p.pendingRentProofName||'file')}</a>`;
+        const dlLink    = `<a href="${escapeAttr(p.pendingRentProofUrl)}" download="${escapeAttr(p.pendingRentProofName||'proof')}" target="_blank" rel="noopener" title="Download" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px;text-decoration:none">⬇</a>`;
+        const replaceBtn = editable ? `<button title="Replace file" onclick="document.getElementById('${inputId}').click()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px">↻</button>` : '';
+        const delBtn     = editable ? `<button title="Delete file" onclick="deletePendingRentProof('${p.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button>` : '';
+        const hiddenIn   = editable ? `<input type="file" id="${inputId}" accept="application/pdf,image/*" style="display:none" onchange="uploadPendingRentProof('${p.id}',this)">` : '';
+        return `<div style="display:flex;align-items:center;gap:4px">${viewLink}${dlLink}${replaceBtn}${delBtn}${hiddenIn}</div>`;
+      }
+      if(!editable) return '<span style="color:var(--muted2);font-size:11px">—</span>';
+      return `<button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px" onclick="document.getElementById('${inputId}').click()">📎 Attach</button>
+        <input type="file" id="${inputId}" accept="application/pdf,image/*" style="display:none" onchange="uploadPendingRentProof('${p.id}',this)">`;
+    };
 
     // Age tier from the Package Sent date. Used to color both the
     // dedicated "Days" cell and the whole row so overdue packages
@@ -16110,6 +16189,7 @@ function renderAvailableView(){
             <td>${textCell(p,'pendingRentTenantName','Tenant name','140px')}</td>
             <td>${textCell(p,'pendingRentTenantPhone','555-555-5555','130px')}</td>
             <td style="text-align:right">${moneyCell(p,'pendingRentDeposit','$0')}</td>
+            <td style="text-align:center">${proofCell(p)}</td>
             <td style="text-align:center">${typeCell(p)}</td>
             <td>${dateCell(p,'pendingRentPackageDate')}</td>
             <td style="text-align:center">${daysCell(p)}</td>
@@ -16131,7 +16211,7 @@ function renderAvailableView(){
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)">
         <strong style="color:var(--text)">${pendingList.length}</strong> pending-rent house${pendingList.length===1?'':'s'} · Someone has committed but paperwork/deposit/etc. is still in progress.
       </div>
-      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2330px">
+      <div class="tbl-wrap"><table class="call-log-tbl" style="width:100%;border-collapse:collapse;min-width:2500px">
         <thead><tr>
           <th style="width:130px">Status</th>
           <th style="min-width:180px">Address</th>
@@ -16141,6 +16221,7 @@ function renderAvailableView(){
           <th style="min-width:150px">👤 Tenant Name</th>
           <th style="min-width:140px">📞 Tenant #</th>
           <th style="text-align:right;width:130px">💵 Holding Deposit</th>
+          <th style="text-align:center;width:160px" title="Attach a PDF or image as proof of the holding deposit (receipt, transfer screenshot, etc.)">📎 Proof Holding</th>
           <th style="text-align:center;width:110px">🏷 Type</th>
           <th style="width:150px">📦 Package Sent</th>
           <th style="text-align:center;width:90px" title="Days since package was sent · 0–15 green · 16–30 orange · 31+ dark red">⏱ Days</th>
