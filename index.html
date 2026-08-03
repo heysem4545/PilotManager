@@ -4064,8 +4064,12 @@ function generateThreeDayNoticePdf(propertyId){
 <meta charset="utf-8">
 <title>3-Day Notice — ${esc(fullAddr)}</title>
 <style>
-  @page { size: Letter; margin: 0.85in 0.9in; }
-  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.55; color:#000; margin:0; padding:0; }
+  /* margin:0 on @page eats the strip where browsers stamp the
+     header (URL / title / date-time) and footer (page number),
+     so those never appear on the saved PDF. Visual margin is
+     applied as padding on <body> so the layout still looks right. */
+  @page { size: Letter; margin: 0; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.55; color:#000; margin:0; padding:0.85in 0.9in; }
   h1 { font-size: 13pt; font-weight: bold; text-align: center; text-decoration: underline; margin: 0 0 26px; }
   p { margin: 0 0 14px; }
   .to-line { margin-bottom: 6px; }
@@ -12148,7 +12152,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-11';
+const APP_VERSION='2026-08-02-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
