@@ -54,8 +54,8 @@
 [data-theme="light"] .lm-picker{color-scheme:light}
 [data-theme="light"] .lm-picker::-webkit-calendar-picker-indicator{filter:none;opacity:0.75}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:14px}
-body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+html{font-size:14px;overscroll-behavior-x:none}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overscroll-behavior-x:none}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--surface)}
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px}
@@ -12047,7 +12047,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-06';
+const APP_VERSION='2026-08-02-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
