@@ -8663,13 +8663,23 @@ async function renderExcelDailyLog(){
       <div style="flex:1"></div>
       ${windowNav}
     </div>
-    <div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:10px">↓ / Enter → next row in the same column · ↑ → previous · Tab still works</div>
+    <div style="font-size:11px;color:var(--muted);font-style:italic;margin-bottom:10px">↓ / Enter → next row · ↑ → previous · → / ← jumps between columns (at caret edge) · Tab still works</div>
     <div id="excelDailyLogGrid" style="display:grid;grid-template-columns:repeat(${visibleDays.length},1fr);gap:12px;align-items:start">
       ${dayPanels}
     </div>`;
 
   // Keyboard nav: within one day's table, arrows / Enter move
-  // through the same column. Tab keeps native behavior.
+  // through cells. Tab keeps native behavior.
+  //   Enter / ↓ → next row, same column
+  //   ↑         → previous row, same column
+  //   →         → next column, same row (at end of input); wraps
+  //               to next row's first column if you were on Notes
+  //   ←         → previous column, same row (at start of input);
+  //               wraps to previous row's last column if on Task
+  // → / ← only intercept when the caret is at the input's edge so
+  // arrows still move the text cursor mid-edit — same convention
+  // Excel uses when you're in cell-edit mode.
+  const CELLS = ['task','status','notes'];
   const grid = document.getElementById('excelDailyLogGrid');
   if(grid && !grid._excelKeyHooked){
     grid._excelKeyHooked = true;
@@ -8682,18 +8692,40 @@ async function renderExcelDailyLog(){
       const row = el.closest('tr');
       if(!row) return;
       const rowIdx = parseInt(row.dataset.row || '0', 10);
-      const move = (delta) => {
-        const target = table.querySelector(`tr[data-row="${rowIdx + delta}"] [data-cell="${cell}"]`);
-        if(!target) return;
+      const focusTarget = (r, c) => {
+        const target = table.querySelector(`tr[data-row="${r}"] [data-cell="${c}"]`);
+        if(!target) return false;
         target.focus();
         if(target.tagName === 'INPUT'){
           const v = target.value || '';
           try{ target.setSelectionRange(v.length, v.length); }catch(_){}
         }
+        return true;
       };
-      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); move(+1); return; }
-      if(e.key === 'ArrowDown'){ e.preventDefault(); move(+1); return; }
-      if(e.key === 'ArrowUp'){ e.preventDefault(); move(-1); return; }
+      // Vertical moves — always intercepted.
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); focusTarget(rowIdx+1, cell); return; }
+      if(e.key === 'ArrowDown'){ e.preventDefault(); focusTarget(rowIdx+1, cell); return; }
+      if(e.key === 'ArrowUp'){ e.preventDefault(); focusTarget(rowIdx-1, cell); return; }
+      // Horizontal moves — only intercept at the caret edge, so
+      // mid-text arrow keys still move the caret naturally.
+      if(e.key === 'ArrowRight'){
+        const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
+        if(!atEnd) return;
+        const cIdx = CELLS.indexOf(cell);
+        e.preventDefault();
+        if(cIdx < CELLS.length - 1) focusTarget(rowIdx, CELLS[cIdx+1]);
+        else focusTarget(rowIdx+1, CELLS[0]);  // wrap → next row's Task
+        return;
+      }
+      if(e.key === 'ArrowLeft'){
+        const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+        if(!atStart) return;
+        const cIdx = CELLS.indexOf(cell);
+        e.preventDefault();
+        if(cIdx > 0) focusTarget(rowIdx, CELLS[cIdx-1]);
+        else focusTarget(rowIdx-1, CELLS[CELLS.length-1]); // wrap → prev row's Notes
+        return;
+      }
     });
   }
 }
@@ -12393,7 +12425,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-07';
+const APP_VERSION='2026-08-03-08';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
