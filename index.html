@@ -9422,9 +9422,21 @@ function renderTenantLeaseView(){
       <td>${(()=>{
         const methods=['Zelle','Doorloop','Turbotenant','Money Order','Cash'];
         const saved=(p.payMethods||[]);
-        const display=saved.length?saved.map(m=>`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--accent-dim);color:var(--accent)">${m}</span>`).join(' '):'';
-        const opts=methods.map(m=>`<option value="${m}">${saved.includes(m)?'✓ ':''} ${m}</option>`).join('');
-        return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap">${display}<select ${dis} style="font-size:9px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;background:var(--surface2);color:var(--muted);cursor:pointer;width:18px" onchange="togglePayMethod('${p.id}',this.value,true);this.selectedIndex=0"><option value="">+</option>${opts}</select></div>`;
+        // Each saved method is a clickable pill — × removes it.
+        // The old chip was a static <span> with no way to uncheck.
+        const chipCursor = editable ? 'cursor:pointer' : '';
+        const display = saved.length ? saved.map(m => {
+          const rm = editable ? `onclick="togglePayMethod('${p.id}','${escapeAttr(m)}',false)" title="Click to remove ${escapeAttr(m)}"` : '';
+          const xMark = editable ? '<span style="opacity:0.55;margin-left:2px;font-weight:700">×</span>' : '';
+          return `<span ${rm} style="font-size:9px;padding:2px 5px;border-radius:3px;background:var(--accent-dim);color:var(--accent);display:inline-flex;align-items:center;gap:2px;${chipCursor}">${m}${xMark}</span>`;
+        }).join(' ') : '';
+        // '+' picker only shows methods not already saved so the
+        // dropdown doesn't try to add duplicates.
+        const opts = methods.filter(m => !saved.includes(m)).map(m => `<option value="${m}">${m}</option>`).join('');
+        const picker = editable && opts
+          ? `<select ${dis} style="font-size:9px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;background:var(--surface2);color:var(--muted);cursor:pointer;width:22px" onchange="togglePayMethod('${p.id}',this.value,true);this.selectedIndex=0" title="Add pay method"><option value="">+</option>${opts}</select>`
+          : '';
+        return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">${display}${picker}</div>`;
       })()}</td>
       <td><input type="tel" value="${escapeAttr(secInfo)}" placeholder="📞" style="${ism};width:120px" ${dis} onblur="updatePropertyField('${p.id}','secondaryInfo',this.value)"></td>
       <td><input type="text" value="${escapeAttr(p.emergencyName||'')}" placeholder="—" style="${is};width:120px" ${dis} onblur="updatePropertyField('${p.id}','emergencyName',this.value)"></td>
@@ -12441,7 +12453,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-10';
+const APP_VERSION='2026-08-03-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
