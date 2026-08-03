@@ -4033,6 +4033,102 @@ async function returnLegalCaseToCollection(propertyId){
   }catch(e){ toast('Error: '+e.message); }
 }
 
+// Build an Ohio 3-Day Notice ('Notice to Leave Premises') for the
+// given property, pre-filled with the current tenant name + full
+// address, and open the browser's print dialog so the user can
+// save it as PDF. Uses HTML rendering (no external PDF library) so
+// there's nothing to install and the layout matches the paper form.
+function generateThreeDayNoticePdf(propertyId){
+  const p = properties.find(x => x.id === propertyId);
+  if(!p){ toast('Property not found'); return; }
+  const tenantName = (p.tenant || '').trim() || '_______________________';
+  const fullAddr = (p.addr || '').trim() || '_______________________';
+  const today = new Date();
+  const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNum = today.getDate();
+  const monthName = MNAMES_FULL[today.getMonth()];
+  const yearNum = today.getFullYear();
+
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ toast('Please allow popups so the notice can open'); return; }
+  const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // Underlined-blank helper (matches the paper form's fill-in lines).
+  const filled = v => `<span style="display:inline-block;border-bottom:1px solid #000;padding:0 6px;font-weight:600">${esc(v)}</span>`;
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<title>3-Day Notice — ${esc(fullAddr)}</title>
+<style>
+  @page { size: Letter; margin: 0.85in 0.9in; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.55; color:#000; margin:0; padding:0; }
+  h1 { font-size: 13pt; font-weight: bold; text-align: center; text-decoration: underline; margin: 0 0 26px; }
+  p { margin: 0 0 14px; }
+  .to-line { margin-bottom: 6px; }
+  .hint { font-style: italic; font-size: 10.5pt; color:#333; margin: 0 0 18px 24px; }
+  .indent { text-indent: 32px; }
+  .caps { font-weight: bold; text-transform: uppercase; }
+  .sig-block { margin-top: 46px; padding-left: 200px; }
+  .sig-line { border-bottom: 1px solid #000; width: 320px; margin-bottom: 4px; }
+  .sig-caption { font-size: 11pt; margin-bottom: 14px; }
+  .landlord-name { border-bottom: 1px solid #000; padding: 0 8px; display:inline-block; min-width:280px; font-weight:600; }
+  .contact { font-size: 11pt; line-height: 1.4; margin-top: 8px; padding-left: 20px; }
+  .date-line { margin-top: 30px; text-align: right; }
+  @media print { .no-print { display:none } }
+  .no-print { position: fixed; top: 12px; right: 12px; }
+  .no-print button { font: 500 13px/1.2 -apple-system,sans-serif; padding:8px 14px; background:#c9f563; color:#0d0d10; border:0; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.2) }
+</style>
+</head>
+<body>
+  <div class="no-print"><button onclick="window.print()">🖨 Save as PDF</button></div>
+
+  <h1>NOTICE TO LEAVE PREMISES</h1>
+
+  <p class="to-line">To: ${filled(tenantName)}</p>
+  <p class="hint">[list each tenant who will be affected by this notice]</p>
+
+  <p class="indent">The purpose of this letter is to ask you to LEAVE the premises now in your possession,
+  situated in ${filled('Cleveland Ohio')} [city], ${filled('Cuyahoga')} [county], Ohio and
+  known as ${filled(fullAddr)}
+  [full address and suite number of rental premises]
+  together with the lot of land on which these premises are located. You are being asked to leave
+  for the following reason: ${filled('No Payment of rent')}
+  [state reasons for eviction].</p>
+
+  <p class="indent">Your compliance with this notice within [${filled('3')}] days after its service will prevent any
+  further eviction action against you.</p>
+
+  <p class="caps">You are being asked to leave the premises. If you do not leave, an eviction action may be initiated against you. If you are in doubt regarding your legal rights and obligations as a tenant, it is recommended that you seek legal assistance.</p>
+
+  <p style="text-align:center;margin-top:36px">Yours respectfully,</p>
+
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <div class="sig-caption">Landlord's Signature</div>
+    <div><span class="landlord-name">Pilot Property Investment LLC</span></div>
+    <div class="sig-caption">Landlord's Printed Name</div>
+    <div><span class="landlord-name">Quentin Ousley</span></div>
+    <div class="contact">
+      815 Superior Ave,<br>
+      Suite #1825<br>
+      Cleveland Oh 44114<br>
+      (818)–941-4770
+    </div>
+  </div>
+
+  <p class="date-line">Dated this ${filled(String(dayNum))} day of ${filled(monthName)}, ${filled(String(yearNum))}</p>
+
+  <script>
+    // Auto-open the print dialog once the page is rendered so the
+    // user's next click is 'Save as PDF' in Chrome's print sheet.
+    window.addEventListener('load', () => setTimeout(() => window.print(), 250));
+  </script>
+</body>
+</html>`);
+  win.document.close();
+}
+
 async function renderAllBalances(){
   const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const now=new Date();
@@ -4110,6 +4206,7 @@ async function renderAllBalances(){
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">3 Day Notice</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th" title="Upload photo of 3 day notice">📷 Pic</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">PIC</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th" title="Generate a 3-Day Notice PDF pre-filled with this property's address and tenant name">+PDF</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">VAWA</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">Notes</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">To Legal</th>
@@ -4141,6 +4238,7 @@ async function renderAllBalances(){
                 <td style="${r.notice3Date&&(Date.now()-new Date(r.notice3Date+'T00:00:00').getTime())>=3*86400000?'background:rgba(245,112,106,0.2);border-radius:4px':''}"><input type="date" class="ab-input ab-date" value="${r.notice3Date}" ${dis} onchange="abSaveField('${r.id}','notice3Date',this.value)" style="${r.notice3Date&&(Date.now()-new Date(r.notice3Date+'T00:00:00').getTime())>=3*86400000?'background:rgba(245,112,106,0.15);color:var(--red);font-weight:600':''}"></td>
                 <td class="ab-check-cell">${renderNoticePicCell(r.id,'notice3',r.notice3PicUrl,r.notice3PicName,editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 3 day notice" ${r.notice3Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice3Pic',this.checked)"></td>
+                <td class="ab-check-cell"><button title="Generate a 3-Day Notice PDF pre-filled with address + tenant name" onclick="generateThreeDayNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" ${r.vawa?'checked':''} ${dis} onchange="abSaveField('${r.id}','vawa',this.checked)"></td>
                 <td>${renderPopupCell(r.id, r.collectionNotes, 'collectionNotes', 'Note', editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check legal" ${r.toLegal?'checked':''} ${dis} onchange="abSaveField('${r.id}','toLegal',this.checked)"></td>
@@ -12047,7 +12145,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-08';
+const APP_VERSION='2026-08-02-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
