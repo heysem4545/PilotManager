@@ -8489,9 +8489,15 @@ async function renderDailyLogView(){
 
     const tabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
       <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='excel'?' active':''}" onclick="dailyLogTab='excel';renderDailyLogView()">📊 Excel Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='late'?' active':''}" onclick="dailyLogTab='late';renderDailyLogView()" style="position:relative">⚠ Late Entry Log${lateCount>0?' <span style="background:var(--red);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:4px">'+lateCount+'</span>':''}</button>
       <button class="maint-vtab${dailyLogTab==='scorecard'?' active':''}" onclick="dailyLogTab='scorecard';renderDailyLogView()">🏆 Scorecard</button>
     </div>`;
+
+    if(dailyLogTab==='excel'){
+      el.innerHTML=tabs+renderExcelDailyLogPlaceholder();
+      return;
+    }
 
     if(dailyLogTab==='late'){
       el.innerHTML=tabs+'<div id="lateEntryContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
@@ -8509,8 +8515,13 @@ async function renderDailyLogView(){
   } else {
     const userTabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
       <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='excel'?' active':''}" onclick="dailyLogTab='excel';renderDailyLogView()">📊 Excel Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='scorecard'?' active':''}" onclick="dailyLogTab='scorecard';renderDailyLogView()">🏆 My Scorecard</button>
     </div>`;
+    if(dailyLogTab==='excel'){
+      el.innerHTML=userTabs+renderExcelDailyLogPlaceholder();
+      return;
+    }
     if(dailyLogTab==='scorecard'){
       el.innerHTML=userTabs+'<div id="scorecardContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
       await renderDailyLogScorecard();
@@ -8519,6 +8530,24 @@ async function renderDailyLogView(){
     el.innerHTML=userTabs+'<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
   }
   await renderTeamDailyLog();
+}
+
+// Placeholder shell for the '📊 Excel Daily Log' tab. Kept
+// intentionally simple until the user finalizes the intended
+// layout / columns — they mentioned Daily Log is heading in a
+// new direction, so we render a friendly 'design-in-progress'
+// panel here for now.
+function renderExcelDailyLogPlaceholder(){
+  return `<div class="table-card" style="padding:40px 32px;text-align:center">
+    <div style="font-size:38px;margin-bottom:8px">📊</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">Excel Daily Log — coming soon</div>
+    <div style="font-size:12px;color:var(--muted);max-width:520px;margin:0 auto 20px">
+      A spreadsheet-style daily-log grid will live here. Tell me the columns and rows you want and I'll build it out.
+    </div>
+    <div style="display:inline-flex;gap:6px;padding:8px 14px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;font-size:11px;color:var(--muted)">
+      Placeholder — no data captured yet
+    </div>
+  </div>`;
 }
 
 let scorecardMonth=new Date().getMonth();
@@ -12195,7 +12224,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-04';
+const APP_VERSION='2026-08-03-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
