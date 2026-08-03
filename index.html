@@ -10875,11 +10875,8 @@ async function saveTask(day, rowIdx, field, value, uid=null){
       const updateData = {[field]:value, updatedAt:new Date()};
       if(field === 'task') updateData.suspiciousFlag = suspiciousFlag;
       await snap.docs[0].ref.update(updateData);
-      // Auto-log to Daily Log when task marked as done
-      if(field==='status'&&value==='done'){
-        const taskDoc=snap.docs[0].data();
-        if(taskDoc.task) autoLogToDailyLog(targetUid, taskDoc.task, day);
-      }
+      // Auto-mirror to Daily Log on 'done' was intentionally removed
+      // per user request — Daily Log now stands on its own workflow.
     } else {
       await db.collection('tasks').add({
         monthKey:key, day, rowIdx,
@@ -11341,8 +11338,8 @@ async function saveTaskFromModal(){
         createdAt: new Date()
       });
     }
-    // Auto-log to Daily Log when task marked as done
-    if(status==='done'&&task) autoLogToDailyLog(taskUid, task, day);
+    // Auto-mirror to Daily Log on 'done' was intentionally removed
+    // per user request — Daily Log now stands on its own workflow.
     closeModal('taskEditModal');
     toast('Task saved');
     await renderTasksView();
@@ -12198,7 +12195,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-03';
+const APP_VERSION='2026-08-03-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
