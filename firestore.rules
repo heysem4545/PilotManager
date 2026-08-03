@@ -274,5 +274,13 @@ service cloud.firestore {
     match /pendingRentArchive/{archId} {
       allow read, write: if request.auth != null;
     }
+
+    // Excel-style Daily Log — one doc per user per day (id =
+    // <uid>_<YYYY-MM-DD>) with task / status / notes fields.
+    // Read/write for authenticated users; the front-end restricts
+    // to admin OR the doc's own uid.
+    match /dailyLogExcel/{docId} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

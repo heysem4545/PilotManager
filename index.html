@@ -8532,22 +8532,183 @@ async function renderDailyLogView(){
   await renderTeamDailyLog();
 }
 
-// Placeholder shell for the '📊 Excel Daily Log' tab. Kept
-// intentionally simple until the user finalizes the intended
-// layout / columns — they mentioned Daily Log is heading in a
-// new direction, so we render a friendly 'design-in-progress'
-// panel here for now.
+// '📊 Excel Daily Log' — one row per day of the visible month,
+// three editable columns (Task / Status / Notes). Keyboard-nav
+// works like the Call Log Quick Fill: Enter or ↓ = next cell,
+// ↑ = previous, Tab still works natively. Same user-picker /
+// month-nav shell the other daily-log tabs use so switching
+// tabs feels seamless.
 function renderExcelDailyLogPlaceholder(){
-  return `<div class="table-card" style="padding:40px 32px;text-align:center">
-    <div style="font-size:38px;margin-bottom:8px">📊</div>
-    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">Excel Daily Log — coming soon</div>
-    <div style="font-size:12px;color:var(--muted);max-width:520px;margin:0 auto 20px">
-      A spreadsheet-style daily-log grid will live here. Tell me the columns and rows you want and I'll build it out.
+  // Async work happens inline via setTimeout — we return the
+  // container immediately so the tab switch is snappy, then the
+  // async renderer fills it in.
+  setTimeout(renderExcelDailyLog, 0);
+  return `<div id="excelDailyLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>`;
+}
+
+async function renderExcelDailyLog(){
+  const el = document.getElementById('excelDailyLogContent');
+  if(!el) return;
+
+  const users = teamUsersCache.length ? teamUsersCache : await getUsers();
+  teamUsersCache = users;
+  if(!teamLogUser && users.length) teamLogUser = users[0].uid;
+
+  const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DNAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const isOwnLog = teamLogUser === currentUser.uid;
+  const editable = isAdmin() || isOwnLog;
+
+  const userOpts = users.map(u => `<option value="${u.uid}" ${u.uid===teamLogUser?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('');
+  const mKey = `${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+
+  // Load all rows for this user + month in one shot.
+  let byDay = {};
+  try{
+    const snap = await db.collection('dailyLogExcel')
+      .where('monthKey','==',mKey)
+      .where('uid','==',teamLogUser)
+      .get();
+    snap.docs.forEach(d => { const dat = d.data(); byDay[dat.day] = {id:d.id, ...dat}; });
+  }catch(e){ console.error('loadExcelDailyLog', e); }
+
+  const daysInMonth = new Date(teamLogYear, teamLogMonth+1, 0).getDate();
+  const today = new Date();
+  const isCurMonth = today.getFullYear()===teamLogYear && today.getMonth()===teamLogMonth;
+  const todayDay = today.getDate();
+  const dis = editable ? '' : 'disabled';
+
+  // Status pill colors (mirrors Task Management).
+  const statusColor = s => s === 'done' ? 'var(--accent)' : s === 'progressing' ? 'var(--blue)' : s === 'skipped' ? 'var(--muted)' : 'var(--amber)';
+
+  const rowsHtml = Array.from({length: daysInMonth}, (_, i) => {
+    const day = i + 1;
+    const r = byDay[day] || {};
+    const isToday = isCurMonth && day === todayDay;
+    const dow = DNAMES[new Date(teamLogYear, teamLogMonth, day).getDay()];
+    const isSun = dow === 'Sun';
+    const rowBg = isToday ? 'background:rgba(201,245,99,.06)' : isSun ? 'background:rgba(255,255,255,.015)' : '';
+    const status = r.status || 'notstarted';
+    const sColor = statusColor(status);
+    return `<tr data-day="${day}" style="${rowBg}">
+      <td style="width:80px;padding:8px 12px;font-family:var(--mono);font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--accent)':(isSun?'var(--muted)':'var(--text)')};border-right:1px solid var(--border);white-space:nowrap">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${dow}</div>
+        <div style="font-size:16px;line-height:1.1">${day}</div>
+      </td>
+      <td style="padding:4px 6px"><input type="text" data-cell="task" value="${escapeAttr(r.task||'')}" placeholder="Task…" ${dis} onblur="excelDailyLogSave(${day},'task',this.value)" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none"></td>
+      <td style="width:150px;padding:4px 6px"><select data-cell="status" ${dis} onchange="excelDailyLogSave(${day},'status',this.value)" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid ${sColor}55;border-radius:5px;background:${sColor}18;color:${sColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">
+        <option value="notstarted" ${status==='notstarted'?'selected':''}>Not Started</option>
+        <option value="progressing" ${status==='progressing'?'selected':''}>Progressing</option>
+        <option value="done" ${status==='done'?'selected':''}>✓ Done</option>
+        <option value="skipped" ${status==='skipped'?'selected':''}>Skipped</option>
+      </select></td>
+      <td style="padding:4px 6px"><input type="text" data-cell="notes" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${dis} onblur="excelDailyLogSave(${day},'notes',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none"></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <select onchange="teamLogUser=this.value;renderExcelDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>
+      <button class="btn btn-ghost btn-sm" onclick="teamLogMonth--;if(teamLogMonth<0){teamLogMonth=11;teamLogYear--;}renderExcelDailyLog()">‹</button>
+      <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[teamLogMonth]} ${teamLogYear}</span>
+      <button class="btn btn-ghost btn-sm" onclick="teamLogMonth++;if(teamLogMonth>11){teamLogMonth=0;teamLogYear++;}renderExcelDailyLog()">›</button>
+      <div style="flex:1"></div>
+      <span style="font-size:11px;color:var(--muted);font-style:italic">↓ / Enter → next cell · ↑ → previous · Tab still works</span>
     </div>
-    <div style="display:inline-flex;gap:6px;padding:8px 14px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;font-size:11px;color:var(--muted)">
-      Placeholder — no data captured yet
-    </div>
-  </div>`;
+    <div class="table-card" style="overflow:hidden">
+      <div class="tbl-wrap" id="excelDailyLogWrap">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="width:80px;padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);border-right:1px solid var(--border)">📅 Day</th>
+              <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">📝 Task</th>
+              <th style="width:150px;padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">📊 Status</th>
+              <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">💬 Notes</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Excel-style keyboard nav across the [data-cell] fields.
+  // Enter / ↓ = next, ↑ = previous (moves down/up the same column
+  // first, then across columns if we're at the row edge).
+  const wrap = document.getElementById('excelDailyLogWrap');
+  if(wrap && !wrap._excelKeyHooked){
+    wrap._excelKeyHooked = true;
+    const CELL_ORDER = ['task','status','notes'];
+    wrap.addEventListener('keydown', e => {
+      const el = e.target;
+      if(!el || !el.matches || !el.matches('[data-cell]')) return;
+      const tag = el.tagName;
+      const cell = el.dataset.cell;
+      const row = el.closest('tr');
+      if(!row) return;
+      const day = parseInt(row.dataset.day || '0', 10);
+      const move = (deltaDay, deltaCell) => {
+        // Same column, ±deltaDay row.
+        let targetCell = cell;
+        if(deltaCell){
+          const idx = CELL_ORDER.indexOf(cell) + deltaCell;
+          if(idx < 0 || idx >= CELL_ORDER.length){
+            // Wrap: move to next/prev day at edge column.
+            deltaDay += deltaCell;
+            targetCell = deltaCell > 0 ? CELL_ORDER[0] : CELL_ORDER[CELL_ORDER.length - 1];
+          } else {
+            targetCell = CELL_ORDER[idx];
+          }
+        }
+        const targetRow = wrap.querySelector(`tr[data-day="${day + deltaDay}"]`);
+        if(!targetRow) return;
+        const targetEl = targetRow.querySelector(`[data-cell="${targetCell}"]`);
+        if(targetEl){
+          targetEl.focus();
+          if(targetEl.tagName === 'INPUT' && (targetEl.type === 'text' || targetEl.type === 'search')){
+            const v = targetEl.value || '';
+            try{ targetEl.setSelectionRange(v.length, v.length); }catch(_){}
+          }
+        }
+      };
+      // Enter — same column, next row.
+      if(e.key === 'Enter' && !e.shiftKey){
+        if(tag === 'TEXTAREA') return; // let newline win in textareas (none here yet, future-proof)
+        e.preventDefault();
+        move(+1, 0);
+        return;
+      }
+      // Arrow up/down — same column, ±1 row. Skip on <select>
+      // (arrows cycle native options); skip on date/time inputs
+      // (none in this grid, but future-proof).
+      if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        if(tag === 'SELECT') return;
+        e.preventDefault();
+        move(e.key === 'ArrowDown' ? +1 : -1, 0);
+      }
+    });
+  }
+}
+
+// Optimistic-write save for a single cell on the Excel Daily Log.
+// Doc id is deterministic (uid + monthKey + day) so a save is
+// either an insert or an update — no lookup query needed.
+async function excelDailyLogSave(day, field, value){
+  const isOwnLog = teamLogUser === currentUser.uid;
+  if(!isAdmin() && !isOwnLog) return;
+  const mKey = `${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  const docId = `${teamLogUser}_${mKey}_${String(day).padStart(2,'0')}`;
+  const v = value == null ? '' : String(value);
+  try{
+    await db.collection('dailyLogExcel').doc(docId).set({
+      uid: teamLogUser,
+      monthKey: mKey,
+      day,
+      targetDate: `${mKey}-${String(day).padStart(2,'0')}`,
+      [field]: v,
+      updatedAt: new Date(),
+      updatedBy: currentUser?.name || currentUser?.email || ''
+    }, {merge: true});
+  }catch(e){ toast('Error: '+(e.message||'unknown')); }
 }
 
 let scorecardMonth=new Date().getMonth();
@@ -12224,7 +12385,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-05';
+const APP_VERSION='2026-08-03-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
