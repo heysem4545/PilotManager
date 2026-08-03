@@ -12198,7 +12198,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-02';
+const APP_VERSION='2026-08-03-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15659,9 +15659,15 @@ async function updateLeadField(callId, field, value){
     const c = (typeof callLogData !== 'undefined' ? callLogData : []).find(x => x.id === callId);
     const newDate = field === 'appointmentDate' ? value : (c?.appointmentDate || '');
     const newTime = field === 'appointmentTime' ? value : (c?.appointmentTime || '');
-    const uid = c?.assignedToUid;
-    if(uid && newDate && newTime && (value || '').trim()){
+    // Fall back to currentUser if the lead has no assignedToUid yet
+    // — previously that case silently skipped the check, so leads
+    // added without an assignee never surfaced conflicts.
+    const uid = (c && c.assignedToUid) || currentUser?.uid || '';
+    const shouldCheck = uid && newDate && newTime && (value || '').trim();
+    console.log('[appt-conflict] updateLeadField', {field, value, newDate, newTime, uid, shouldCheck, leadFound: !!c});
+    if(shouldCheck){
       const conflicts = findApptConflicts(uid, newDate, newTime, callId);
+      console.log('[appt-conflict] found', conflicts.length, 'conflicts', conflicts);
       if(conflicts.length){
         const users = (typeof allUsersCache !== 'undefined' ? allUsersCache : []) || [];
         const u = users.find(x => x.uid === uid);
