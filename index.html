@@ -4041,7 +4041,10 @@ async function returnLegalCaseToCollection(propertyId){
 function generateThreeDayNoticePdf(propertyId){
   const p = properties.find(x => x.id === propertyId);
   if(!p){ toast('Property not found'); return; }
-  const tenantName = (p.tenant || '').trim() || '_______________________';
+  // Prefer the Tenant & Lease section's tenantName2 (the newer,
+  // actively-maintained field). Fall back to the old top-level
+  // 'tenant' from the Edit Property modal only if T&L is empty.
+  const tenantName = ((p.tenantName2 || p.tenant || '').trim()) || '_______________________';
   const fullAddr = (p.addr || '').trim() || '_______________________';
   const today = new Date();
   const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -12145,7 +12148,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-10';
+const APP_VERSION='2026-08-02-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
