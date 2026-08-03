@@ -12047,7 +12047,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-05';
+const APP_VERSION='2026-08-02-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -13134,14 +13134,16 @@ async function updateDocField(id, field, value){
 // user drops a hair outside the intended drop cell the browser
 // navigates to file:// and opens the PDF instead. We only cancel
 // the default — we do NOT stop propagation, so the cell-level drop
-// handler still runs when the drop lands inside .doc-pdf-cell.
+// handler still runs when the drop lands inside a valid drop cell
+// (Documents Tracking OR Pending Rent proof).
 if(!window._docDragBlocker){
   window._docDragBlocker = true;
+  const DROP_SELECTOR = '.doc-pdf-cell, .pending-proof-cell';
   ['dragover','drop'].forEach(evt=>{
     window.addEventListener(evt, e=>{
       const dt = e.dataTransfer;
       if(!dt || !dt.types || Array.prototype.indexOf.call(dt.types,'Files') === -1) return;
-      const inCell = e.target && e.target.closest && e.target.closest('.doc-pdf-cell');
+      const inCell = e.target && e.target.closest && e.target.closest(DROP_SELECTOR);
       if(!inCell) e.preventDefault();
     });
   });
@@ -15910,6 +15912,35 @@ function confirmOverwritePendingRent(p, newDeposit){
 // the Documents Tracking pdf uploader — extension-inferred
 // content-type, replaces the previous file on save, saves the
 // download URL back onto the property doc.
+// Drag-and-drop handlers for the Pending Rent proof cell — same
+// green-dashed hover feedback as Documents Tracking. Drop the
+// first file to attach it.
+function onPendingProofDropOver(e, cell){
+  if(!canEdit()) return;
+  e.preventDefault();
+  e.stopPropagation();
+  try{ e.dataTransfer.dropEffect = 'copy'; }catch(_){}
+  cell.style.background = 'rgba(201,245,99,.12)';
+  cell.style.outline = '2px dashed var(--accent)';
+  cell.style.outlineOffset = '-3px';
+}
+function onPendingProofDropLeave(e, cell){
+  cell.style.background = '';
+  cell.style.outline = '';
+  cell.style.outlineOffset = '';
+}
+async function onPendingProofDrop(e, cell){
+  e.preventDefault();
+  e.stopPropagation();
+  onPendingProofDropLeave(e, cell);
+  if(!canEdit()){ toast("You don't have edit access"); return; }
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if(!files || files.length === 0) return;
+  const propId = cell.getAttribute('data-prop-id');
+  if(!propId) return;
+  await uploadPendingRentProof(propId, {files, value:''});
+}
+
 async function uploadPendingRentProof(propId, input){
   if(!canEdit()){ toast("You don't have edit access"); return; }
   const file = input.files && input.files[0];
@@ -16189,7 +16220,7 @@ function renderAvailableView(){
             <td>${textCell(p,'pendingRentTenantName','Tenant name','140px')}</td>
             <td>${textCell(p,'pendingRentTenantPhone','555-555-5555','130px')}</td>
             <td style="text-align:right">${moneyCell(p,'pendingRentDeposit','$0')}</td>
-            <td style="text-align:center">${proofCell(p)}</td>
+            <td class="pending-proof-cell" data-prop-id="${p.id}" style="text-align:center;vertical-align:middle" ondragover="onPendingProofDropOver(event,this)" ondragenter="onPendingProofDropOver(event,this)" ondragleave="onPendingProofDropLeave(event,this)" ondrop="onPendingProofDrop(event,this)">${proofCell(p)}</td>
             <td style="text-align:center">${typeCell(p)}</td>
             <td>${dateCell(p,'pendingRentPackageDate')}</td>
             <td style="text-align:center">${daysCell(p)}</td>
