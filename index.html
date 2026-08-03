@@ -8562,6 +8562,9 @@ async function renderExcelDailyLog(){
 
   const users = teamUsersCache.length ? teamUsersCache : await getUsers();
   teamUsersCache = users;
+  // Non-admins are locked to their own log — pin the target user
+  // to currentUser regardless of any lingering state.
+  if(!isAdmin()) teamLogUser = currentUser.uid;
   if(!teamLogUser && users.length) teamLogUser = users[0].uid;
 
   const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -8587,7 +8590,13 @@ async function renderExcelDailyLog(){
   for(let d = winStart; d <= winEnd; d++) visibleDays.push(d);
 
   const mKey = `${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}`;
+  // Admins get a full user picker; non-admins see a static badge
+  // for their own name so they can't peek at anyone else's log.
   const userOpts = users.map(u => `<option value="${u.uid}" ${u.uid===teamLogUser?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('');
+  const currentName = escapeHtml(currentUser?.name || currentUser?.email || 'You');
+  const userPicker = isAdmin()
+    ? `<select onchange="teamLogUser=this.value;renderExcelDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>`
+    : `<div style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text)">👤 <strong>${currentName}</strong></div>`;
 
   // Load every row for this user + month; index by day + rowIdx.
   const rows = {};
@@ -8658,7 +8667,7 @@ async function renderExcelDailyLog(){
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-      <select onchange="teamLogUser=this.value;renderExcelDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>
+      ${userPicker}
       ${monthNav}
       <div style="flex:1"></div>
       ${windowNav}
@@ -8913,6 +8922,8 @@ async function renderTeamDailyLog(){
 
   const users=teamUsersCache.length?teamUsersCache:await getUsers();
   teamUsersCache=users;
+  // Non-admins can only see their own log — lock the target user.
+  if(!isAdmin()) teamLogUser=currentUser.uid;
   if(!teamLogUser&&users.length) teamLogUser=users[0].uid;
 
   const MNAMES_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -8922,11 +8933,16 @@ async function renderTeamDailyLog(){
   const selectedUser=users.find(u=>u.uid===teamLogUser);
   const userName=selectedUser?(selectedUser.name||selectedUser.email):'';
 
-  // User selector + month nav
+  // User selector + month nav — admins can pick anyone, non-admins
+  // see their own name as a static badge (no dropdown).
   const userOpts=users.map(u=>`<option value="${u.uid}" ${u.uid===teamLogUser?'selected':''}>${escapeHtml(u.name||u.email)}</option>`).join('');
+  const currentName=escapeHtml(currentUser?.name||currentUser?.email||'You');
+  const userPicker=isAdmin()
+    ? `<select onchange="teamLogUser=this.value;renderTeamDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>`
+    : `<div style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text)">👤 <strong>${currentName}</strong></div>`;
 
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-    <select onchange="teamLogUser=this.value;renderTeamDailyLog()" style="font-size:13px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">${userOpts}</select>
+    ${userPicker}
     <button class="btn btn-ghost btn-sm" onclick="teamLogMonth--;if(teamLogMonth<0){teamLogMonth=11;teamLogYear--;}renderTeamDailyLog()">‹</button>
     <span style="font-size:15px;font-weight:600;min-width:180px;text-align:center">${MNAMES_FULL[teamLogMonth]} ${teamLogYear}</span>
     <button class="btn btn-ghost btn-sm" onclick="teamLogMonth++;if(teamLogMonth>11){teamLogMonth=0;teamLogYear++;}renderTeamDailyLog()">›</button>
@@ -12425,7 +12441,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-08';
+const APP_VERSION='2026-08-03-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
