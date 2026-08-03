@@ -12047,7 +12047,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-02';
+const APP_VERSION='2026-08-02-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -14849,14 +14849,6 @@ async function renderLeadsView(skipLoad){
         <td style="text-align:center"><input type="checkbox" ${c.turboScreening?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('turboScreening')}"></td>
         <td><input type="text" value="${escapeAttr(c.anyNotes||'')}" placeholder="📝" style="${is};width:120px" onblur="${uf('anyNotes')}"></td>
         <td>${mkSel('moveForward',['','Yes','Risk','No'],c.moveForward)}</td>
-        <td><input type="date" value="${c.leaseEffective||''}" style="${is};width:125px" onchange="${uf('leaseEffective')}"></td>
-        <td><input type="date" value="${c.leaseExpire||''}" style="${is};width:125px" onchange="${uf('leaseExpire')}"></td>
-        <td style="text-align:center"><input type="checkbox" ${c.leaseSigned?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('leaseSigned')}"></td>
-        <td style="text-align:center"><input type="checkbox" ${c.depositReceived?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('depositReceived')}"></td>
-        <td><input type="text" value="${escapeAttr(c.electricNumber||'')}" placeholder="⚡" style="${isn};width:100px" onblur="${uf('electricNumber')}"></td>
-        <td><input type="text" value="${escapeAttr(c.gasNumber||'')}" placeholder="🔥" style="${isn};width:100px" onblur="${uf('gasNumber')}"></td>
-        <td><input type="text" value="${escapeAttr(c.keyHandle||'')}" placeholder="🔑" style="${is};width:80px" onblur="${uf('keyHandle')}"></td>
-        <td style="text-align:center"><input type="checkbox" ${c.moveInPaperSign?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="${uc('moveInPaperSign')}"></td>
       </tr>`;
     }).join('') + '</tbody>';
   }
@@ -14878,7 +14870,6 @@ async function renderLeadsView(skipLoad){
             <th colspan="${leadsSubTab==='own'?25:29}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log &amp; Follow Up</th>
             <th colspan="6" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 2 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 3 — Screening</th>
-            <th colspan="8" style="text-align:center;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📝 PART 4 — Move In</th>
           </tr>
           <tr>
             <th>Date</th><th class="lead-own-hide">Direction</th><th>Property</th><th class="lead-own-hide">Reason</th><th>Status</th><th>Name</th><th>Number</th>
@@ -14887,7 +14878,6 @@ async function renderLeadsView(skipLoad){
             <th>🔄 Follow Up</th><th>📄 Proof</th><th>📝 Proof Note</th><th>🏠 Landlord</th><th>📞 Landlord #</th><th>💼 Work #</th><th>📊 Status</th>
             <th style="border-top:2px solid var(--purple)">🤳 Selfie</th><th style="border-top:2px solid var(--purple)">📅 Appt Date</th><th style="border-top:2px solid var(--purple)">🕑 Appt Time</th><th style="border-top:2px solid var(--purple)">📞 Verify</th><th style="border-top:2px solid var(--purple)">🏠 Showing</th><th style="border-top:2px solid var(--purple)">💬 Comments</th>
             <th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🔍 Turbo</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">📝 Notes</th><th style="border-top:3px solid var(--amber);background:rgba(245,201,106,0.08)">🚀 Forward</th>
-            <th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease Start</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📅 Lease End</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">✍ Signed</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">💰 Deposit</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">⚡ Electric</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔥 Gas</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">🔑 Key</th><th style="border-top:3px solid var(--red);background:rgba(245,112,106,0.08)">📋 Move In</th>
           </tr>
           </thead>
           ${body}
