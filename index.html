@@ -4038,9 +4038,13 @@ async function returnLegalCaseToCollection(propertyId){
 // address, and open the browser's print dialog so the user can
 // save it as PDF. Uses HTML rendering (no external PDF library) so
 // there's nothing to install and the layout matches the paper form.
-function generateThreeDayNoticePdf(propertyId){
+function generateThreeDayNoticePdf(propertyId){ generateNoticePdf(propertyId, 3); }
+function generateThirtyDayNoticePdf(propertyId){ generateNoticePdf(propertyId, 30); }
+
+function generateNoticePdf(propertyId, days){
   const p = properties.find(x => x.id === propertyId);
   if(!p){ toast('Property not found'); return; }
+  const noticeLabel = `${days}-Day Notice`;
   // Prefer the Tenant & Lease section's tenantName2 (the newer,
   // actively-maintained field). Fall back to the old top-level
   // 'tenant' from the Edit Property modal only if T&L is empty.
@@ -4062,7 +4066,7 @@ function generateThreeDayNoticePdf(propertyId){
 <html lang="en-US">
 <head>
 <meta charset="utf-8">
-<title>3-Day Notice — ${esc(fullAddr)}</title>
+<title>${noticeLabel} — ${esc(fullAddr)}</title>
 <style>
   /* margin:0 on @page eats the strip where browsers stamp the
      header (URL / title / date-time) and footer (page number),
@@ -4103,7 +4107,7 @@ function generateThreeDayNoticePdf(propertyId){
   for the following reason: ${filled('No Payment of rent')}
   [state reasons for eviction].</p>
 
-  <p class="indent">Your compliance with this notice within [${filled('3')}] days after its service will prevent any
+  <p class="indent">Your compliance with this notice within [${filled(String(days))}] days after its service will prevent any
   further eviction action against you.</p>
 
   <p class="caps">You are being asked to leave the premises. If you do not leave, an eviction action may be initiated against you. If you are in doubt regarding your legal rights and obligations as a tenant, it is recommended that you seek legal assistance.</p>
@@ -4210,6 +4214,7 @@ async function renderAllBalances(){
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">30 Day Notice</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th" title="Upload photo of 30 day notice">📷 Pic</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">PIC</th>
+              <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th" title="Generate a 30-Day Notice PDF pre-filled with this property's address and tenant name">+PDF</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">3 Day Notice</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th" title="Upload photo of 3 day notice">📷 Pic</th>
               <th rowspan="2" style="vertical-align:bottom" class="ab-extra-th">PIC</th>
@@ -4242,6 +4247,7 @@ async function renderAllBalances(){
                 <td style="${r.notice30Date&&(Date.now()-new Date(r.notice30Date+'T00:00:00').getTime())>=30*86400000?'background:rgba(245,112,106,0.2);border-radius:4px':''}"><input type="date" class="ab-input ab-date" value="${r.notice30Date}" ${dis} onchange="abSaveField('${r.id}','notice30Date',this.value)" style="${r.notice30Date&&(Date.now()-new Date(r.notice30Date+'T00:00:00').getTime())>=30*86400000?'background:rgba(245,112,106,0.15);color:var(--red);font-weight:600':''}"></td>
                 <td class="ab-check-cell">${renderNoticePicCell(r.id,'notice30',r.notice30PicUrl,r.notice30PicName,editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 30 day notice" ${r.notice30Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice30Pic',this.checked)"></td>
+                <td class="ab-check-cell"><button title="Generate a 30-Day Notice PDF pre-filled with address + tenant name" onclick="generateThirtyDayNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
                 <td style="${r.notice3Date&&(Date.now()-new Date(r.notice3Date+'T00:00:00').getTime())>=3*86400000?'background:rgba(245,112,106,0.2);border-radius:4px':''}"><input type="date" class="ab-input ab-date" value="${r.notice3Date}" ${dis} onchange="abSaveField('${r.id}','notice3Date',this.value)" style="${r.notice3Date&&(Date.now()-new Date(r.notice3Date+'T00:00:00').getTime())>=3*86400000?'background:rgba(245,112,106,0.15);color:var(--red);font-weight:600':''}"></td>
                 <td class="ab-check-cell">${renderNoticePicCell(r.id,'notice3',r.notice3PicUrl,r.notice3PicName,editable)}</td>
                 <td class="ab-check-cell"><input type="checkbox" class="ab-check" title="Photo proof received for 3 day notice" ${r.notice3Pic?'checked':''} ${dis} onchange="abSaveField('${r.id}','notice3Pic',this.checked)"></td>
@@ -12152,7 +12158,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-02-12';
+const APP_VERSION='2026-08-02-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
