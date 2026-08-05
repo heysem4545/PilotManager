@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-15';
+const APP_VERSION='2026-08-05-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21221,12 +21221,28 @@ function renderPilotListModal(r){
     {v:'pending',    label:'Pending',     color:'#f59e0b'},
     {v:'done',       label:'✓ Done',      color:'#4ade80'}
   ];
+  const MAX_PICS = 3;
   const rowsHtml = _pilotListDraft.map((it, i) => {
     const optHtml = STATUSES.map(s => `<option value="${s.v}" ${it.status===s.v?'selected':''}>${s.label}</option>`).join('');
     const stColor = (STATUSES.find(s => s.v === it.status) || STATUSES[0]).color;
+    // Pics cell: thumbnails of already-uploaded shots + a small +
+    // button that opens a file picker. Optional; empty by default.
+    const pics = Array.isArray(it.pics) ? it.pics : [];
+    const inputId = `_plPic_${i}`;
+    const thumbs = pics.map((p, pi) => `<span style="position:relative;display:inline-block;margin-right:3px">
+      <a href="${escapeAttr(p.url||'')}" target="_blank" rel="noopener" title="${escapeAttr(p.name||'photo')}"><img src="${escapeAttr(p.url||'')}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border2);display:block"></a>
+      <button title="Remove" onclick="_pilotPicDelete(${i},${pi})" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;border:1px solid var(--surface);cursor:pointer;font-size:9px;font-weight:700;padding:0;line-height:1">×</button>
+    </span>`).join('');
+    const addBtn = pics.length < MAX_PICS
+      ? `<button title="Attach a photo (up to ${MAX_PICS})" onclick="document.getElementById('${inputId}').click()" style="background:var(--surface2);border:1px dashed var(--border2);color:var(--muted);border-radius:4px;width:32px;height:32px;cursor:pointer;font-size:14px;line-height:1;padding:0;vertical-align:middle" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">📷</button>`
+      : '';
+    const hiddenInput = pics.length < MAX_PICS
+      ? `<input type="file" id="${inputId}" accept="image/*" style="display:none" onchange="_pilotPicUpload(${i},this)">`
+      : '';
     return `<tr>
       <td style="width:28px;font-size:10px;color:var(--muted2);text-align:right;font-family:var(--mono);padding:4px 2px">${i+1}.</td>
       <td style="padding:4px 2px"><input type="text" value="${escapeAttr(it.text||'')}" placeholder="What needs to be checked?" oninput="_pilotListDraft[${i}].text=this.value" style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box"></td>
+      <td style="padding:4px 2px;width:130px;white-space:nowrap">${thumbs}${addBtn}${hiddenInput}</td>
       <td style="padding:4px 2px;width:140px"><select onchange="_pilotListDraft[${i}].status=this.value;renderPilotListModal(_pilotListActiveRow())" style="width:100%;font-size:12px;padding:6px 10px;border:1px solid ${stColor}55;border-radius:5px;background:${stColor}18;color:${stColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">${optHtml}</select></td>
       <td style="padding:4px 2px;width:28px;text-align:center"><button title="Delete this row" onclick="_pilotListDraft.splice(${i},1);renderPilotListModal(_pilotListActiveRow())" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;font-weight:700;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button></td>
     </tr>`;
@@ -21239,7 +21255,7 @@ function renderPilotListModal(r){
   modal.className = 'overlay open';
   modal.id = 'pilotListModal';
   modal.onclick = e => { if(e.target === modal) closePilotListModal(); };
-  modal.innerHTML = `<div class="modal" style="width:720px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+  modal.innerHTML = `<div class="modal" style="width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
     <div class="modal-title">
       <span>📃 Pilot List${addr?` — ${escapeHtml(addr)}`:''}</span>
       <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:10px">${done}/${total} done</span>
@@ -21250,13 +21266,14 @@ function renderPilotListModal(r){
         <thead><tr>
           <th style="padding:6px 2px;width:28px"></th>
           <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 To-Do</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px" title="Attach up to 3 photos (optional)">📷 Pic</th>
           <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:140px">📊 Status</th>
           <th style="padding:6px 2px;width:28px"></th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
       <div style="padding:8px 4px;text-align:center">
-        <button onclick="_pilotListDraft.push({text:'',status:'notstarted'});renderPilotListModal(_pilotListActiveRow())" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
+        <button onclick="_pilotListDraft.push({text:'',status:'notstarted',pics:[]});renderPilotListModal(_pilotListActiveRow())" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
       </div>
     </div>
     <div class="modal-foot">
@@ -21287,7 +21304,11 @@ async function savePilotList(){
   // the modal comfortable.
   const clean = _pilotListDraft
     .filter(x => (x.text || '').trim())
-    .map(x => ({ text: (x.text || '').trim(), status: x.status || 'notstarted' }));
+    .map(x => ({
+      text: (x.text || '').trim(),
+      status: x.status || 'notstarted',
+      pics: Array.isArray(x.pics) ? x.pics : []
+    }));
   try{
     await db.collection('inspections').doc(id).update({ pilotListItems: clean });
     const r = inspectionsData.find(x => x.id === id);
@@ -21296,6 +21317,77 @@ async function savePilotList(){
     toast('Pilot list saved');
     if(typeof renderInspectionsContent === 'function') renderInspectionsContent(null);
   }catch(e){ toast('Save failed: ' + (e.message || 'unknown')); }
+}
+
+// Photo upload for a Pilot-List row. Writes straight to Firebase
+// Storage under pilotListPics/<inspectionId>/… so photos survive
+// modal close/open and are attached to the row-item's pics[]
+// array. We also PERSIST the item to Firestore right after upload
+// so if the user closes the modal via ✕ / backdrop they don't
+// lose the photo they just attached.
+async function _pilotPicUpload(itemIdx, input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file){ return; }
+  if(file.size === 0){ toast('That file is empty'); return; }
+  if(file.size > 10 * 1024 * 1024){ toast('Photo too large (max 10 MB)'); return; }
+  const inspectionId = _pilotListEditId;
+  if(!inspectionId) return;
+  const it = _pilotListDraft[itemIdx];
+  if(!it) return;
+  if(!Array.isArray(it.pics)) it.pics = [];
+  if(it.pics.length >= 3){ toast('Max 3 photos per item'); return; }
+  toast('Uploading photo…');
+  try{
+    const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const ext = (safeName.split('.').pop() || '').toLowerCase();
+    const extMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif'};
+    const contentType = extMap[ext] || file.type || 'application/octet-stream';
+    const path = `pilotListPics/${inspectionId}/${Date.now()}_${itemIdx}_${safeName}`;
+    const ref = firebase.storage().ref(path);
+    await ref.put(file, {contentType, contentDisposition: `inline; filename="${safeName}"`});
+    const url = await ref.getDownloadURL();
+    it.pics.push({url, path, name: file.name || safeName});
+    // Persist immediately so a modal-close doesn't drop the photo.
+    await _pilotListPersistDraft();
+    renderPilotListModal(_pilotListActiveRow());
+    toast('Photo attached');
+  }catch(e){ toast('Upload failed: ' + (e.message || 'unknown')); }
+}
+
+async function _pilotPicDelete(itemIdx, picIdx){
+  const it = _pilotListDraft[itemIdx];
+  if(!it || !Array.isArray(it.pics)) return;
+  const pic = it.pics[picIdx];
+  if(!pic) return;
+  if(!confirm('Remove this photo?')) return;
+  try{
+    if(pic.path){
+      try{ await firebase.storage().ref(pic.path).delete(); }
+      catch(err){ console.warn('storage delete', err); }
+    }
+    it.pics.splice(picIdx, 1);
+    await _pilotListPersistDraft();
+    renderPilotListModal(_pilotListActiveRow());
+    toast('Photo removed');
+  }catch(e){ toast('Delete failed: ' + (e.message || 'unknown')); }
+}
+
+// Save current _pilotListDraft to Firestore (used by pic upload/
+// delete so photo state survives an accidental modal close).
+async function _pilotListPersistDraft(){
+  const id = _pilotListEditId;
+  if(!id) return;
+  const clean = _pilotListDraft
+    .filter(x => (x.text || '').trim() || (Array.isArray(x.pics) && x.pics.length))
+    .map(x => ({
+      text: (x.text || '').trim(),
+      status: x.status || 'notstarted',
+      pics: Array.isArray(x.pics) ? x.pics : []
+    }));
+  await db.collection('inspections').doc(id).update({ pilotListItems: clean });
+  const r = inspectionsData.find(x => x.id === id);
+  if(r) r.pilotListItems = clean;
 }
 
 // Custom date cell used by the Inspection Tracker so users always
