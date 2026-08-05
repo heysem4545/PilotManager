@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-12';
+const APP_VERSION='2026-08-05-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21100,8 +21100,8 @@ async function renderInspectionsContent(users){
       })()}</td>
       <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Note', editable)}</td>
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
-      <td><input type="date" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
-      <td><input type="date" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
+      <td><input type="date" lang="en-US" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
+      <td><input type="date" lang="en-US" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
       <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
       <td style="text-align:center"><button title="Generate a 24-hour Entry Notification Letter pre-filled with address + tenant name + inspection date/time" onclick="generate24HourEntryNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
