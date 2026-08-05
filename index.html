@@ -4057,6 +4057,127 @@ async function returnLegalCaseToCollection(propertyId){
 function generateThreeDayNoticePdf(propertyId){ generateNoticePdf(propertyId, 3); }
 function generateThirtyDayNoticePdf(propertyId){ generateNoticePdf(propertyId, 30); }
 
+// 24-Hour Entry Notification Letter — printed the day before an
+// inspection and stuck on the door. Sourced from an inspection
+// row (not a property id) so we can grab the scheduled inspection
+// date / time straight from the record.
+function generate24HourEntryNoticePdf(inspectionId){
+  const r = (typeof inspectionsData !== 'undefined' ? inspectionsData : []).find(x => x.id === inspectionId);
+  if(!r){ toast('Inspection not found'); return; }
+  const addr = (r.propertyAddress || '').trim() || '_______________________';
+  const prop = properties.find(p => (p.addr || '').trim() === addr);
+  const tenantName = ((prop && (prop.tenantName2 || prop.tenant)) || '').trim() || '_______________________';
+  const inspDate = r.inspectionDate || '';
+  const inspTime = r.inspectionTime || '';
+  const inspType = r.inspectionType || 'inspection';
+  const today = new Date();
+  const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNum = today.getDate();
+  const monthName = MNAMES_FULL[today.getMonth()];
+  const yearNum = today.getFullYear();
+
+  // Format the scheduled date/time for the letter body.
+  let apptLine = '_______________________';
+  if(inspDate){
+    const d = new Date(inspDate + 'T00:00:00');
+    if(!isNaN(d)){
+      const dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+      const dateStr = `${MNAMES_FULL[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      let timeStr = '';
+      if(inspTime && /^\d{2}:\d{2}/.test(inspTime)){
+        const [hh, mm] = inspTime.split(':').map(x => parseInt(x, 10));
+        const ap = hh >= 12 ? 'PM' : 'AM';
+        const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+        timeStr = ` at ${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+      }
+      apptLine = `${dow}, ${dateStr}${timeStr}`;
+    }
+  }
+
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ toast('Please allow popups so the notice can open'); return; }
+  const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const filled = v => `<span style="display:inline-block;border-bottom:1px solid #000;padding:0 6px;font-weight:600">${esc(v)}</span>`;
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<title>24-Hour Entry Notice — ${esc(addr)}</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.55; color:#000; margin:0; padding:0.85in 0.9in; }
+  h1 { font-size: 13pt; font-weight: bold; text-align: center; text-decoration: underline; margin: 0 0 26px; }
+  p { margin: 0 0 14px; }
+  .to-line { margin-bottom: 6px; }
+  .hint { font-style: italic; font-size: 10.5pt; color:#333; margin: 0 0 18px 24px; }
+  .indent { text-indent: 32px; }
+  .highlight-box { padding: 12px 16px; margin: 20px 0; border: 1.5px solid #000; background: rgba(245,201,106,0.10); }
+  .highlight-line { font-size: 12pt; font-weight: bold; text-align: center; margin: 4px 0; }
+  .sig-block { margin-top: 40px; padding-left: 200px; }
+  .sig-line { border-bottom: 1px solid #000; width: 320px; margin-bottom: 4px; }
+  .sig-caption { font-size: 11pt; margin-bottom: 14px; }
+  .landlord-name { border-bottom: 1px solid #000; padding: 0 8px; display:inline-block; min-width:280px; font-weight:600; }
+  .contact { font-size: 11pt; line-height: 1.4; margin-top: 8px; padding-left: 20px; }
+  .date-line { margin-top: 30px; text-align: right; }
+  @media print { .no-print { display:none } }
+  .no-print { position: fixed; top: 12px; right: 12px; }
+  .no-print button { font: 500 13px/1.2 -apple-system,sans-serif; padding:8px 14px; background:#c9f563; color:#0d0d10; border:0; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.2) }
+</style>
+</head>
+<body>
+  <div class="no-print"><button onclick="window.print()">🖨 Save as PDF</button></div>
+
+  <h1>24-HOUR NOTICE OF ENTRY</h1>
+
+  <p class="to-line">To: ${filled(tenantName)}</p>
+  <p class="hint">[tenant of the rental premises]</p>
+
+  <p class="indent">This letter is to inform you that the landlord or an authorized representative
+  will enter the premises located at ${filled(addr)}
+  [full address and unit number] for the purpose of a scheduled ${esc(inspType).toLowerCase()}.</p>
+
+  <div class="highlight-box">
+    <div class="highlight-line">📅 Scheduled entry:</div>
+    <div class="highlight-line">${filled(apptLine)}</div>
+  </div>
+
+  <p class="indent">This notice is being provided in accordance with Ohio Revised Code § 5321.04(A)(8),
+  which requires at least twenty-four (24) hours' notice before non-emergency entry into a tenant's rental unit.
+  Entry will be made during reasonable hours only.</p>
+
+  <p class="indent">If the scheduled time is inconvenient, please contact the landlord as soon as possible
+  to arrange an alternative time. If we do not hear from you, entry will proceed as scheduled and access
+  to all rooms — including the basement, attic, and any locked areas — is expected.</p>
+
+  <p style="font-weight:bold;font-size:11.5pt">Please secure any pets before the scheduled entry. Thank you for your cooperation.</p>
+
+  <p style="text-align:center;margin-top:30px">Respectfully,</p>
+
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <div class="sig-caption">Landlord's Signature</div>
+    <div><span class="landlord-name">Pilot Property Investment LLC</span></div>
+    <div class="sig-caption">Landlord's Printed Name</div>
+    <div><span class="landlord-name">Quentin Ousley</span></div>
+    <div class="contact">
+      815 Superior Ave,<br>
+      Suite #1825<br>
+      Cleveland Oh 44114<br>
+      (818)–941-4770
+    </div>
+  </div>
+
+  <p class="date-line">Dated this ${filled(String(dayNum))} day of ${filled(monthName)}, ${filled(String(yearNum))}</p>
+
+  <script>
+    window.addEventListener('load', () => setTimeout(() => window.print(), 250));
+  <\/script>
+</body>
+</html>`);
+  win.document.close();
+}
+
 function generateNoticePdf(propertyId, days){
   const p = properties.find(x => x.id === propertyId);
   if(!p){ toast('Property not found'); return; }
@@ -12497,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-10';
+const APP_VERSION='2026-08-05-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -20968,30 +21089,24 @@ async function renderInspectionsContent(users){
       }
     }
     return `<tr class="${inspRowClass}" style="${inspRowClass?'':rowBg}">
-      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','assignedUser',this.value)">
-        <option value="Pilot"${(r.assignedUser||'Pilot')==='Pilot'?' selected':''}>Pilot</option>
-        ${userOpts}
-      </select></td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','inspectionType',this.value)">${typeOpts}</select></td>
       <td><input type="text" list="${dlId}" value="${escapeAttr(r.propertyAddress||'')}" placeholder="🔍 Search address…" style="${is};width:180px" onfocus="this.dataset.prev=this.value;this.value='';this.style.borderColor='var(--accent)'" onblur="if(!this.value)this.value=this.dataset.prev||'';updateInspectionField('${r.id}','propertyAddress',this.value);this.style.borderColor=''" onkeydown="if(event.key==='Enter')this.blur()"><datalist id="${dlId}">${propList}</datalist></td>
       <td style="font-size:11px;color:var(--text)">${(()=>{
-        // Auto-fill tenant name from the Tenant & Lease section
-        // (property.tenantName2, falling back to legacy property.tenant)
-        // matched against the row's saved propertyAddress.
         const addr = (r.propertyAddress||'').trim();
         if(!addr) return '<span style="color:var(--muted2)">—</span>';
         const prop = properties.find(p => (p.addr||'').trim() === addr);
         const name = (prop && (prop.tenantName2 || prop.tenant) || '').trim();
         return name ? escapeHtml(name) : '<span style="color:var(--muted2)">—</span>';
       })()}</td>
+      <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Note', editable)}</td>
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
-      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
-      <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
-      <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
       <td><input type="date" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
       <td><input type="date" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
       <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
-      <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Additional Note', editable)}</td>
+      <td style="text-align:center"><button title="Generate a 24-hour Entry Notification Letter pre-filled with address + tenant name + inspection date/time" onclick="generate24HourEntryNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
+      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
+      <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
+      <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
       <td><select style="${iss}" class="${statusCls}" onchange="updateInspectionField('${r.id}','status',this.value).then(()=>renderInspectionsContent(null))">${statusOpts}</select></td>
       ${archiveCol}
     </tr>`;
@@ -21004,9 +21119,11 @@ async function renderInspectionsContent(users){
     <div class="table-card"><div class="tbl-wrap">
       <table class="call-log-tbl">
         <thead><tr>
-          <th>👤 Assigned</th><th>📋 Type</th><th>🏠 Address</th><th title="Auto-filled from Tenant & Lease based on the address">👥 Tenant Name</th><th>📝 Update</th><th>🔧 Fixing By</th>
-          <th>💬 Cost Notes</th><th>💰 Total Cost</th><th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
-          <th>📎 Note</th><th>📊 Status</th><th>${archiveHeader}</th>
+          <th>📋 Type</th><th>🏠 Address</th><th title="Auto-filled from Tenant & Lease based on the address">👥 Tenant Name</th><th>📎 Note</th><th>📝 Update</th>
+          <th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
+          <th title="Generate a 24-hour Entry Notification Letter pre-filled with tenant + address + inspection date/time">📄 24h Notice</th>
+          <th>🔧 Fixing By</th><th>💬 Cost Notes</th><th>💰 Total Cost</th>
+          <th>📊 Status</th><th>${archiveHeader}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
