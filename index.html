@@ -12481,7 +12481,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-01';
+const APP_VERSION='2026-08-05-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12858,6 +12858,10 @@ async function renderActivityView(){
 // ─────────────────────────────────────────────
 let myPaymentsCache=[];
 let myPaymentsYear=(new Date()).getFullYear();
+// Session-only 'edit / reorder' mode — flips the row layout to
+// show a drag-handle column + makes rows draggable so users can
+// pin important payments to the top regardless of due day.
+let myPaymentsEditMode=false;
 const MY_PAYMENTS_YEARS=[2026,2027,2028,2029,2030,2031];
 const MY_PAYMENTS_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -12871,7 +12875,18 @@ async function loadMyPayments(){
   try{
     const snap=await db.collection('myPayments').get();
     myPaymentsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Sort order:
+    //   1. Manual sortOrder (lower number = higher on the list) —
+    //      lets users pin important payments above the natural
+    //      due-day order.
+    //   2. Then by due day (5th < 15th < 30th).
+    //   3. Then alphabetical by Pay To.
+    // Docs without sortOrder are treated as +Infinity so brand-new
+    // (never-reordered) rows fall into their due-day slot.
+    const so=x=>typeof x.sortOrder==='number'?x.sortOrder:Infinity;
     myPaymentsCache.sort((a,b)=>{
+      const sa=so(a), sb=so(b);
+      if(sa!==sb) return sa-sb;
       const da=_parseDueDay(a.dueDate);
       const dbb=_parseDueDay(b.dueDate);
       if(da!==dbb) return da-dbb;
@@ -12895,23 +12910,29 @@ async function renderMyPaymentsView(){
   const yearOptions=MY_PAYMENTS_YEARS.map(y=>`<option value="${y}" ${y===myPaymentsYear?'selected':''}>${y}</option>`).join('');
   const selectStyle='font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none';
 
+  const edit = myPaymentsEditMode;
+  const editBtn = `<button class="btn ${edit?'btn-primary':'btn-ghost'} btn-sm" onclick="myPaymentsEditMode=!myPaymentsEditMode;renderMyPaymentsView()">${edit?'✓ Done Reordering':'↕ Edit / Reorder'}</button>`;
+
   let html=`<div class="table-card" style="padding:18px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="openAddMyPayment()">+ Add Payment</button>
+      ${editBtn}
+      ${edit?`<span style="font-size:11px;color:var(--muted);font-style:italic">Drag the ⋮⋮ handle on the left of any row to move it up or down. Payments stay pinned in the order you leave them.</span>`:''}
       <div style="flex:1"></div>
       <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Year</label>
       <select onchange="myPaymentsYear=parseInt(this.value);renderMyPaymentsView()" style="${selectStyle}">${yearOptions}</select>
     </div>
 
     <div class="tbl-wrap"><table><thead><tr>
+      ${edit?'<th style="width:24px"></th>':''}
       <th>Pay To</th>
       <th>Due</th>
       ${MY_PAYMENTS_MONTHS.map(m=>`<th style="text-align:center;font-size:10px">${m}</th>`).join('')}
       <th></th>
-    </tr></thead><tbody>`;
+    </tr></thead><tbody id="myPaymentsBody">`;
 
   if(myPaymentsCache.length===0){
-    html+=`<tr><td colspan="${MY_PAYMENTS_MONTHS.length+3}" style="text-align:center;padding:32px;color:var(--muted)">No payments yet — click <strong>+ Add Payment</strong> to get started</td></tr>`;
+    html+=`<tr><td colspan="${MY_PAYMENTS_MONTHS.length+3+(edit?1:0)}" style="text-align:center;padding:32px;color:var(--muted)">No payments yet — click <strong>+ Add Payment</strong> to get started</td></tr>`;
   } else {
     myPaymentsCache.forEach(p=>{
       const cells=MY_PAYMENTS_MONTHS.map((m,i)=>{
@@ -12919,7 +12940,12 @@ async function renderMyPaymentsView(){
         const checked=p.paid&&p.paid[key]===true;
         return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleMyPaymentPaid('${p.id}','${key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
       }).join('');
-      html+=`<tr>
+      const handleCell = edit
+        ? `<td style="width:24px;text-align:center;cursor:grab;color:var(--muted);font-size:14px;user-select:none" title="Drag to reorder">⋮⋮</td>`
+        : '';
+      const rowAttrs = edit ? `draggable="true" data-mp-id="${p.id}" style="cursor:grab" ondragstart="mpDragStart(event,'${p.id}')" ondragover="mpDragOver(event,this)" ondragleave="mpDragLeave(event,this)" ondrop="mpDrop(event,'${p.id}')" ondragend="mpDragEnd(event)"` : '';
+      html+=`<tr ${rowAttrs}>
+        ${handleCell}
         <td style="font-weight:500">${escapeHtml(p.payTo||'')}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(fmtMDY(p.dueDate)||'—')}</td>
         ${cells}
@@ -12929,6 +12955,66 @@ async function renderMyPaymentsView(){
   }
   html+=`</tbody></table></div></div>`;
   el.innerHTML=html;
+}
+
+// HTML5 drag-and-drop for My Payments row reordering. Only wired
+// when myPaymentsEditMode is on. Drop calculates a new sortOrder
+// map (0, 10, 20, …) and batch-writes it to Firestore.
+let _mpDragSourceId = null;
+function mpDragStart(e, id){
+  _mpDragSourceId = id;
+  try{ e.dataTransfer.effectAllowed = 'move'; }catch(_){}
+  try{ e.dataTransfer.setData('text/plain', id); }catch(_){}
+}
+function mpDragOver(e, row){
+  e.preventDefault();
+  try{ e.dataTransfer.dropEffect = 'move'; }catch(_){}
+  row.style.outline = '2px dashed var(--accent)';
+  row.style.outlineOffset = '-2px';
+}
+function mpDragLeave(e, row){
+  row.style.outline = '';
+  row.style.outlineOffset = '';
+}
+async function mpDrop(e, targetId){
+  e.preventDefault();
+  const row = e.currentTarget || e.target.closest('tr');
+  if(row){ row.style.outline = ''; row.style.outlineOffset = ''; }
+  const srcId = _mpDragSourceId;
+  _mpDragSourceId = null;
+  if(!srcId || srcId === targetId) return;
+  const srcIdx = myPaymentsCache.findIndex(x => x.id === srcId);
+  const dstIdx = myPaymentsCache.findIndex(x => x.id === targetId);
+  if(srcIdx < 0 || dstIdx < 0) return;
+  // Move srcIdx → dstIdx in the local array, then renumber all
+  // sortOrders sequentially (0, 10, 20, …) so future inserts have
+  // room to slot in between.
+  const [moved] = myPaymentsCache.splice(srcIdx, 1);
+  myPaymentsCache.splice(dstIdx, 0, moved);
+  try{
+    const batch = db.batch();
+    myPaymentsCache.forEach((p, i) => {
+      const newOrder = i * 10;
+      if(p.sortOrder !== newOrder){
+        batch.update(db.collection('myPayments').doc(p.id), {sortOrder: newOrder, updatedAt: new Date()});
+        p.sortOrder = newOrder;
+      }
+    });
+    await batch.commit();
+    renderMyPaymentsView();
+  }catch(err){
+    toast('Reorder failed: '+(err.message||'unknown'));
+    // Re-load to reset local state to whatever survived.
+    renderMyPaymentsView();
+  }
+}
+function mpDragEnd(e){
+  // Belt-and-braces cleanup — any stray outlines on drop-cancel.
+  document.querySelectorAll('#myPaymentsBody tr').forEach(tr => {
+    tr.style.outline = '';
+    tr.style.outlineOffset = '';
+  });
+  _mpDragSourceId = null;
 }
 
 async function toggleMyPaymentPaid(id,key,checked){
