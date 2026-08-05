@@ -12488,7 +12488,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-05';
+const APP_VERSION='2026-08-05-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15294,7 +15294,10 @@ async function renderLeadsView(skipLoad){
   // Toggle the own-mode class so the 4 own-lead-hide columns
   // (Direction, Reason, Script, Assigned By) disappear via CSS
   // without touching the row/header markup.
-  el.classList.toggle('leads-mode-own', leadsSubTab==='own');
+  // 'own' and 'internet' hide the same call-log-only columns
+  // (Direction / Reason / Script / Assigned By), so both flip
+  // the leads-mode-own class on the container.
+  el.classList.toggle('leads-mode-own', leadsSubTab==='own' || leadsSubTab==='internet');
   if(!skipLoad){
     el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
     await loadCallLog();
@@ -15329,17 +15332,21 @@ async function renderLeadsView(skipLoad){
 
   // All leads for the active user (both sub-tabs combined) — used for sub-tab counts.
   const userAllLeads = callLogData.filter(c => c.assignedToUid === activeUid);
-  const callLogLeads = userAllLeads.filter(c => c.leadSource !== 'self');
-  const ownLeads     = userAllLeads.filter(c => c.leadSource === 'self');
+  // 'Call Log' bucket excludes anything the agent added themselves
+  // (own OR internet lead) so it stays scoped to real assigned calls.
+  const callLogLeads  = userAllLeads.filter(c => c.leadSource !== 'self' && c.leadSource !== 'internet');
+  const ownLeads      = userAllLeads.filter(c => c.leadSource === 'self');
+  const internetLeads = userAllLeads.filter(c => c.leadSource === 'internet');
 
   // How many of the active user's leads have an appointment date
   // — used to badge the Calendar tab so it hints at scheduled work.
   const apptLeadsCount = userAllLeads.filter(c => c.appointmentDate).length;
 
-  // Sub-tab bar (Call Log vs Own Leads vs Calendar). Always visible.
+  // Sub-tab bar (Call Log · Own · Internet · Calendar). Always visible.
   const subTabBar = `<div class="ftabs" style="margin-bottom:12px;flex-wrap:wrap">
     <button class="ftab ${leadsSubTab==='callLog'?'active':''}" onclick="switchLeadsSubTab('callLog')">📞 From Call Log${callLogLeads.length?' ('+callLogLeads.length+')':''}</button>
     <button class="ftab ${leadsSubTab==='own'?'active':''}" onclick="switchLeadsSubTab('own')">🎯 Own Leads${ownLeads.length?' ('+ownLeads.length+')':''}</button>
+    <button class="ftab ${leadsSubTab==='internet'?'active':''}" onclick="switchLeadsSubTab('internet')">🌐 Internet Leads${internetLeads.length?' ('+internetLeads.length+')':''}</button>
     <button class="ftab ${leadsSubTab==='calendar'?'active':''}" onclick="switchLeadsSubTab('calendar')">📅 Calendar${apptLeadsCount?' ('+apptLeadsCount+')':''}</button>
   </div>`;
 
@@ -15350,17 +15357,23 @@ async function renderLeadsView(skipLoad){
     return;
   }
 
-  const myLeads = leadsSubTab === 'own' ? ownLeads : callLogLeads;
+  // 'own' and 'internet' behave the same in the table (both are
+  // user-added leads with the same column set); only the leadSource
+  // stamped on save differs.
+  const isSelfLikeTab = leadsSubTab === 'own' || leadsSubTab === 'internet';
+  const myLeads = leadsSubTab === 'own' ? ownLeads
+              : leadsSubTab === 'internet' ? internetLeads
+              : callLogLeads;
 
   let body;
   if(myLeads.length === 0){
-    const isSelfTab = leadsSubTab === 'own';
     const ownerYou = activeUid === currentUser.uid;
+    const tabLabel = leadsSubTab === 'own' ? 'own' : leadsSubTab === 'internet' ? 'internet' : 'call-log';
     let emptyMsg;
-    if(isSelfTab){
+    if(isSelfLikeTab){
       emptyMsg = ownerYou
-        ? `<div class="call-empty-title">No own leads yet</div>Click <strong>+ Add Lead</strong> to create one from your own outreach.`
-        : `<div class="call-empty-title">${escapeHtml(activeFirst)} has no own leads yet</div>Click <strong>+ Add Lead</strong> to create one for ${escapeHtml(activeFirst)}.`;
+        ? `<div class="call-empty-title">No ${tabLabel} leads yet</div>Click <strong>+ Add Lead</strong> to create one${leadsSubTab==='internet'?' from a Zillow / Facebook / etc. inquiry':' from your own outreach'}.`
+        : `<div class="call-empty-title">${escapeHtml(activeFirst)} has no ${tabLabel} leads yet</div>Click <strong>+ Add Lead</strong> to create one for ${escapeHtml(activeFirst)}.`;
     } else {
       emptyMsg = ownerYou
         ? `<div class="call-empty-title">No call-log leads yet</div>When someone assigns a call to you in the Call Log it will appear here.`
@@ -15441,7 +15454,9 @@ async function renderLeadsView(skipLoad){
     }).join('') + '</tbody>';
   }
 
-  const sourceLabel = leadsSubTab === 'own' ? 'own lead' : 'call-log lead';
+  const sourceLabel = leadsSubTab === 'own' ? 'own lead'
+                    : leadsSubTab === 'internet' ? 'internet lead'
+                    : 'call-log lead';
   const ownerLabel = activeUid === currentUser.uid
     ? `for <strong style="color:var(--text)">you</strong>`
     : `for <strong style="color:var(--text)">${escapeHtml(activeFirst)}</strong>`;
@@ -15449,13 +15464,13 @@ async function renderLeadsView(skipLoad){
     <div class="table-card">
       <div class="call-log-toolbar">
         <div class="call-log-toolbar-left"><strong style="color:var(--text)">${myLeads.length}</strong> ${sourceLabel}${myLeads.length===1?'':'s'} ${ownerLabel}</div>
-        <div style="display:flex;gap:8px;align-items:center">${leadsSubTab==='own'?`<button class="btn btn-primary btn-sm" onclick="openLeadAdd('${activeUid}')">+ Add Lead</button>`:''}</div>
+        <div style="display:flex;gap:8px;align-items:center">${isSelfLikeTab?`<button class="btn btn-primary btn-sm" onclick="openLeadAdd('${activeUid}')">+ Add Lead</button>`:''}</div>
       </div>
       <div class="tbl-wrap">
         <table class="call-log-tbl" style="width:100%;border-collapse:collapse">
           <thead>
           <tr>
-            <th colspan="${leadsSubTab==='own'?25:29}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log &amp; Follow Up</th>
+            <th colspan="${isSelfLikeTab?25:29}" style="text-align:center;background:var(--accent);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">📋 PART 1 — Call Log &amp; Follow Up</th>
             <th colspan="6" style="text-align:center;background:var(--purple);color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🏠 PART 2 — Showing</th>
             <th colspan="3" style="text-align:center;background:var(--amber);color:#0d0d10;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;border-radius:6px 6px 0 0;border-bottom:none">🔍 PART 3 — Screening</th>
           </tr>
@@ -20190,7 +20205,9 @@ async function saveCallLogEntry(){
       // "Own Leads" sub-tabs. 'self' = added from the Own Leads tab.
       if(leadsAddForUid){
         data.assignedToUid = leadsAddForUid;
-        data.leadSource = (leadsSubTab === 'own') ? 'self' : 'callLog';
+        data.leadSource = (leadsSubTab === 'own') ? 'self'
+                       : (leadsSubTab === 'internet') ? 'internet'
+                       : 'callLog';
       } else {
         data.leadSource = 'callLog';
       }
