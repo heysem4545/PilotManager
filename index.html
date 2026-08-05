@@ -12481,7 +12481,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-03';
+const APP_VERSION='2026-08-05-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -12862,6 +12862,8 @@ let myPaymentsYear=(new Date()).getFullYear();
 // show a drag-handle column + makes rows draggable so users can
 // pin important payments to the top regardless of due day.
 let myPaymentsEditMode=false;
+// Sub-tab: 'active' shows non-archived rows, 'archived' shows the archive.
+let myPaymentsTab='active';
 const MY_PAYMENTS_YEARS=[2026,2027,2028,2029,2030,2031];
 const MY_PAYMENTS_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -12913,43 +12915,69 @@ async function renderMyPaymentsView(){
   const edit = myPaymentsEditMode;
   const editBtn = `<button class="btn ${edit?'btn-primary':'btn-ghost'} btn-sm" onclick="myPaymentsEditMode=!myPaymentsEditMode;renderMyPaymentsView()">${edit?'✓ Done Reordering':'↕ Edit / Reorder'}</button>`;
 
+  // Split the cache into active vs archived, counts drive the tab
+  // badges below. The tab-bar itself lives above the toolbar so
+  // year / reorder controls stay near their table.
+  const activePayments = myPaymentsCache.filter(p => !p.archived);
+  const archivedPayments = myPaymentsCache.filter(p => !!p.archived);
+  const showing = myPaymentsTab === 'archived' ? archivedPayments : activePayments;
+  const isArchivedTab = myPaymentsTab === 'archived';
+
+  const tabBar = `<div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 4px;margin-bottom:14px">
+    <button onclick="myPaymentsTab='active';renderMyPaymentsView()" style="background:none;border:none;padding:10px 18px;font-size:13px;font-weight:${myPaymentsTab==='active'?'700':'500'};color:${myPaymentsTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${myPaymentsTab==='active'?'var(--accent)':'transparent'};margin-bottom:-1px;cursor:pointer;font-family:var(--font)">📋 Active${activePayments.length?` <span style="background:var(--accent);color:#0d0d10;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700">${activePayments.length}</span>`:''}</button>
+    <button onclick="myPaymentsTab='archived';renderMyPaymentsView()" style="background:none;border:none;padding:10px 18px;font-size:13px;font-weight:${myPaymentsTab==='archived'?'700':'500'};color:${myPaymentsTab==='archived'?'var(--purple)':'var(--muted)'};border-bottom:2px solid ${myPaymentsTab==='archived'?'var(--purple)':'transparent'};margin-bottom:-1px;cursor:pointer;font-family:var(--font)">📦 Archived List${archivedPayments.length?` <span style="background:var(--purple);color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700">${archivedPayments.length}</span>`:''}</button>
+  </div>`;
+
+  // Reorder + Add controls only make sense on the Active tab —
+  // archived rows are meant to be historical and stay put.
+  const activeControls = isArchivedTab ? '' : `<button class="btn btn-primary btn-sm" onclick="openAddMyPayment()">+ Add Payment</button>${editBtn}${edit?`<span style="font-size:11px;color:var(--muted);font-style:italic">Drag the ⋮⋮ handle on the left of any row to move it up or down. Payments stay pinned in the order you leave them.</span>`:''}`;
+  const archivedNote = isArchivedTab ? `<span style="font-size:11px;color:var(--muted);font-style:italic">Archived payments — hidden from the main list. Restore any row with ↩ to send it back.</span>` : '';
+
   let html=`<div class="table-card" style="padding:18px">
+    ${tabBar}
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" onclick="openAddMyPayment()">+ Add Payment</button>
-      ${editBtn}
-      ${edit?`<span style="font-size:11px;color:var(--muted);font-style:italic">Drag the ⋮⋮ handle on the left of any row to move it up or down. Payments stay pinned in the order you leave them.</span>`:''}
+      ${activeControls}
+      ${archivedNote}
       <div style="flex:1"></div>
       <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Year</label>
       <select onchange="myPaymentsYear=parseInt(this.value);renderMyPaymentsView()" style="${selectStyle}">${yearOptions}</select>
     </div>
 
     <div class="tbl-wrap"><table><thead><tr>
-      ${edit?'<th style="width:24px"></th>':''}
+      ${edit && !isArchivedTab?'<th style="width:24px"></th>':''}
       <th>Pay To</th>
       <th>Due</th>
       ${MY_PAYMENTS_MONTHS.map(m=>`<th style="text-align:center;font-size:10px">${m}</th>`).join('')}
       <th></th>
     </tr></thead><tbody id="myPaymentsBody">`;
 
-  if(myPaymentsCache.length===0){
-    html+=`<tr><td colspan="${MY_PAYMENTS_MONTHS.length+3+(edit?1:0)}" style="text-align:center;padding:32px;color:var(--muted)">No payments yet — click <strong>+ Add Payment</strong> to get started</td></tr>`;
+  if(showing.length===0){
+    const emptyMsg = isArchivedTab
+      ? 'No archived payments yet — click <strong>📦 Archive</strong> on any active row to move it here.'
+      : 'No payments yet — click <strong>+ Add Payment</strong> to get started.';
+    html+=`<tr><td colspan="${MY_PAYMENTS_MONTHS.length+3+(edit&&!isArchivedTab?1:0)}" style="text-align:center;padding:32px;color:var(--muted)">${emptyMsg}</td></tr>`;
   } else {
-    myPaymentsCache.forEach(p=>{
+    showing.forEach(p=>{
       const cells=MY_PAYMENTS_MONTHS.map((m,i)=>{
         const key=myPaymentsYear+'-'+String(i+1).padStart(2,'0');
         const checked=p.paid&&p.paid[key]===true;
         return `<td style="text-align:center"><input type="checkbox" ${checked?'checked':''} onchange="toggleMyPaymentPaid('${p.id}','${key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"></td>`;
       }).join('');
-      const handleCell = edit
+      const handleCell = (edit && !isArchivedTab)
         ? `<td style="width:24px;text-align:center;cursor:grab;color:var(--muted);font-size:14px;user-select:none" title="Drag to reorder">⋮⋮</td>`
         : '';
-      const rowAttrs = edit ? `draggable="true" data-mp-id="${p.id}" style="cursor:grab" ondragstart="mpDragStart(event,'${p.id}')" ondragover="mpDragOver(event,this)" ondragleave="mpDragLeave(event,this)" ondrop="mpDrop(event,'${p.id}')" ondragend="mpDragEnd(event)"` : '';
-      html+=`<tr ${rowAttrs}>
+      const rowAttrs = (edit && !isArchivedTab)
+        ? `draggable="true" data-mp-id="${p.id}" style="cursor:grab" ondragstart="mpDragStart(event,'${p.id}')" ondragover="mpDragOver(event,this)" ondragleave="mpDragLeave(event,this)" ondrop="mpDrop(event,'${p.id}')" ondragend="mpDragEnd(event)"`
+        : '';
+      const archiveBtn = isArchivedTab
+        ? `<button class="btn btn-ghost btn-sm" title="Restore to Active list" onclick="restoreMyPayment('${p.id}')" style="color:var(--accent)">↩</button>`
+        : `<button class="btn btn-ghost btn-sm" title="Archive — move to Archived List" onclick="archiveMyPayment('${p.id}')" style="color:var(--purple)">📦</button>`;
+      html+=`<tr ${rowAttrs}${isArchivedTab?' style="opacity:0.85"':''}>
         ${handleCell}
         <td style="font-weight:500">${escapeHtml(p.payTo||'')}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${escapeHtml(fmtMDY(p.dueDate)||'—')}</td>
         ${cells}
-        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Edit" onclick="editMyPayment('${p.id}')">✎</button> <button class="btn btn-ghost btn-sm" title="Delete" onclick="deleteMyPayment('${p.id}')">🗑</button></td>
+        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Edit" onclick="editMyPayment('${p.id}')">✎</button> ${archiveBtn} <button class="btn btn-ghost btn-sm" title="Delete permanently" onclick="deleteMyPayment('${p.id}')">🗑</button></td>
       </tr>`;
     });
   }
@@ -13068,6 +13096,37 @@ async function saveMyPayment(id){
 function editMyPayment(id){
   const p=myPaymentsCache.find(x=>x.id===id);
   if(p) openAddMyPayment(p);
+}
+
+async function archiveMyPayment(id){
+  const p=myPaymentsCache.find(x=>x.id===id);
+  if(!p) return;
+  try{
+    await db.collection('myPayments').doc(id).update({
+      archived:true,
+      archivedAt:new Date(),
+      archivedBy:currentUser?.name||currentUser?.email||'',
+      updatedAt:new Date()
+    });
+    p.archived=true;
+    toast('Moved to Archived List');
+    renderMyPaymentsView();
+  }catch(e){ toast('Archive failed: '+(e.message||'unknown')); }
+}
+
+async function restoreMyPayment(id){
+  const p=myPaymentsCache.find(x=>x.id===id);
+  if(!p) return;
+  try{
+    await db.collection('myPayments').doc(id).update({
+      archived:false,
+      archivedAt:'',
+      updatedAt:new Date()
+    });
+    p.archived=false;
+    toast('Restored to Active');
+    renderMyPaymentsView();
+  }catch(e){ toast('Restore failed: '+(e.message||'unknown')); }
 }
 
 async function deleteMyPayment(id){
