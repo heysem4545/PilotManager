@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-17';
+const APP_VERSION='2026-08-05-18';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21198,17 +21198,23 @@ async function saveInspectionNote(){
 // Firestore on Save.
 let _pilotListEditId = null;
 let _pilotListDraft = [];
+// Top-of-modal header fields — who did the inspection + the date
+// they wrapped it up. Stored as flat strings on the inspection doc.
+let _pilotListInspectedBy = '';
+let _pilotListCompletedDate = ''; // ISO YYYY-MM-DD
 
 function openPilotListModal(inspectionId){
   const r = (inspectionsData || []).find(x => x.id === inspectionId);
   if(!r){ toast('Inspection not found'); return; }
   _pilotListEditId = inspectionId;
   _pilotListDraft = Array.isArray(r.pilotListItems)
-    ? r.pilotListItems.map(x => ({ text: x.text || '', status: x.status || 'notstarted' }))
+    ? r.pilotListItems.map(x => ({ text: x.text || '', status: x.status || 'notstarted', pics: Array.isArray(x.pics) ? x.pics : [] }))
     : [];
+  _pilotListInspectedBy = r.pilotListInspectedBy || '';
+  _pilotListCompletedDate = r.pilotListCompletedDate || '';
   // Always start with at least 3 blank rows so the user has room
   // to type without hunting for a '+ row' button first.
-  while(_pilotListDraft.length < 3) _pilotListDraft.push({text:'', status:'notstarted'});
+  while(_pilotListDraft.length < 3) _pilotListDraft.push({text:'', status:'notstarted', pics:[]});
   renderPilotListModal(r);
 }
 
@@ -21261,6 +21267,20 @@ function renderPilotListModal(r){
       <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:10px">${done}/${total} done</span>
       <button class="modal-close" onclick="closePilotListModal()">×</button>
     </div>
+    <div style="display:grid;grid-template-columns:1fr 200px;gap:12px;padding:8px 2px 12px;border-bottom:1px dashed var(--border);margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">👤 Who Inspected</label>
+        <input type="text" value="${escapeAttr(_pilotListInspectedBy||'')}" placeholder="Name of the inspector…" oninput="_pilotListInspectedBy=this.value" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;margin-top:4px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">📅 Completed On</label>
+        <div style="display:flex;align-items:center;gap:2px;position:relative;margin-top:4px">
+          <input type="text" value="${escapeAttr(fmtMDY(_pilotListCompletedDate||'')||'')}" placeholder="MM/DD/YYYY" onblur="_pilotListCompletedBlur(this)" onkeydown="if(event.key==='Enter')this.blur()" style="flex:1;font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--mono);outline:none;box-sizing:border-box">
+          <button type="button" title="Open calendar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted);border-radius:5px;width:30px;height:30px;cursor:pointer;font-size:13px;padding:0;line-height:1;flex-shrink:0" onclick="_pilotListCompletedPickerOpen()" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">📅</button>
+          <input type="date" id="_pilotListCompletedPicker" value="${escapeAttr(_pilotListCompletedDate||'')}" style="position:absolute;right:0;bottom:0;width:30px;height:30px;opacity:0;pointer-events:none" onchange="_pilotListCompletedFromPicker(this)">
+        </div>
+      </div>
+    </div>
     <div style="flex:1;overflow-y:auto;padding:4px 2px">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr>
@@ -21294,6 +21314,45 @@ function closePilotListModal(){
   if(m) m.remove();
   _pilotListEditId = null;
   _pilotListDraft = [];
+  _pilotListInspectedBy = '';
+  _pilotListCompletedDate = '';
+}
+
+// Text-input handler for the Completed On date. Accepts M/D/YY,
+// MM/DD/YYYY, etc.; normalizes display + stores ISO. Empty clears.
+function _pilotListCompletedBlur(input){
+  const raw = (input.value || '').trim();
+  if(!raw){
+    _pilotListCompletedDate = '';
+    const dp = document.getElementById('_pilotListCompletedPicker');
+    if(dp) dp.value = '';
+    return;
+  }
+  const iso = _mdyToIso(raw);
+  if(!iso){
+    toast('Use MM/DD/YYYY (e.g. 08/07/2026)');
+    input.focus();
+    return;
+  }
+  _pilotListCompletedDate = iso;
+  input.value = fmtMDY(iso);
+  const dp = document.getElementById('_pilotListCompletedPicker');
+  if(dp) dp.value = iso;
+}
+
+function _pilotListCompletedPickerOpen(){
+  const el = document.getElementById('_pilotListCompletedPicker');
+  if(!el) return;
+  try{ el.showPicker(); }
+  catch(_){ el.focus(); el.click(); }
+}
+
+function _pilotListCompletedFromPicker(input){
+  const iso = input.value || '';
+  _pilotListCompletedDate = iso;
+  const wrap = input.parentElement;
+  const textEl = wrap && wrap.querySelector('input[type="text"]');
+  if(textEl) textEl.value = iso ? fmtMDY(iso) : '';
 }
 
 async function savePilotList(){
@@ -21310,9 +21369,18 @@ async function savePilotList(){
       pics: Array.isArray(x.pics) ? x.pics : []
     }));
   try{
-    await db.collection('inspections').doc(id).update({ pilotListItems: clean });
+    const payload = {
+      pilotListItems: clean,
+      pilotListInspectedBy: (_pilotListInspectedBy || '').trim(),
+      pilotListCompletedDate: _pilotListCompletedDate || ''
+    };
+    await db.collection('inspections').doc(id).update(payload);
     const r = inspectionsData.find(x => x.id === id);
-    if(r) r.pilotListItems = clean;
+    if(r){
+      r.pilotListItems = clean;
+      r.pilotListInspectedBy = payload.pilotListInspectedBy;
+      r.pilotListCompletedDate = payload.pilotListCompletedDate;
+    }
     closePilotListModal();
     toast('Pilot list saved');
     if(typeof renderInspectionsContent === 'function') renderInspectionsContent(null);
@@ -21385,9 +21453,18 @@ async function _pilotListPersistDraft(){
       status: x.status || 'notstarted',
       pics: Array.isArray(x.pics) ? x.pics : []
     }));
-  await db.collection('inspections').doc(id).update({ pilotListItems: clean });
+  const payload = {
+    pilotListItems: clean,
+    pilotListInspectedBy: (_pilotListInspectedBy || '').trim(),
+    pilotListCompletedDate: _pilotListCompletedDate || ''
+  };
+  await db.collection('inspections').doc(id).update(payload);
   const r = inspectionsData.find(x => x.id === id);
-  if(r) r.pilotListItems = clean;
+  if(r){
+    r.pilotListItems = clean;
+    r.pilotListInspectedBy = payload.pilotListInspectedBy;
+    r.pilotListCompletedDate = payload.pilotListCompletedDate;
+  }
 }
 
 // Custom date cell used by the Inspection Tracker so users always
