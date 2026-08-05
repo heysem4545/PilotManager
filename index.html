@@ -12481,7 +12481,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-02';
+const APP_VERSION='2026-08-05-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -20832,8 +20832,8 @@ async function renderInspectionsContent(users){
       return `<option value="${escapeAttr(u.name||u.email||'')}" ${sel}>${escapeHtml(u.name||u.email||'')}</option>`;
     }).join('');
 
-    const TYPE_EMOJIS = {'Annual':'🔄','Initial':'🆕'};
-    const typeOpts = ['','Annual','Initial'].map(o => {
+    const TYPE_EMOJIS = {'Annual':'🔄','Initial':'🆕','Reinspection':'🔁'};
+    const typeOpts = ['','Annual','Initial','Reinspection'].map(o => {
       const em = TYPE_EMOJIS[o]||'';
       return `<option value="${o}"${(r.inspectionType||'')===o?' selected':''}>${o?(em+' '+o):'— select —'}</option>`;
     }).join('');
@@ -20866,6 +20866,16 @@ async function renderInspectionsContent(users){
       </select></td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','inspectionType',this.value)">${typeOpts}</select></td>
       <td><input type="text" list="${dlId}" value="${escapeAttr(r.propertyAddress||'')}" placeholder="🔍 Search address…" style="${is};width:180px" onfocus="this.dataset.prev=this.value;this.value='';this.style.borderColor='var(--accent)'" onblur="if(!this.value)this.value=this.dataset.prev||'';updateInspectionField('${r.id}','propertyAddress',this.value);this.style.borderColor=''" onkeydown="if(event.key==='Enter')this.blur()"><datalist id="${dlId}">${propList}</datalist></td>
+      <td style="font-size:11px;color:var(--text)">${(()=>{
+        // Auto-fill tenant name from the Tenant & Lease section
+        // (property.tenantName2, falling back to legacy property.tenant)
+        // matched against the row's saved propertyAddress.
+        const addr = (r.propertyAddress||'').trim();
+        if(!addr) return '<span style="color:var(--muted2)">—</span>';
+        const prop = properties.find(p => (p.addr||'').trim() === addr);
+        const name = (prop && (prop.tenantName2 || prop.tenant) || '').trim();
+        return name ? escapeHtml(name) : '<span style="color:var(--muted2)">—</span>';
+      })()}</td>
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
       <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
@@ -20886,7 +20896,7 @@ async function renderInspectionsContent(users){
     <div class="table-card"><div class="tbl-wrap">
       <table class="call-log-tbl">
         <thead><tr>
-          <th>👤 Assigned</th><th>📋 Type</th><th>🏠 Address</th><th>📝 Update</th><th>🔧 Fixing By</th>
+          <th>👤 Assigned</th><th>📋 Type</th><th>🏠 Address</th><th title="Auto-filled from Tenant & Lease based on the address">👥 Tenant Name</th><th>📝 Update</th><th>🔧 Fixing By</th>
           <th>💬 Cost Notes</th><th>💰 Total Cost</th><th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
           <th>📎 Note</th><th>📊 Status</th><th>${archiveHeader}</th>
         </tr></thead>
