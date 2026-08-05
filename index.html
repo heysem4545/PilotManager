@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-13';
+const APP_VERSION='2026-08-05-14';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21108,7 +21108,19 @@ async function renderInspectionsContent(users){
       <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
       <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
       <td style="text-align:center"><input type="checkbox" ${r.pilotInspection?'checked':''} title="Pilot Inspection" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateInspectionField('${r.id}','pilotInspection',this.checked)"></td>
-      <td style="text-align:center"><input type="checkbox" ${r.pilotList?'checked':''} title="Pilot List" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateInspectionField('${r.id}','pilotList',this.checked)"></td>
+      <td style="text-align:center">${(() => {
+        // Pilot List — a per-inspection to-do list. Renders as either
+        // '+ Add' (when empty) or a done/total progress pill.
+        const items = Array.isArray(r.pilotListItems) ? r.pilotListItems.filter(x => x && (x.text||'').trim()) : [];
+        const total = items.length;
+        const done = items.filter(x => (x.status||'') === 'done').length;
+        if(total === 0){
+          return `<button title="Add a Pilot List of things to check" onclick="openPilotListModal('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add</button>`;
+        }
+        const pct = Math.round(done/total*100);
+        const color = pct === 100 ? '#4ade80' : done > 0 ? '#60a5fa' : 'var(--muted)';
+        return `<button onclick="openPilotListModal('${r.id}')" title="${done}/${total} done — click to view / edit" style="background:${color}22;color:${color};border:1px solid ${color}66;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--mono)">${done}/${total}${pct===100?' ✓':''}</button>`;
+      })()}</td>
       <td><select style="${iss}" class="${statusCls}" onchange="updateInspectionField('${r.id}','status',this.value).then(()=>renderInspectionsContent(null))">${statusOpts}</select></td>
       ${archiveCol}
     </tr>`;
@@ -21178,6 +21190,112 @@ async function saveInspectionNote(){
     console.error('saveInspectionNote error:', e);
     toast('Error: '+e.message);
   }
+}
+
+// ─── Pilot List modal ───
+// Per-inspection to-do list. State is a working copy of the row's
+// pilotListItems array while the modal is open; committed to
+// Firestore on Save.
+let _pilotListEditId = null;
+let _pilotListDraft = [];
+
+function openPilotListModal(inspectionId){
+  const r = (inspectionsData || []).find(x => x.id === inspectionId);
+  if(!r){ toast('Inspection not found'); return; }
+  _pilotListEditId = inspectionId;
+  _pilotListDraft = Array.isArray(r.pilotListItems)
+    ? r.pilotListItems.map(x => ({ text: x.text || '', status: x.status || 'notstarted' }))
+    : [];
+  // Always start with at least 3 blank rows so the user has room
+  // to type without hunting for a '+ row' button first.
+  while(_pilotListDraft.length < 3) _pilotListDraft.push({text:'', status:'notstarted'});
+  renderPilotListModal(r);
+}
+
+function renderPilotListModal(r){
+  const existing = document.getElementById('pilotListModal');
+  if(existing) existing.remove();
+  const addr = (r && r.propertyAddress) || '';
+  const STATUSES = [
+    {v:'notstarted', label:'Not Started', color:'var(--muted)'},
+    {v:'pending',    label:'Pending',     color:'#f59e0b'},
+    {v:'done',       label:'✓ Done',      color:'#4ade80'}
+  ];
+  const rowsHtml = _pilotListDraft.map((it, i) => {
+    const optHtml = STATUSES.map(s => `<option value="${s.v}" ${it.status===s.v?'selected':''}>${s.label}</option>`).join('');
+    const stColor = (STATUSES.find(s => s.v === it.status) || STATUSES[0]).color;
+    return `<tr>
+      <td style="width:28px;font-size:10px;color:var(--muted2);text-align:right;font-family:var(--mono);padding:4px 2px">${i+1}.</td>
+      <td style="padding:4px 2px"><input type="text" value="${escapeAttr(it.text||'')}" placeholder="What needs to be checked?" oninput="_pilotListDraft[${i}].text=this.value" style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box"></td>
+      <td style="padding:4px 2px;width:140px"><select onchange="_pilotListDraft[${i}].status=this.value;renderPilotListModal(_pilotListActiveRow())" style="width:100%;font-size:12px;padding:6px 10px;border:1px solid ${stColor}55;border-radius:5px;background:${stColor}18;color:${stColor};font-weight:600;font-family:var(--font);outline:none;cursor:pointer">${optHtml}</select></td>
+      <td style="padding:4px 2px;width:28px;text-align:center"><button title="Delete this row" onclick="_pilotListDraft.splice(${i},1);renderPilotListModal(_pilotListActiveRow())" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;font-weight:700;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button></td>
+    </tr>`;
+  }).join('');
+
+  const total = _pilotListDraft.filter(x => (x.text||'').trim()).length;
+  const done = _pilotListDraft.filter(x => (x.text||'').trim() && x.status === 'done').length;
+
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'pilotListModal';
+  modal.onclick = e => { if(e.target === modal) closePilotListModal(); };
+  modal.innerHTML = `<div class="modal" style="width:720px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-title">
+      <span>📃 Pilot List${addr?` — ${escapeHtml(addr)}`:''}</span>
+      <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:10px">${done}/${total} done</span>
+      <button class="modal-close" onclick="closePilotListModal()">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:4px 2px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="padding:6px 2px;width:28px"></th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 To-Do</th>
+          <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:140px">📊 Status</th>
+          <th style="padding:6px 2px;width:28px"></th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div style="padding:8px 4px;text-align:center">
+        <button onclick="_pilotListDraft.push({text:'',status:'notstarted'});renderPilotListModal(_pilotListActiveRow())" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closePilotListModal()">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary btn-sm" onclick="savePilotList()">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function _pilotListActiveRow(){
+  return (inspectionsData || []).find(x => x.id === _pilotListEditId) || null;
+}
+
+function closePilotListModal(){
+  const m = document.getElementById('pilotListModal');
+  if(m) m.remove();
+  _pilotListEditId = null;
+  _pilotListDraft = [];
+}
+
+async function savePilotList(){
+  const id = _pilotListEditId;
+  if(!id) return;
+  // Strip empty rows before saving so a fresh open doesn't see
+  // ghost blanks; the render will re-pad with a couple to keep
+  // the modal comfortable.
+  const clean = _pilotListDraft
+    .filter(x => (x.text || '').trim())
+    .map(x => ({ text: (x.text || '').trim(), status: x.status || 'notstarted' }));
+  try{
+    await db.collection('inspections').doc(id).update({ pilotListItems: clean });
+    const r = inspectionsData.find(x => x.id === id);
+    if(r) r.pilotListItems = clean;
+    closePilotListModal();
+    toast('Pilot list saved');
+    if(typeof renderInspectionsContent === 'function') renderInspectionsContent(null);
+  }catch(e){ toast('Save failed: ' + (e.message || 'unknown')); }
 }
 
 async function updateInspectionField(docId, field, value){
