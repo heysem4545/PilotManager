@@ -848,6 +848,13 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .insp-status-pass{background:var(--accent-dim);color:var(--accent);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-status-needs{background:var(--amber-dim);color:var(--amber);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-status-prog{background:var(--blue-dim);color:var(--blue);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+/* Countdown highlights for the Insp. Date column.
+     .insp-row-warn   → 4-5 days out from the scheduled date
+     .insp-row-urgent → 0-3 days out OR already overdue (pulses) */
+.insp-row-warn > td{background:rgba(245,201,106,0.14) !important}
+.insp-row-urgent > td{background:rgba(245,112,106,0.18) !important;position:relative}
+@keyframes inspPulse{0%,100%{background:rgba(245,112,106,0.18)}50%{background:rgba(245,112,106,0.40)}}
+.insp-row-urgent > td{animation:inspPulse 1.1s ease-in-out infinite}
 .insp-tabs{display:flex;gap:6px;margin-bottom:14px}
 .insp-tab{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);transition:all .12s}
 .insp-tab:hover{color:var(--text);background:var(--surface3)}
@@ -12481,7 +12488,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-04';
+const APP_VERSION='2026-08-05-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -20918,7 +20925,21 @@ async function renderInspectionsContent(users){
     const dlId = 'inspPropDl_'+r.id;
 
     const rowBg = r.status==='Pass'?'background:rgba(74,222,128,0.05)':r.status==='Fail'?'background:rgba(245,112,106,0.05)':r.status==='Needs Action'?'background:rgba(245,201,106,0.05)':r.status==='Progressing'?'background:rgba(106,184,245,0.05)':'';
-    return `<tr style="${rowBg}">
+    // Countdown-to-inspection highlight. Only for rows that aren't
+    // already 'Pass' (a passed inspection doesn't need to nag).
+    //   ≤ 3 days away or overdue → red row + pulse
+    //   4-5 days away             → amber row
+    let inspRowClass = '';
+    if(r.inspectionDate && r.status !== 'Pass'){
+      const target = new Date(r.inspectionDate + 'T00:00:00');
+      if(!isNaN(target)){
+        const today0 = new Date(); today0.setHours(0,0,0,0);
+        const daysLeft = Math.floor((target - today0) / 86400000);
+        if(daysLeft <= 3) inspRowClass = 'insp-row-urgent';
+        else if(daysLeft <= 5) inspRowClass = 'insp-row-warn';
+      }
+    }
+    return `<tr class="${inspRowClass}" style="${inspRowClass?'':rowBg}">
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','assignedUser',this.value)">
         <option value="Pilot"${(r.assignedUser||'Pilot')==='Pilot'?' selected':''}>Pilot</option>
         ${userOpts}
