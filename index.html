@@ -849,13 +849,16 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .insp-status-needs{background:var(--amber-dim);color:var(--amber);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 .insp-status-prog{background:var(--blue-dim);color:var(--blue);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
 /* Countdown highlights for the Insp. Date column.
-     .insp-row-warn   → 4-5 days out from the scheduled date
-     .insp-row-urgent → 0-3 days out OR already overdue (BLINKS) */
+     .insp-row-warn   → 6-10 days out (calm amber)
+     .insp-row-red    → 3-5 days out (solid red, no blink)
+     .insp-row-urgent → 0-2 days out OR already overdue (BLINKS red)
+   Only the closest-to-due tier animates so multiple red rows
+   don't create competing motion. */
 .insp-row-warn > td{background:rgba(245,201,106,0.14) !important}
-/* Blink for urgent rows. NOTE: no !important on the base background
-   here — !important would override the animation and the swing
-   never renders. Wider opacity range (0.10 → 0.65) + faster
-   cycle (0.85s) makes the blink obvious across the whole row. */
+.insp-row-red  > td{background:rgba(245,112,106,0.20) !important;box-shadow:inset 3px 0 0 rgba(245,112,106,0.55) !important}
+/* Blink for urgent rows. NOTE: no !important on the base
+   background here — !important would override the animation and
+   the swing never renders. */
 @keyframes inspBlink{
   0%,100%{background:rgba(245,112,106,0.12);box-shadow:inset 3px 0 0 rgba(245,112,106,0.35)}
   50%    {background:rgba(245,112,106,0.60);box-shadow:inset 3px 0 0 rgba(245,112,106,1)}
@@ -12494,7 +12497,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-09';
+const APP_VERSION='2026-08-05-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -20950,16 +20953,18 @@ async function renderInspectionsContent(users){
     const rowBg = r.status==='Pass'?'background:rgba(74,222,128,0.05)':r.status==='Fail'?'background:rgba(245,112,106,0.05)':r.status==='Needs Action'?'background:rgba(245,201,106,0.05)':r.status==='Progressing'?'background:rgba(106,184,245,0.05)':'';
     // Countdown-to-inspection highlight. Only for rows that aren't
     // already 'Pass' (a passed inspection doesn't need to nag).
-    //   ≤ 3 days away or overdue → red row + pulse
-    //   4-5 days away             → amber row
+    //   ≤ 2 days or overdue → blinking red (urgent)
+    //   3-5 days away        → solid red (no blink)
+    //   6-10 days away       → amber
     let inspRowClass = '';
     if(r.inspectionDate && r.status !== 'Pass'){
       const target = new Date(r.inspectionDate + 'T00:00:00');
       if(!isNaN(target)){
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const daysLeft = Math.floor((target - today0) / 86400000);
-        if(daysLeft <= 3) inspRowClass = 'insp-row-urgent';
-        else if(daysLeft <= 5) inspRowClass = 'insp-row-warn';
+        if(daysLeft <= 2) inspRowClass = 'insp-row-urgent';
+        else if(daysLeft <= 5) inspRowClass = 'insp-row-red';
+        else if(daysLeft <= 10) inspRowClass = 'insp-row-warn';
       }
     }
     return `<tr class="${inspRowClass}" style="${inspRowClass?'':rowBg}">
