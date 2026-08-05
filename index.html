@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-14';
+const APP_VERSION='2026-08-05-15';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21100,8 +21100,8 @@ async function renderInspectionsContent(users){
       })()}</td>
       <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Note', editable)}</td>
       <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
-      <td><input type="date" lang="en-US" value="${r.dueDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','dueDate',this.value)"></td>
-      <td><input type="date" lang="en-US" value="${r.inspectionDate||''}" style="${is};width:125px" onchange="updateInspectionField('${r.id}','inspectionDate',this.value)"></td>
+      <td>${renderInspDateCell(r.id, 'dueDate', r.dueDate)}</td>
+      <td>${renderInspDateCell(r.id, 'inspectionDate', r.inspectionDate)}</td>
       <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
       <td style="text-align:center"><button title="Generate a 24-hour Entry Notification Letter pre-filled with address + tenant name + inspection date/time" onclick="generate24HourEntryNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
@@ -21296,6 +21296,76 @@ async function savePilotList(){
     toast('Pilot list saved');
     if(typeof renderInspectionsContent === 'function') renderInspectionsContent(null);
   }catch(e){ toast('Save failed: ' + (e.message || 'unknown')); }
+}
+
+// Custom date cell used by the Inspection Tracker so users always
+// see MM/DD/YYYY regardless of what their browser locale says.
+// Renders a text input (MM/DD/YYYY) + a 📅 button that opens the
+// native <input type="date"> picker for click-to-pick. Both stay
+// in sync — the input value is always ISO YYYY-MM-DD on save so
+// Firestore storage is unchanged.
+function renderInspDateCell(id, field, iso){
+  const mdy = fmtMDY(iso||'') || '';
+  const uid = `inspDp_${id}_${field}`;
+  return `<div style="display:inline-flex;align-items:center;gap:2px;position:relative">
+    <input type="text" value="${escapeAttr(mdy)}" placeholder="MM/DD/YYYY"
+      style="font-size:11px;padding:3px 6px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text);font-family:var(--mono);outline:none;width:105px"
+      onblur="_inspDateBlur(this,'${id}','${field}','${uid}')"
+      onkeydown="if(event.key==='Enter')this.blur()">
+    <button type="button" title="Open calendar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted);border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:12px;padding:0;line-height:1;flex-shrink:0" onclick="_inspDateOpenPicker('${uid}')" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">📅</button>
+    <input type="date" id="${uid}" value="${escapeAttr(iso||'')}"
+      style="position:absolute;right:0;bottom:0;width:26px;height:26px;opacity:0;pointer-events:none"
+      onchange="_inspDateFromPicker(this,'${id}','${field}')">
+  </div>`;
+}
+
+// Parse 'MM/DD/YYYY' (or M/D/YY / M/D/YYYY) → ISO 'YYYY-MM-DD'.
+// Returns '' on invalid so the caller can flag it.
+function _mdyToIso(s){
+  const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\s*$/.exec(String(s||''));
+  if(!m) return '';
+  const mo = parseInt(m[1],10), d = parseInt(m[2],10);
+  const year = m[3].length === 2 ? 2000 + parseInt(m[3],10) : parseInt(m[3],10);
+  if(mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return `${year}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function _inspDateOpenPicker(uid){
+  const el = document.getElementById(uid);
+  if(!el) return;
+  try{ el.showPicker(); }
+  catch(_){ el.focus(); el.click(); }
+}
+
+function _inspDateBlur(input, id, field, uid){
+  const raw = (input.value || '').trim();
+  if(!raw){
+    // Cleared → save empty and sync the hidden picker.
+    const dp = document.getElementById(uid);
+    if(dp) dp.value = '';
+    updateInspectionField(id, field, '');
+    return;
+  }
+  const iso = _mdyToIso(raw);
+  if(!iso){
+    toast('Use MM/DD/YYYY (e.g. 08/07/2026)');
+    input.focus();
+    return;
+  }
+  // Round-trip to normalize display (e.g. '8/7/26' → '08/07/2026').
+  input.value = fmtMDY(iso);
+  const dp = document.getElementById(uid);
+  if(dp) dp.value = iso;
+  updateInspectionField(id, field, iso);
+}
+
+function _inspDateFromPicker(input, id, field){
+  const iso = input.value || '';
+  // Sync the sister text input with the MM/DD/YYYY display.
+  const wrap = input.parentElement;
+  const textEl = wrap && wrap.querySelector('input[type="text"]');
+  if(textEl) textEl.value = iso ? fmtMDY(iso) : '';
+  updateInspectionField(id, field, iso);
 }
 
 async function updateInspectionField(docId, field, value){
