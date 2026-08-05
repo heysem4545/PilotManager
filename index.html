@@ -8544,6 +8544,11 @@ async function renderDailyLogView(){
 let excelDailyLogAnchor = null;
 const EXCEL_ROWS_PER_DAY = 15;
 const EXCEL_DAYS_PER_SCREEN = 3;
+// User-added extra rows per day, keyed by 'YYYY-MM-DD'. Session-only
+// state so it doesn't need a Firestore round-trip — extra rows stick
+// while the tab is open and persist once any cell in them gets typed
+// (that write creates a real doc at rowIdx=N).
+let excelExtraRows = {};
 
 function renderExcelDailyLogPlaceholder(){
   setTimeout(renderExcelDailyLog, 0);
@@ -8633,8 +8638,15 @@ async function renderExcelDailyLog(){
     const headerBg = isToday ? 'var(--accent-dim)' : isSun ? 'rgba(245,201,106,.10)' : 'var(--surface2)';
     const headerColor = isToday ? 'var(--accent)' : isSun ? 'var(--amber)' : 'var(--muted)';
     const cellCss = 'width:100%;font-size:11px;padding:6px 8px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
-    const rowsHtml = Array.from({length: EXCEL_ROWS_PER_DAY}, (_, i) => {
-      const r = (rows[day] && rows[day][i]) || {};
+    // How many rows to show — base 15, grow to fit any persisted
+    // rowIdx that's already beyond that, then add whatever the user
+    // has clicked '+ Add rows' for this day.
+    const dateKey = `${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayRows = rows[day] || {};
+    const maxSavedIdx = Object.keys(dayRows).reduce((m, k) => Math.max(m, parseInt(k,10)), -1);
+    const nRows = Math.max(EXCEL_ROWS_PER_DAY, maxSavedIdx + 1) + (excelExtraRows[dateKey] || 0);
+    const rowsHtml = Array.from({length: nRows}, (_, i) => {
+      const r = dayRows[i] || {};
       return `<tr data-day="${day}" data-row="${i}">
         <td style="padding:2px 3px;width:28px;font-size:10px;color:var(--muted2);text-align:right;font-family:var(--mono)">${i+1}.</td>
         <td style="padding:2px 3px"><input type="text" data-cell="task" value="${escapeAttr(r.task||'')}" placeholder="Task…" ${dis} onblur="excelDailyLogSave(${day},${i},'task',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()" style="${cellCss}"></td>
@@ -8642,6 +8654,12 @@ async function renderExcelDailyLog(){
         <td style="padding:2px 3px"><input type="text" data-cell="notes" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${dis} onblur="excelDailyLogSave(${day},${i},'notes',this.value);hideLmTip()" oninput="showLmTip(this,this.value)" onmouseenter="showLmTip(this,this.value)" onmouseleave="hideLmTip()" style="${cellCss}"></td>
       </tr>`;
     }).join('');
+
+    const addRowBtn = editable
+      ? `<div style="padding:6px 8px;text-align:center;border-top:1px dashed var(--border2)">
+          <button onclick="excelAddMoreRows(${day})" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;width:100%;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add 5 more rows</button>
+        </div>`
+      : '';
 
     return `<div class="table-card" style="overflow:hidden">
       <div style="padding:10px 14px;background:${headerBg};border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
@@ -8662,6 +8680,7 @@ async function renderExcelDailyLog(){
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>
+      ${addRowBtn}
     </div>`;
   }).join('');
 
@@ -8737,6 +8756,15 @@ async function renderExcelDailyLog(){
       }
     });
   }
+}
+
+// Bump the visible row count for one day by 5. Session-only state
+// (excelExtraRows) — the extra rows become 'real' as soon as any
+// cell in them gets typed and saved.
+function excelAddMoreRows(day){
+  const dateKey = `${teamLogYear}-${String(teamLogMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  excelExtraRows[dateKey] = (excelExtraRows[dateKey] || 0) + 5;
+  renderExcelDailyLog();
 }
 
 // One-cell save. Doc id is deterministic per (uid, day, rowIdx)
@@ -12453,7 +12481,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-03-12';
+const APP_VERSION='2026-08-05-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
