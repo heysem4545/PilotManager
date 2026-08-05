@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-05-11';
+const APP_VERSION='2026-08-05-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21107,6 +21107,8 @@ async function renderInspectionsContent(users){
       <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
       <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
       <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
+      <td style="text-align:center"><input type="checkbox" ${r.pilotInspection?'checked':''} title="Pilot Inspection" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateInspectionField('${r.id}','pilotInspection',this.checked)"></td>
+      <td style="text-align:center"><input type="checkbox" ${r.pilotList?'checked':''} title="Pilot List" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateInspectionField('${r.id}','pilotList',this.checked)"></td>
       <td><select style="${iss}" class="${statusCls}" onchange="updateInspectionField('${r.id}','status',this.value).then(()=>renderInspectionsContent(null))">${statusOpts}</select></td>
       ${archiveCol}
     </tr>`;
@@ -21123,6 +21125,8 @@ async function renderInspectionsContent(users){
           <th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
           <th title="Generate a 24-hour Entry Notification Letter pre-filled with tenant + address + inspection date/time">📄 24h Notice</th>
           <th>🔧 Fixing By</th><th>💬 Cost Notes</th><th>💰 Total Cost</th>
+          <th title="Pilot Inspection">🛩 Pilot Inspection</th>
+          <th title="Pilot List">📃 Pilot List</th>
           <th>📊 Status</th><th>${archiveHeader}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
