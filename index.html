@@ -10031,33 +10031,77 @@ function inlineEditDeposit(propId, field, type, cell){
   };
 }
 
+// Load-in-batches state so 'Load older' can pick up where the
+// previous page left off without a full re-render.
+let _propHistoryDocs = [];
+let _propHistoryLastDoc = null;
+let _propHistoryHasMore = true;
+const PROP_HISTORY_PAGE = 2000;
+
 async function renderPropertyHistory(){
   const el=document.getElementById('propertyHistoryView');
   if(!el)return;
   el.innerHTML='<div style="padding:24px;color:var(--muted);text-align:center">Loading history...</div>';
+  // Reset paging state on a fresh render.
+  _propHistoryDocs = [];
+  _propHistoryLastDoc = null;
+  _propHistoryHasMore = true;
   try{
-    const snap=await db.collection('propertyHistory').orderBy('timestamp','desc').limit(500).get();
-    const logs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    let html=`<div class="table-card"><div class="toolbar"><div class="search-box"><span class="search-icon">\u2315</span><input type="text" placeholder="Search by address or user\u2026" id="historySearchInput" oninput="filterHistoryLog()"></div></div>`;
-    html+=`<div class="tbl-wrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Property Address</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th></tr></thead><tbody id="historyLogBody">`;
-    logs.forEach(log=>{
-      const ts=log.timestamp&&log.timestamp.toDate?log.timestamp.toDate():new Date(log.timestamp);
-      const fmtTs=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
-      html+=`<tr class="history-row" data-addr="${escapeAttr(log.addr||'')}" data-user="${escapeAttr(log.changedBy||'')}">`;
-      html+=`<td style="white-space:nowrap;font-size:12px;color:var(--muted)">${escapeHtml(fmtTs)}</td>`;
-      html+=`<td>${escapeHtml(log.changedBy||'')}</td>`;
-      html+=`<td>${escapeHtml(log.addr||'')}</td>`;
-      html+=`<td><span style="font-family:var(--mono);font-size:12px">${escapeHtml(log.field||'')}</span></td>`;
-      html+=`<td style="font-size:12px">${escapeHtml(log.oldValue||'')}</td>`;
-      html+=`<td style="font-size:12px">${escapeHtml(log.newValue||'')}</td>`;
-      html+=`<td><button class="btn btn-ghost btn-sm" onclick="restorePropertyChange('${escapeAttr(log.id)}')" title="Restore old value">Restore</button></td>`;
-      html+=`</tr>`;
-    });
-    html+=`</tbody></table></div><div class="tbl-footer"><span>${logs.length} log entries</span></div></div>`;
-    el.innerHTML=html;
+    await _loadMorePropertyHistory();
+    _rebuildPropertyHistoryTable();
   }catch(e){
     el.innerHTML=`<div style="padding:24px;color:var(--red);text-align:center">Error loading history: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+async function _loadMorePropertyHistory(){
+  let q = db.collection('propertyHistory').orderBy('timestamp','desc').limit(PROP_HISTORY_PAGE);
+  if(_propHistoryLastDoc) q = q.startAfter(_propHistoryLastDoc);
+  const snap = await q.get();
+  snap.docs.forEach(d => _propHistoryDocs.push({id:d.id, _doc:d, ...d.data()}));
+  _propHistoryLastDoc = snap.docs.length ? snap.docs[snap.docs.length - 1] : _propHistoryLastDoc;
+  if(snap.docs.length < PROP_HISTORY_PAGE) _propHistoryHasMore = false;
+}
+
+function _rebuildPropertyHistoryTable(){
+  const el = document.getElementById('propertyHistoryView');
+  if(!el) return;
+  // Preserve the search-box value + focus across a re-render.
+  const prevSearch = (document.getElementById('historySearchInput')||{}).value || '';
+  const logs = _propHistoryDocs;
+  let html=`<div class="table-card"><div class="toolbar"><div class="search-box"><span class="search-icon">\u2315</span><input type="text" placeholder="Search by address or user\u2026" id="historySearchInput" value="${escapeAttr(prevSearch)}" oninput="filterHistoryLog()"></div></div>`;
+  html+=`<div class="tbl-wrap"><table><thead><tr><th>Timestamp</th><th>User</th><th>Property Address</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th></tr></thead><tbody id="historyLogBody">`;
+  logs.forEach(log=>{
+    const ts=log.timestamp&&log.timestamp.toDate?log.timestamp.toDate():new Date(log.timestamp);
+    const fmtTs=ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    html+=`<tr class="history-row" data-addr="${escapeAttr(log.addr||'')}" data-user="${escapeAttr(log.changedBy||'')}">`;
+    html+=`<td style="white-space:nowrap;font-size:12px;color:var(--muted)">${escapeHtml(fmtTs)}</td>`;
+    html+=`<td>${escapeHtml(log.changedBy||'')}</td>`;
+    html+=`<td>${escapeHtml(log.addr||'')}</td>`;
+    html+=`<td><span style="font-family:var(--mono);font-size:12px">${escapeHtml(log.field||'')}</span></td>`;
+    html+=`<td style="font-size:12px">${escapeHtml(log.oldValue||'')}</td>`;
+    html+=`<td style="font-size:12px">${escapeHtml(log.newValue||'')}</td>`;
+    html+=`<td><button class="btn btn-ghost btn-sm" onclick="restorePropertyChange('${escapeAttr(log.id)}')" title="Restore old value">Restore</button></td>`;
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  html+=`<div class="tbl-footer" style="display:flex;align-items:center;gap:12px;padding:10px 14px">
+    <span>${logs.length} log entries loaded${_propHistoryHasMore?' \u00b7 older ones available':''}</span>
+    <div style="flex:1"></div>
+    ${_propHistoryHasMore ? `<button class="btn btn-primary btn-sm" onclick="loadMorePropertyHistory()">Load next ${PROP_HISTORY_PAGE.toLocaleString()} older \u2192</button>` : `<span style="color:var(--muted);font-style:italic">All history loaded</span>`}
+  </div></div>`;
+  el.innerHTML = html;
+  // Re-apply the search filter after re-render so previously hidden
+  // rows stay hidden when we append more.
+  if(prevSearch){ filterHistoryLog(); }
+}
+
+async function loadMorePropertyHistory(){
+  if(!_propHistoryHasMore) return;
+  try{
+    await _loadMorePropertyHistory();
+    _rebuildPropertyHistoryTable();
+  }catch(e){ toast('Load failed: '+(e.message||'unknown')); }
 }
 
 function filterHistoryLog(){
@@ -12624,7 +12668,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-05';
+const APP_VERSION='2026-08-06-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
