@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-01';
+const APP_VERSION='2026-08-06-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18230,6 +18230,7 @@ function hideRentAddrTip(){
 
 function _buildRentAddrTip(cell, propId){
   const p = properties.find(x => x.id === propId);
+  console.log('[rentAddrTip] propId=', propId, '→ found:', p ? p.addr : '(no match)');
   if(!p) return;
   const tenantName = ((p.tenantName2 || p.tenant) || '').trim();
   const leaseEnd = p.leaseExpire2 || '';
@@ -18292,7 +18293,8 @@ function _buildRentAddrTip(cell, propId){
   }
 
   tip.innerHTML = `
-    <div style="font-size:13px;font-weight:700;color:var(--text)">${escapeHtml(tenantName || '(no tenant on file)')}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🏠 ${escapeHtml(p.addr||'')}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text)">👤 ${escapeHtml(tenantName || '(no tenant on file)')}</div>
     ${daysLeftHtml}
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:10px 0 4px">Balance last ${rows.length||HISTORY_MONTHS} mo.</div>
     ${rowsHtml}
