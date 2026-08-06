@@ -1201,7 +1201,7 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
           <div class="toolbar">
             <div class="search-box">
               <span class="search-icon">⌕</span>
-              <input type="text" placeholder="Search address…" id="searchInput" oninput="applyFilters()">
+              <input type="text" placeholder="Search address or tenant…" id="searchInput" oninput="applyFilters()">
             </div>
             <div class="ftabs" id="filterTabs"></div>
           </div>
@@ -7056,7 +7056,13 @@ function filteredData(){
   return properties.filter(p=>{
     const mp=getMonthProp(p);
     const ms=currentFilter==='all'||mp.status===currentFilter||(currentFilter==='balance'&&mp.balance>0)||(currentFilter==='NO_STATUS'&&!mp.status);
-    const mq=!q||p.addr.toLowerCase().includes(q)||(p.tenant||'').toLowerCase().includes(q);
+    // Tenant name lives in tenantName2 on the Tenant & Lease tab
+    // (with legacy 'tenant' as fallback). Check both so search
+    // matches on either the modern or older-shaped record.
+    const mq = !q
+      || (p.addr||'').toLowerCase().includes(q)
+      || (p.tenant||'').toLowerCase().includes(q)
+      || (p.tenantName2||'').toLowerCase().includes(q);
     return ms&&mq;
   }).sort((a,b)=>{
     let av=a[sortField]??'',bv=b[sortField]??'';
@@ -12618,7 +12624,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-04';
+const APP_VERSION='2026-08-06-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
