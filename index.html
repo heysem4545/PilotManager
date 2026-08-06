@@ -12618,7 +12618,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-02';
+const APP_VERSION='2026-08-06-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18282,21 +18282,32 @@ function _buildRentAddrTip(cell, propId){
     ? `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0 0;margin-top:5px;border-top:1px solid var(--border2);font-weight:700"><span style="color:var(--text)">Total balance</span><span style="color:#f5706a;font-family:var(--mono)">${fmt(runningTotal)}</span></div>`
     : `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0 0;margin-top:5px;border-top:1px solid var(--border2);font-weight:700"><span style="color:var(--text)">Total balance</span><span style="color:#4ade80">$0</span></div>`;
 
-  // Build (or reuse) the tooltip element.
+  // Build (or reuse) the tooltip element. cssText is (re-)set
+  // on every show so an earlier fallback style can't linger and
+  // hide content.
   let tip = _rentAddrTipEl;
   if(!tip){
     tip = document.createElement('div');
     tip.id = 'rentAddrTip';
-    tip.style.cssText = 'position:fixed;z-index:10000;max-width:280px;min-width:220px;padding:10px 12px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12px;color:var(--text);pointer-events:none;font-family:var(--font)';
     document.body.appendChild(tip);
     _rentAddrTipEl = tip;
   }
+  tip.style.cssText = 'position:fixed;z-index:10000;max-width:300px;min-width:240px;padding:12px 14px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12px;color:var(--text);pointer-events:none;font-family:var(--font);line-height:1.5';
+
+  // Always emit every section (even when empty) so the user can
+  // see clearly that the popup fired for the right property and
+  // that the underlying data is just missing.
+  const tenantLine = tenantName
+    ? `<div style="font-size:14px;font-weight:700;color:#ededf0">👤 ${escapeHtml(tenantName)}</div>`
+    : `<div style="font-size:12px;color:#78787f;font-style:italic">👤 No tenant on file — add on Tenant & Lease tab</div>`;
+  const daysLine = daysLeftHtml
+    || `<div style="font-size:11px;color:#78787f;font-style:italic">📅 No lease-expire date on file</div>`;
 
   tip.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🏠 ${escapeHtml(p.addr||'')}</div>
-    <div style="font-size:13px;font-weight:700;color:var(--text)">👤 ${escapeHtml(tenantName || '(no tenant on file)')}</div>
-    ${daysLeftHtml}
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:10px 0 4px">Balance last ${rows.length||HISTORY_MONTHS} mo.</div>
+    <div style="font-size:11px;color:#78787f;margin-bottom:6px">🏠 ${escapeHtml(p.addr||'(no address)')}</div>
+    ${tenantLine}
+    <div style="margin-top:4px">${daysLine}</div>
+    <div style="font-size:10px;color:#78787f;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 4px">📊 Balance History</div>
     ${rowsHtml}
     ${totalLine}
   `;
