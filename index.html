@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-10';
+const APP_VERSION='2026-08-06-11';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22566,6 +22566,187 @@ function startConstProjectsListener(){
     console.error('constProjects listener error:',e);
   });
 }
+// ─── Weekly Construction List ───
+// Simple per-row to-do table grouped by ISO week (Monday-start).
+// Users add tasks Monday, review the following week, mark result
+// and rate on how it went. WhatsApp button generates a shareable
+// formatted list.
+let _weeklyConstAnchor = null; // Monday-of-visible-week ISO date
+
+// Return the ISO date (YYYY-MM-DD) for the Monday of the week that
+// contains `d` (defaults to today). Uses local time so the boundary
+// matches what the user sees on the calendar.
+function _weekStartMonday(d){
+  const dt = d ? new Date(d) : new Date();
+  dt.setHours(0,0,0,0);
+  const day = dt.getDay(); // 0 = Sun, 1 = Mon, …
+  const diff = day === 0 ? -6 : 1 - day; // shift back to Monday
+  dt.setDate(dt.getDate() + diff);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function _shiftWeek(mondayIso, weeks){
+  const d = new Date(mondayIso + 'T00:00:00');
+  d.setDate(d.getDate() + weeks*7);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function _weekLabel(mondayIso){
+  const start = new Date(mondayIso + 'T00:00:00');
+  const end = new Date(start); end.setDate(end.getDate()+6);
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const sm = MNAMES[start.getMonth()], em = MNAMES[end.getMonth()];
+  if(start.getMonth() === end.getMonth()){
+    return `${sm} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`;
+  }
+  return `${sm} ${start.getDate()} – ${em} ${end.getDate()}, ${end.getFullYear()}`;
+}
+
+async function renderWeeklyConstList(){
+  const el = document.getElementById('weeklyConstListRoot');
+  if(!el) return;
+  if(!_weeklyConstAnchor) _weeklyConstAnchor = _weekStartMonday();
+  const weekStart = _weeklyConstAnchor;
+  const editable = canEdit();
+
+  // Fetch rows for this week.
+  let rows = [];
+  try{
+    const snap = await db.collection('weeklyConstructionList')
+      .where('weekStart','==',weekStart)
+      .get();
+    rows = snap.docs
+      .map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
+  }catch(e){ console.warn('renderWeeklyConstList', e?.message); }
+
+  const rateOpts = (cur) => {
+    const opts = ['','1','2','3','4','5'].map(v => `<option value="${v}" ${String(cur||'')===v?'selected':''}>${v?('★'.repeat(Number(v))):'—'}</option>`).join('');
+    return opts;
+  };
+  const resultOpts = (cur) => {
+    const list = ['','Done','Pending','Missed','Rescheduled'];
+    return list.map(v => `<option value="${v}" ${(cur||'')===v?'selected':''}>${v||'—'}</option>`).join('');
+  };
+  const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
+
+  const rowsHtml = rows.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">
+        <div style="font-weight:600;color:var(--text);margin-bottom:4px">No tasks yet for this week</div>
+        Click <strong>+ Add Task</strong> to start planning.
+      </td></tr>`
+    : rows.map((r, i) => `<tr>
+        <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
+        <td style="padding:4px"><input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}"></td>
+        <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
+        <td style="padding:4px;width:130px"><select onchange="saveWeeklyConstField('${r.id}','result',this.value)" ${editable?'':'disabled'} style="${inputCss};cursor:pointer">${resultOpts(r.result)}</select></td>
+        <td style="padding:4px;width:100px"><select onchange="saveWeeklyConstField('${r.id}','rate',this.value)" ${editable?'':'disabled'} style="${inputCss};cursor:pointer;color:#f59e0b">${rateOpts(r.rate)}</select></td>
+        <td style="padding:4px;width:28px;text-align:center">${editable ? `<button title="Delete row" onclick="deleteWeeklyConstRow('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button>` : ''}</td>
+      </tr>`).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
+      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}</div>
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartMonday();renderWeeklyConstList()">This Week</button>
+      <div style="flex:1"></div>
+      ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow()">+ Add Task</button>` : ''}
+      <button class="btn btn-ghost btn-sm" style="background:rgba(37,211,102,.15);color:#25d366;border-color:#25d366" onclick="shareWeeklyConstListWhatsApp()" title="Copy or share the list via WhatsApp">📱 Share on WhatsApp</button>
+    </div>
+    <div class="table-card">
+      <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="width:30px;padding:8px 4px"></th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
+          <th style="width:28px"></th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Monday, come back next week and fill in Result + Rate to grade how the week went.</div>
+  `;
+}
+
+async function addWeeklyConstRow(){
+  if(!canEdit()) return;
+  try{
+    await db.collection('weeklyConstructionList').add({
+      weekStart: _weeklyConstAnchor || _weekStartMonday(),
+      text:'', targetDate:'', result:'', rate:'',
+      createdAt: new Date(),
+      createdBy: currentUser?.name || currentUser?.email || ''
+    });
+    renderWeeklyConstList();
+  }catch(e){ toast('Add failed: '+(e.message||'unknown')); }
+}
+
+async function saveWeeklyConstField(id, field, value){
+  if(!canEdit()) return;
+  try{
+    await db.collection('weeklyConstructionList').doc(id).update({[field]: value, updatedAt: new Date()});
+  }catch(e){ toast('Save failed: '+(e.message||'unknown')); }
+}
+
+async function saveWeeklyConstTargetDate(id, input){
+  if(!canEdit()) return;
+  const raw = (input.value || '').trim();
+  if(!raw){ await saveWeeklyConstField(id, 'targetDate', ''); return; }
+  const iso = _mdyToIso(raw);
+  if(!iso){ toast('Use MM/DD/YYYY (e.g. 08/12/2026)'); input.focus(); return; }
+  input.value = fmtMDY(iso);
+  await saveWeeklyConstField(id, 'targetDate', iso);
+}
+
+async function deleteWeeklyConstRow(id){
+  if(!canEdit()) return;
+  if(!confirm('Delete this row?')) return;
+  try{
+    await db.collection('weeklyConstructionList').doc(id).delete();
+    renderWeeklyConstList();
+  }catch(e){ toast('Delete failed: '+(e.message||'unknown')); }
+}
+
+async function shareWeeklyConstListWhatsApp(){
+  const weekStart = _weeklyConstAnchor || _weekStartMonday();
+  let rows = [];
+  try{
+    const snap = await db.collection('weeklyConstructionList')
+      .where('weekStart','==',weekStart)
+      .get();
+    rows = snap.docs
+      .map(d => ({id:d.id, ...d.data()}))
+      .filter(r => (r.text||'').trim())
+      .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
+  }catch(e){ toast('Failed to load: '+(e.message||'unknown')); return; }
+
+  if(rows.length === 0){ toast('No tasks in this week to share.'); return; }
+
+  const icon = r => {
+    const res = (r.result||'').toLowerCase();
+    if(res === 'done') return '✅';
+    if(res === 'missed') return '❌';
+    if(res === 'rescheduled') return '🔁';
+    if(res === 'pending') return '⏳';
+    return '•';
+  };
+  const stars = n => n ? '⭐'.repeat(Number(n)) : '';
+  const lines = rows.map((r,i) => {
+    const parts = [`${icon(r)} ${i+1}. ${r.text}`];
+    if(r.targetDate) parts.push(`🎯 ${fmtMDY(r.targetDate)}`);
+    if(r.result) parts.push(`${r.result}`);
+    if(r.rate) parts.push(stars(r.rate));
+    return parts.join(' — ');
+  });
+  const header = `📅 *Weekly Construction List — ${_weekLabel(weekStart)}*`;
+  const text = header + '\n\n' + lines.join('\n');
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener');
+}
+
 async function loadConstProjects(){
   // If listener already populated data, skip
   if(constProjectsData.length>0) return;
@@ -22594,8 +22775,17 @@ async function renderConstProjectsView(){
 
   let html=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
     <button onclick="window._cpTab='active';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">🔨 Active Projects (${activeProjects.length})</button>
+    <button onclick="window._cpTab='weekly';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='weekly'?'var(--blue)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='weekly'?'var(--blue)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📅 Weekly List</button>
     <button onclick="window._cpTab='archived';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📦 Projects Archived (${archivedProjects.length})</button>
   </div>`;
+
+  // Weekly List short-circuit — has its own layout independent of
+  // the projects list; render and bail.
+  if(window._cpTab === 'weekly'){
+    el.innerHTML = html + '<div id="weeklyConstListRoot"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
+    await renderWeeklyConstList();
+    return;
+  }
 
   html+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
   html+='<button class="btn btn-primary btn-sm" onclick="openAddProject()">+ Add Project</button>';
