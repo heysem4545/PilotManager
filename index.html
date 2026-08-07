@@ -4064,12 +4064,33 @@ function generateThirtyDayNoticePdf(propertyId){ generateNoticePdf(propertyId, 3
 function generate24HourEntryNoticePdf(inspectionId){
   const r = (typeof inspectionsData !== 'undefined' ? inspectionsData : []).find(x => x.id === inspectionId);
   if(!r){ toast('Inspection not found'); return; }
-  const addr = (r.propertyAddress || '').trim() || '_______________________';
+  const addr = (r.propertyAddress || '').trim();
   const prop = properties.find(p => (p.addr || '').trim() === addr);
-  const tenantName = ((prop && (prop.tenantName2 || prop.tenant)) || '').trim() || '_______________________';
-  const inspDate = r.inspectionDate || '';
-  const inspTime = r.inspectionTime || '';
-  const inspType = r.inspectionType || 'inspection';
+  const tenantName = ((prop && (prop.tenantName2 || prop.tenant)) || '').trim();
+  _render24HourNoticeWindow({
+    addr, tenantName,
+    inspDate: r.inspectionDate || '',
+    inspTime: r.inspectionTime || '',
+    inspType: r.inspectionType || 'inspection'
+  });
+}
+
+// Property-list variant — no scheduled inspection, so date/time
+// print as blank fill-in lines the user can pen-in at the door.
+function generate24HourNoticeFromProperty(propertyId){
+  const p = properties.find(x => x.id === propertyId);
+  if(!p){ toast('Property not found'); return; }
+  _render24HourNoticeWindow({
+    addr: (p.addr || '').trim(),
+    tenantName: ((p.tenantName2 || p.tenant) || '').trim(),
+    inspDate: '', inspTime: '', inspType: 'inspection'
+  });
+}
+
+function _render24HourNoticeWindow({addr, tenantName, inspDate, inspTime, inspType}){
+  addr = addr || '_______________________';
+  tenantName = tenantName || '_______________________';
+  inspType = inspType || 'inspection';
   const today = new Date();
   const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const dayNum = today.getDate();
@@ -7301,7 +7322,10 @@ function renderPropertiesList(){
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(unit)}</td>
       <td>${statusBadge}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${p.rent?fmt(p.rent):'—'}</td>
-      ${editable?`<td style="text-align:right">
+      ${editable?`<td style="text-align:right;white-space:nowrap">
+        <button title="Generate 30-Day Notice PDF for ${escapeAttr(addr)}" onclick="generateThirtyDayNoticePdf('${p.id}')" style="background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid #3b82f6;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">+30d</button>
+        <button title="Generate 3-Day Notice PDF for ${escapeAttr(addr)}" onclick="generateThreeDayNoticePdf('${p.id}')" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">+3d</button>
+        <button title="Generate 24-Hour Entry Notice PDF for ${escapeAttr(addr)} (date/time blank — fill in at the door)" onclick="generate24HourNoticeFromProperty('${p.id}')" style="background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid #8b5cf6;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:6px">+24h</button>
         <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" onclick="openEdit('${p.id}')">Edit</button>
         ${isAdmin()?`<button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:10px" onclick="if(confirm('Delete ${escapeAttr(addr)}? This cannot be undone.'))deleteProp('${p.id}')">Sold/Delete</button>`:''}
       </td>`:'<td></td>'}
@@ -12675,7 +12699,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-30';
+const APP_VERSION='2026-08-06-31';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
