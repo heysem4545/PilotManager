@@ -8638,8 +8638,8 @@ async function renderDailyLogView(){
     try{const s=await db.collection('teamDailyLog').where('lateEntry','==',true).get();lateCount=s.size;}catch(e){}
 
     const tabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
-      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='excel'?' active':''}" onclick="dailyLogTab='excel';renderDailyLogView()">📊 Excel Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='late'?' active':''}" onclick="dailyLogTab='late';renderDailyLogView()" style="position:relative">⚠ Late Entry Log${lateCount>0?' <span style="background:var(--red);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:4px">'+lateCount+'</span>':''}</button>
       <button class="maint-vtab${dailyLogTab==='scorecard'?' active':''}" onclick="dailyLogTab='scorecard';renderDailyLogView()">🏆 Scorecard</button>
     </div>`;
@@ -8664,8 +8664,8 @@ async function renderDailyLogView(){
     el.innerHTML=tabs+'<div id="teamLogContent"><div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div></div>';
   } else {
     const userTabs=`<div class="maint-view-tabs" style="margin-bottom:16px">
-      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='excel'?' active':''}" onclick="dailyLogTab='excel';renderDailyLogView()">📊 Excel Daily Log</button>
+      <button class="maint-vtab${dailyLogTab==='calendar'?' active':''}" onclick="dailyLogTab='calendar';renderDailyLogView()">📅 Daily Log</button>
       <button class="maint-vtab${dailyLogTab==='scorecard'?' active':''}" onclick="dailyLogTab='scorecard';renderDailyLogView()">🏆 My Scorecard</button>
     </div>`;
     if(dailyLogTab==='excel'){
@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-24';
+const APP_VERSION='2026-08-06-25';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
