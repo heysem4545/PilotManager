@@ -2801,7 +2801,9 @@ async function loadMonthData(key){
     snap.docs.forEach(d=>{
       const dat = d.data();
       if(!monthData[dat.propertyId]) monthData[dat.propertyId]={};
-      monthData[dat.propertyId][key] = {status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,cmha:dat.cmha||0,tenantPortion:dat.tenantPortion||0,monthNote:dat.monthNote||'',collActionNote:dat.collActionNote||'',docId:d.id};
+      // Spread the whole doc so newly-added fields (e.g. collActionStatus)
+      // survive listener rebuilds without needing to update this list.
+      monthData[dat.propertyId][key] = {...dat, docId:d.id};
     });
   }catch(e){console.error('loadMonthData',e);}
 }
@@ -2833,16 +2835,24 @@ function startPropertiesListener(){
 function startMonthDataListener(key){
   if(monthDataUnsub){ try{ monthDataUnsub(); }catch(e){} monthDataUnsub = null; }
   monthDataUnsub = db.collection('monthlyData').where('monthKey','==',key).onSnapshot(snap=>{
-    // Rebuild monthData for this key from the snapshot
+    // Rebuild monthData for this key from the snapshot. Spread the
+    // whole doc so newly-added fields (collActionStatus, or any
+    // future per-month field) don't get silently dropped when a
+    // later save re-triggers this listener.
     snap.docs.forEach(d=>{
       const dat = d.data();
       if(!monthData[dat.propertyId]) monthData[dat.propertyId]={};
-      monthData[dat.propertyId][key] = {
-        status:dat.status||'',cmhaPaid:dat.cmhaPaid||0,tenantPaid:dat.tenantPaid||0,
-        cmha:dat.cmha||0,tenantPortion:dat.tenantPortion||0,monthNote:dat.monthNote||'',collActionNote:dat.collActionNote||'',docId:d.id
-      };
+      monthData[dat.propertyId][key] = {...dat, docId:d.id};
     });
     if(currentView==='properties') renderTable();
+    if(currentView==='collection' && collectionViewMode==='monthly'){
+      // Guard against replacing DOM while a text input is focused —
+      // otherwise typing in Action Notes flickers on every keystroke's
+      // save. Blur handler will re-render after save anyway.
+      const ae = document.activeElement;
+      const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+      if(!typing) renderCollectionMonthlyView();
+    }
     if(currentView==='dashboard'){ renderMetrics(); renderDonut(); renderStatusBars(); }
   }, err=>{ console.warn('monthData listener', err?.message); });
 }
@@ -12722,7 +12732,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-03';
+const APP_VERSION='2026-08-07-04';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
