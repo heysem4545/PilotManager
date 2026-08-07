@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-13';
+const APP_VERSION='2026-08-06-14';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22727,18 +22727,35 @@ async function renderWeeklyConstList(){
   const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
 
   const rowsHtml = rows.length === 0
-    ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">
         <div style="font-weight:600;color:var(--text);margin-bottom:4px">No tasks yet for this week</div>
         Click <strong>+ Add Row</strong> to start planning.
       </td></tr>`
-    : rows.map((r, i) => `<tr>
-        <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
-        <td style="padding:4px"><input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}"></td>
-        <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
-        <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(r.result||'')}" placeholder="Result…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','result',this.value)" style="${inputCss}"></td>
-        <td style="padding:4px;width:120px"><input type="text" value="${escapeAttr(r.rate||'')}" placeholder="Rate…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','rate',this.value)" style="${inputCss}"></td>
-        <td style="padding:4px;width:28px;text-align:center">${editable ? `<button title="Delete row" onclick="deleteWeeklyConstRow('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button>` : ''}</td>
-      </tr>`).join('');
+    : rows.map((r, i) => {
+        // Amber tint + left bar for rows that were carried over from
+        // a previous week — makes it visually obvious that the PM
+        // pushed this item and it still needs to be closed out.
+        const carried = !!r.carriedOver;
+        const rowBg = carried ? 'background:rgba(245,158,11,.10);border-left:3px solid #f59e0b' : '';
+        const carriedBadge = carried
+          ? '<span title="Carried over from a previous week" style="display:inline-block;margin-right:4px;padding:1px 5px;font-size:9px;font-weight:700;border-radius:8px;background:rgba(245,158,11,.20);color:#f59e0b;letter-spacing:.04em">⚠ CARRY</span>'
+          : '';
+        const pushBtn = editable
+          ? `<button title="Duplicate this task to next week (Sat-Fri) — carries over as amber-highlighted" onclick="pushWeeklyConstRowNextWeek('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:12px;cursor:pointer;line-height:1;padding:0" onmouseover="this.style.color='#f59e0b';this.style.borderColor='#f59e0b'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">→</button>`
+          : '';
+        const delBtn = editable
+          ? `<button title="Delete row" onclick="deleteWeeklyConstRow('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button>`
+          : '';
+        return `<tr style="${rowBg}">
+          <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
+          <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
+          <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
+          <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(r.result||'')}" placeholder="Result…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','result',this.value)" style="${inputCss}"></td>
+          <td style="padding:4px;width:120px"><input type="text" value="${escapeAttr(r.rate||'')}" placeholder="Rate…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','rate',this.value)" style="${inputCss}"></td>
+          <td style="padding:4px;width:28px;text-align:center">${pushBtn}</td>
+          <td style="padding:4px;width:28px;text-align:center">${delBtn}</td>
+        </tr>`;
+      }).join('');
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -22758,6 +22775,7 @@ async function renderWeeklyConstList(){
           <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
           <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
           <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
+          <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
           <th style="width:28px"></th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
@@ -22766,7 +22784,7 @@ async function renderWeeklyConstList(){
         <button onclick="addWeeklyConstRow()" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 16px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
       </div>` : ''}
     </div>
-    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, come back the next Saturday and fill in Result + Rate to grade how the week went.</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, review the next Saturday and fill in Result + Rate. Click the <strong style="color:#f59e0b">→</strong> on any unfinished row to push it to next week — it'll show up there amber-highlighted so the PM knows to push hard.</div>
   `;
 }
 
@@ -22798,6 +22816,64 @@ async function saveWeeklyConstTargetDate(id, input){
   if(!iso){ toast('Use MM/DD/YYYY (e.g. 08/12/2026)'); input.focus(); return; }
   input.value = fmtMDY(iso);
   await saveWeeklyConstField(id, 'targetDate', iso);
+}
+
+// Duplicate this row's task into next week's list, tagged as
+// carriedOver so the amber highlight shows up. Doesn't touch the
+// current-week row (user still fills in Result/Rate here). Target
+// date is shifted +7 days if there was one, otherwise blank.
+async function pushWeeklyConstRowNextWeek(id){
+  if(!canEdit()) return;
+  const curStart = _weeklyConstAnchor || _weekStartSaturday();
+  let source;
+  try{
+    const doc = await db.collection('weeklyConstructionList').doc(id).get();
+    if(!doc.exists){ toast('Row not found'); return; }
+    source = {id:doc.id, ...doc.data()};
+  }catch(e){ toast('Read failed: '+(e.message||'unknown')); return; }
+
+  const text = (source.text || '').trim();
+  if(!text){ toast('This row is empty — nothing to carry over.'); return; }
+
+  const nextStart = _shiftWeek(curStart, 1);
+  // Shift the target date +7d too, if the user set one.
+  let nextTarget = '';
+  if(source.targetDate){
+    const d = new Date(source.targetDate + 'T00:00:00');
+    if(!isNaN(d)){
+      d.setDate(d.getDate() + 7);
+      nextTarget = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+  }
+
+  // Don't create a duplicate if next week already has this exact
+  // task text — protects against double-clicks.
+  try{
+    const dupSnap = await db.collection('weeklyConstructionList')
+      .where('weekStart','==',nextStart)
+      .where('text','==',text)
+      .limit(1)
+      .get();
+    if(!dupSnap.empty){
+      if(!confirm(`Next week already has a task with the same text. Add another copy anyway?`)) return;
+    }
+  }catch(_){/* if the query fails just move on, worst case is a dup */}
+
+  try{
+    await db.collection('weeklyConstructionList').add({
+      weekStart: nextStart,
+      text,
+      targetDate: nextTarget,
+      result: '',
+      rate: '',
+      carriedOver: true,
+      carriedFromWeek: curStart,
+      carriedFromId: id,
+      createdAt: new Date(),
+      createdBy: currentUser?.name || currentUser?.email || ''
+    });
+    toast('Pushed to next week ✓');
+  }catch(e){ toast('Push failed: '+(e.message||'unknown')); }
 }
 
 async function deleteWeeklyConstRow(id){
@@ -22837,10 +22913,17 @@ async function shareWeeklyConstListWhatsApp(){
     return '•';
   };
   const lines = rows.map((r,i) => {
-    const parts = [`${iconFor(r)} ${i+1}. ${r.text}`];
+    // Carried-over items get wrapped in ** so the team sees a
+    // clear visual highlight in the WhatsApp message (WhatsApp
+    // doesn't have a highlight, but ** brackets read at a glance).
+    const carried = !!r.carriedOver;
+    const taskText = carried ? `**${r.text}**` : r.text;
+    const prefix = carried ? '⚠️ ' : '';
+    const parts = [`${prefix}${iconFor(r)} ${i+1}. ${taskText}`];
     if(r.targetDate) parts.push(`🎯 ${fmtMDY(r.targetDate)}`);
     if(r.result) parts.push(r.result);
     if(r.rate) parts.push(`⭐ ${r.rate}`);
+    if(carried) parts.push('CARRY-OVER');
     return parts.join(' — ');
   });
   const header = `📅 *Weekly Construction List — ${_weekLabel(weekStart)}*`;
