@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-15';
+const APP_VERSION='2026-08-06-16';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22706,6 +22706,17 @@ function _weekLabel(satIso){
   return `Sat ${sm} ${start.getDate()} – Fri ${em} ${end.getDate()}, ${end.getFullYear()}`;
 }
 
+// Three stacked to-do lists on one page, all sharing the same
+// Sat-Fri week anchor. Rows are stored in the same collection with
+// a `section` field so a single query fetches everything for a week
+// and we partition client-side. Legacy rows without `section` are
+// treated as 'construction' so existing data stays visible.
+const WEEKLY_CONST_SECTIONS = [
+  {key:'construction', label:'🏗️ Construction To-Do', accent:'#3b82f6'},
+  {key:'turnover',     label:'🔄 Turnover To-Do',      accent:'#f59e0b'},
+  {key:'inspection',   label:'🔍 Inspection To-Do',    accent:'#22c55e'}
+];
+
 async function renderWeeklyConstList(){
   const el = document.getElementById('weeklyConstListRoot');
   if(!el) return;
@@ -22713,28 +22724,42 @@ async function renderWeeklyConstList(){
   const weekStart = _weeklyConstAnchor;
   const editable = canEdit();
 
-  // Fetch rows for this week.
-  let rows = [];
+  // Fetch all rows for this week; partition by section below.
+  let allRows = [];
   try{
     const snap = await db.collection('weeklyConstructionList')
       .where('weekStart','==',weekStart)
       .get();
-    rows = snap.docs
+    allRows = snap.docs
       .map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
   }catch(e){ console.warn('renderWeeklyConstList', e?.message); }
 
+  const sectionsHtml = WEEKLY_CONST_SECTIONS.map(sec => {
+    const rows = allRows.filter(r => (r.section || 'construction') === sec.key);
+    return _renderWeeklyConstSection(sec, rows, editable);
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
+      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}</div>
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartSaturday();renderWeeklyConstList()">This Week</button>
+    </div>
+    ${sectionsHtml}
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, review the next Saturday and fill in Result + Rate. Click the <strong style="color:#f59e0b">→</strong> on any unfinished row to push it to next week — it'll show up there amber-highlighted so the PM knows to push hard.</div>
+  `;
+}
+
+function _renderWeeklyConstSection(sec, rows, editable){
   const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
 
   const rowsHtml = rows.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">
-        <div style="font-weight:600;color:var(--text);margin-bottom:4px">No tasks yet for this week</div>
-        Click <strong>+ Add Row</strong> to start planning.
+    ? `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);font-size:12px">
+        No ${sec.key} tasks yet for this week — click <strong>+ Add Row</strong> below.
       </td></tr>`
     : rows.map((r, i) => {
-        // Amber tint + left bar for rows that were carried over from
-        // a previous week — makes it visually obvious that the PM
-        // pushed this item and it still needs to be closed out.
         const carried = !!r.carriedOver;
         const rowBg = carried ? 'background:rgba(245,158,11,.10);border-left:3px solid #f59e0b' : '';
         const carriedBadge = carried
@@ -22757,42 +22782,43 @@ async function renderWeeklyConstList(){
         </tr>`;
       }).join('');
 
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
-      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}</div>
-      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
-      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartSaturday();renderWeeklyConstList()">This Week</button>
-      <div style="flex:1"></div>
-      ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow()">+ Add Row</button>` : ''}
-      <button class="btn btn-ghost btn-sm" style="background:rgba(37,211,102,.15);color:#25d366;border-color:#25d366" onclick="shareWeeklyConstListWhatsApp()" title="Copy or share the list via WhatsApp">📱 Share on WhatsApp</button>
+  return `
+    <div style="margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;border-left:3px solid ${sec.accent};padding-left:10px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${sec.label}</div>
+        <div style="font-size:11px;color:var(--muted)">${rows.length} row${rows.length===1?'':'s'}</div>
+        <div style="flex:1"></div>
+        ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow('${sec.key}')">+ Add Row</button>` : ''}
+        <button class="btn btn-ghost btn-sm" style="background:rgba(37,211,102,.15);color:#25d366;border-color:#25d366" onclick="shareWeeklyConstListWhatsApp('${sec.key}')" title="Copy or share this list via WhatsApp">📱 Share on WhatsApp</button>
+      </div>
+      <div class="table-card">
+        <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="width:30px;padding:8px 4px"></th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
+            <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
+            <th style="width:28px"></th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table></div>
+        ${editable ? `<div style="padding:8px;text-align:center;border-top:1px dashed var(--border2)">
+          <button onclick="addWeeklyConstRow('${sec.key}')" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='${sec.accent}';this.style.borderColor='${sec.accent}'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
+        </div>` : ''}
+      </div>
     </div>
-    <div class="table-card">
-      <div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">
-        <thead><tr>
-          <th style="width:30px;padding:8px 4px"></th>
-          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
-          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
-          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
-          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
-          <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
-          <th style="width:28px"></th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table></div>
-      ${editable ? `<div style="padding:10px;text-align:center;border-top:1px dashed var(--border2)">
-        <button onclick="addWeeklyConstRow()" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 16px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
-      </div>` : ''}
-    </div>
-    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, review the next Saturday and fill in Result + Rate. Click the <strong style="color:#f59e0b">→</strong> on any unfinished row to push it to next week — it'll show up there amber-highlighted so the PM knows to push hard.</div>
   `;
 }
 
-async function addWeeklyConstRow(){
+async function addWeeklyConstRow(section){
   if(!canEdit()) return;
+  const sec = section || 'construction';
   try{
     await db.collection('weeklyConstructionList').add({
       weekStart: _weeklyConstAnchor || _weekStartSaturday(),
+      section: sec,
       text:'', targetDate:'', result:'', rate:'',
       createdAt: new Date(),
       createdBy: currentUser?.name || currentUser?.email || ''
@@ -22862,6 +22888,7 @@ async function pushWeeklyConstRowNextWeek(id){
   try{
     await db.collection('weeklyConstructionList').add({
       weekStart: nextStart,
+      section: source.section || 'construction',
       text,
       targetDate: nextTarget,
       result: '',
@@ -22885,7 +22912,9 @@ async function deleteWeeklyConstRow(id){
   }catch(e){ toast('Delete failed: '+(e.message||'unknown')); }
 }
 
-async function shareWeeklyConstListWhatsApp(){
+async function shareWeeklyConstListWhatsApp(section){
+  const sec = section || 'construction';
+  const secMeta = WEEKLY_CONST_SECTIONS.find(s => s.key === sec) || WEEKLY_CONST_SECTIONS[0];
   const weekStart = _weeklyConstAnchor || _weekStartSaturday();
   let rows = [];
   try{
@@ -22894,11 +22923,12 @@ async function shareWeeklyConstListWhatsApp(){
       .get();
     rows = snap.docs
       .map(d => ({id:d.id, ...d.data()}))
+      .filter(r => (r.section || 'construction') === sec)
       .filter(r => (r.text||'').trim())
       .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
   }catch(e){ toast('Failed to load: '+(e.message||'unknown')); return; }
 
-  if(rows.length === 0){ toast('No tasks in this week to share.'); return; }
+  if(rows.length === 0){ toast(`No ${sec} tasks in this week to share.`); return; }
 
   // Simple format per user request: just the to-do text + target
   // date. Carried-over rows keep their ** highlight so the team
@@ -22910,7 +22940,7 @@ async function shareWeeklyConstListWhatsApp(){
     if(r.targetDate) line += ` — 🎯 ${fmtMDY(r.targetDate)}`;
     return line;
   });
-  const header = `📅 *Weekly Construction List — ${_weekLabel(weekStart)}*`;
+  const header = `${secMeta.label.split(' ')[0]} *Weekly ${secMeta.label.replace(/^\S+\s+/, '')} — ${_weekLabel(weekStart)}*`;
   const text = header + '\n\n' + lines.join('\n');
 
   // Show in a preview modal (matches the Collection section's UX)
