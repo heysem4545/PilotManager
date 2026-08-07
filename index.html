@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-16';
+const APP_VERSION='2026-08-06-17';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22756,7 +22756,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
   const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
 
   const rowsHtml = rows.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);font-size:12px">
+    ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);font-size:12px">
         No ${sec.key} tasks yet for this week — click <strong>+ Add Row</strong> below.
       </td></tr>`
     : rows.map((r, i) => {
@@ -22775,6 +22775,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
           <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
           <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
           <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
+          <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(r.result||'')}" placeholder="Result…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','result',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:120px"><input type="text" value="${escapeAttr(r.rate||'')}" placeholder="Rate…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','rate',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:28px;text-align:center">${pushBtn}</td>
@@ -22797,6 +22798,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
             <th style="width:30px;padding:8px 4px"></th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:160px">📝 Update</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
             <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
@@ -22819,7 +22821,7 @@ async function addWeeklyConstRow(section){
     await db.collection('weeklyConstructionList').add({
       weekStart: _weeklyConstAnchor || _weekStartSaturday(),
       section: sec,
-      text:'', targetDate:'', result:'', rate:'',
+      text:'', targetDate:'', update:'', result:'', rate:'',
       createdAt: new Date(),
       createdBy: currentUser?.name || currentUser?.email || ''
     });
