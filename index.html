@@ -917,9 +917,9 @@ tbody tr.to-legal td .addr-main{color:var(--red)}
 .to-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);border:1px solid transparent;transition:all .12s;font-family:var(--font)}
 .to-tab:hover{color:var(--text);background:var(--surface2)}
 .to-tab.active{background:var(--surface3);color:var(--text);border-color:var(--border2)}
-.to-card{background:var(--surface);border:2px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:22px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
-.to-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:2px solid var(--border2)}
-.to-card-addr{font-size:16px;font-weight:700;letter-spacing:-0.01em}
+.to-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+.to-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;padding-bottom:6px;border-bottom:1px solid var(--border2)}
+.to-card-addr{font-size:14px;font-weight:700;letter-spacing:-0.01em}
 .to-badge-heavy{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--red-dim);color:var(--red)}
 .to-badge-medium{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--amber-dim);color:var(--amber)}
 .to-badge-light{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent-dim);color:var(--accent)}
@@ -12668,7 +12668,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-08';
+const APP_VERSION='2026-08-06-09';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -23632,22 +23632,19 @@ function renderTurnoverProjects(){
     // Ahead / behind % indicator removed per user request — was tied
     // to the progress bar and added visual noise.
 
-    html+=`<div style="display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap;font-size:11px">
+    html+=`<div style="display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap;font-size:11px">
       <span style="color:var(--muted)">Tenant Left: <strong style="color:var(--text)">${tenantLeft||'—'}</strong></span>
       <span style="color:var(--muted)">Start: <strong style="color:var(--text)">${startDate||'—'}</strong></span>
       <span style="color:var(--muted)">Target (${targetDays}d): <strong style="color:var(--text)">${targetDate||'—'}</strong></span>
-      ${prog>=100?`<div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:10px;color:var(--muted)">Completed:</span>
-        <span style="font-size:11px;font-family:var(--mono);color:var(--accent)">${completedDate||'—'}</span>
-      </div>`:''}
+      ${prog>=100?`<span style="font-size:11px;color:var(--muted)">Completed: <strong style="color:var(--accent);font-family:var(--mono)">${completedDate||'—'}</strong></span>`:''}
       ${statusBadge} ${daysInfo}
     </div>`;
 
     // Current Home Info — truncated with click to expand
     const notePreview = (proj.currentHomeInfo||'').length>80 ? escapeHtml(proj.currentHomeInfo.slice(0,80))+'…' : escapeHtml(proj.currentHomeInfo||'');
-    html+=`<div style="display:flex;align-items:center;gap:6px;margin:6px 0">
-      ${proj.currentHomeInfo?`<div onclick="openTurnoverNotes('${proj.id}')" style="flex:1;font-size:11px;color:var(--muted);padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Click to read/edit">📝 ${notePreview}</div>`:''}
-      <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px;white-space:nowrap;flex-shrink:0" onclick="openTurnoverNotes('${proj.id}')">${proj.currentHomeInfo?'Edit Notes':'+ Add Notes'}</button>
+    html+=`<div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+      ${proj.currentHomeInfo?`<div onclick="openTurnoverNotes('${proj.id}')" style="flex:1;font-size:11px;color:var(--muted);padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Click to read/edit">📝 ${notePreview}</div>`:''}
+      <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px;white-space:nowrap;flex-shrink:0" onclick="openTurnoverNotes('${proj.id}')">${proj.currentHomeInfo?'Edit Notes':'+ Add Notes'}</button>
     </div>`;
 
     // Overall progress bar + slider removed per user request —
@@ -23669,12 +23666,12 @@ function renderTurnoverProjects(){
     const toCountBadge = toItemsTotal>0
       ? ` <span style="color:var(--accent);font-size:12px;font-weight:600">${toItemsDone}/${toItemsTotal}</span>`
       : '';
-    html+=`<div style="margin:10px 0;border:1px solid var(--border2);border-radius:8px;overflow:hidden">
-      <div onclick="const d=document.getElementById('${toBodyId}');const a=document.getElementById('${toArrowId}');d.style.display=d.style.display==='none'?'':'none';a.textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);cursor:pointer;user-select:none">
-        <span id="${toArrowId}" style="font-size:12px;color:var(--muted)">▸</span>
-        <span style="font-size:13px;font-weight:700;color:var(--text)">🔧 Items to Fix${toCountBadge}</span>
+    html+=`<div style="margin:4px 0;border:1px solid var(--border2);border-radius:6px;overflow:hidden">
+      <div onclick="const d=document.getElementById('${toBodyId}');const a=document.getElementById('${toArrowId}');d.style.display=d.style.display==='none'?'':'none';a.textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface2);cursor:pointer;user-select:none">
+        <span id="${toArrowId}" style="font-size:11px;color:var(--muted)">▸</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">🔧 Items to Fix${toCountBadge}</span>
         <div style="flex:1"></div>
-        <button class="btn btn-primary btn-sm" style="padding:4px 12px;font-size:11px;font-weight:600" onclick="event.stopPropagation();openTurnoverItemsModal('${proj.id}')">
+        <button class="btn btn-primary btn-sm" style="padding:2px 10px;font-size:10px;font-weight:600" onclick="event.stopPropagation();openTurnoverItemsModal('${proj.id}')">
           ${toItemsTotal>0?'Edit ('+toItemsTotal+')':'+ Add Items'}
         </button>
       </div>
@@ -23757,9 +23754,9 @@ function renderTurnoverProjects(){
     const officeTotal = officeItems.length;
     const costTotal = (proj.costMaterial||0)+(proj.costOutsource||0);
     const allOfficeDone = officeTotal>0&&officeDone===officeTotal;
-    html+=`<div style="margin-top:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden">
-      <div onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'':'none';this.querySelector('.to-detail-arrow').textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);cursor:pointer;user-select:none">
-        <span class="to-detail-arrow" style="font-size:12px;color:var(--muted)">▸</span>
+    html+=`<div style="margin-top:4px;border:1px solid var(--border2);border-radius:6px;overflow:hidden">
+      <div onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='none'?'':'none';this.querySelector('.to-detail-arrow').textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface2);cursor:pointer;user-select:none">
+        <span class="to-detail-arrow" style="font-size:11px;color:var(--muted)">▸</span>
         <span style="font-size:11px;font-weight:600;color:var(--text)">Details</span>
         <span style="font-size:10px;color:${allOfficeDone?'#4ade80':'var(--muted)'}">✅ Office ${officeDone}/${officeTotal}</span>
         ${costTotal>0?`<span style="font-size:10px;color:var(--muted)">💰 ${fmt(costTotal)}</span>`:''}
