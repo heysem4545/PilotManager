@@ -12668,7 +12668,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-06';
+const APP_VERSION='2026-08-06-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -23593,16 +23593,8 @@ function renderTurnoverProjects(){
       else if(daysOver <= 30) statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red-dim);color:var(--red)">🚨 ${daysOver} days — TOO LATE!</span>`;
       else statusBadge = `<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--red);color:#fff;animation:pulse 1s infinite">🔥 CHECK YOUR TEAM!! (${daysOver} days over)</span>`;
     }
-    if(startDate && targetDate && prog < 100){
-      const start = new Date(startDate+'T00:00:00');
-      const targ = new Date(targetDate+'T00:00:00');
-      const totalD = Math.max(1,Math.ceil((targ-start)/86400000));
-      const elapsed = Math.ceil((today-start)/86400000);
-      const expectedPct = Math.min(100,Math.round(elapsed/totalD*100));
-      const diff = prog - expectedPct;
-      if(diff >= 0) daysInfo = `<span style="font-size:10px;color:var(--accent)">📈 ${diff}% ahead</span>`;
-      else daysInfo = `<span style="font-size:10px;color:var(--red)">📉 ${Math.abs(diff)}% behind</span>`;
-    }
+    // Ahead / behind % indicator removed per user request — was tied
+    // to the progress bar and added visual noise.
 
     html+=`<div style="display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap;font-size:11px">
       <span style="color:var(--muted)">Tenant Left: <strong style="color:var(--text)">${tenantLeft||'—'}</strong></span>
@@ -23622,16 +23614,10 @@ function renderTurnoverProjects(){
       <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px;white-space:nowrap;flex-shrink:0" onclick="openTurnoverNotes('${proj.id}')">${proj.currentHomeInfo?'Edit Notes':'+ Add Notes'}</button>
     </div>`;
 
-    // Progress bar
-    const fillColor = 'var(--blue)';
-    html+=`<div class="to-overall-bar"><div class="to-overall-fill" style="width:${Math.min(prog,100)}%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;min-width:${prog>0?'50px':'0'}"><span style="font-size:10px;font-weight:700;color:#fff">${prog>0?prog+'%':''}</span></div></div>`;
-    html+=`<div class="to-overall-pct" id="toPct_${proj.id}">${prog}% complete</div>`;
-
-    // Slider
-    html+=`<input type="range" min="0" max="100" step="5" value="${prog}" class="to-slider"
-      style="background:linear-gradient(to right,${fillColor} ${prog}%,var(--surface3) ${prog}%)"
-      oninput="this.style.background='linear-gradient(to right,var(--blue) '+this.value+'%,var(--surface3) '+this.value+'%)';previewTurnoverProgress('${proj.id}',this.value)"
-      onchange="updateTurnoverProgress('${proj.id}',this.value)">`;
+    // Overall progress bar + slider removed per user request —
+    // took too much space and the team wasn't using the % as a
+    // signal. Status derives from Items to Fix + Office checklist
+    // completion counts instead.
 
     // Turnover items checklist (below blue bar)
     const toItems = proj.turnoverItems||[];
@@ -23639,23 +23625,29 @@ function renderTurnoverProjects(){
     const toItemsTotal = toItems.length;
     const toItemsPct = toItemsTotal>0?Math.round(toItemsDone/toItemsTotal*100):0;
 
-    html+=`<div style="margin:10px 0">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:14px;font-weight:700;color:var(--text)">🔧 Items to Fix${toItemsTotal>0?' — <span style="color:var(--accent)">'+toItemsDone+'/'+toItemsTotal+'</span> done ('+toItemsPct+'%)':''}</span>
-        <button class="btn btn-primary btn-sm" style="padding:5px 14px;font-size:12px;font-weight:600" onclick="openTurnoverItemsModal('${proj.id}')">
-          ${toItemsTotal>0?'Edit Items ('+toItemsTotal+')':'+ Add Items'}
+    // Items to Fix — collapsible section so the row stays compact
+    // when the list is long. Click the header to toggle. Closed
+    // by default; no progress bar (just the count).
+    const toBodyId = `toItemsBody_${proj.id}`;
+    const toArrowId = `toItemsArrow_${proj.id}`;
+    const toCountBadge = toItemsTotal>0
+      ? ` <span style="color:var(--accent);font-size:12px;font-weight:600">${toItemsDone}/${toItemsTotal}</span>`
+      : '';
+    html+=`<div style="margin:10px 0;border:1px solid var(--border2);border-radius:8px;overflow:hidden">
+      <div onclick="const d=document.getElementById('${toBodyId}');const a=document.getElementById('${toArrowId}');d.style.display=d.style.display==='none'?'':'none';a.textContent=d.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);cursor:pointer;user-select:none">
+        <span id="${toArrowId}" style="font-size:12px;color:var(--muted)">▸</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text)">🔧 Items to Fix${toCountBadge}</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" style="padding:4px 12px;font-size:11px;font-weight:600" onclick="event.stopPropagation();openTurnoverItemsModal('${proj.id}')">
+          ${toItemsTotal>0?'Edit ('+toItemsTotal+')':'+ Add Items'}
         </button>
-      </div>`;
+      </div>
+      <div id="${toBodyId}" style="display:none;padding:8px 10px">`;
 
     if(toItemsTotal>0){
-      html+=`<div style="width:100%;height:14px;background:var(--surface3);border-radius:7px;overflow:hidden;margin-bottom:6px">
-        <div style="height:100%;border-radius:7px;background:#4ade80;width:${toItemsPct}%;transition:width .3s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:${toItemsPct>0?'32px':'0'}">
-          ${toItemsPct>0?`<span style="font-size:9px;font-weight:700;color:#0d0d10">${toItemsPct}%</span>`:''}
-        </div>
-      </div>`;
       html+=`<div style="display:flex;flex-direction:column;gap:3px">`;
       toItems.forEach((item,ii)=>{
-        html+=`<div style="padding:5px 8px;border-radius:6px;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface2)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
+        html+=`<div style="padding:5px 8px;border-radius:6px;font-size:12px;background:${item.checked?'rgba(74,222,128,0.08)':'var(--surface3)'};border:1px solid ${item.checked?'rgba(74,222,128,0.2)':'var(--border2)'}">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" ${item.checked?'checked':''} style="accent-color:#4ade80;width:15px;height:15px" onchange="toggleTurnoverItem('${proj.id}',${ii},this.checked)">
             <span style="flex:1;${item.checked?'text-decoration:line-through;color:var(--muted)':'color:var(--text)'}">${escapeHtml(item.text)}</span>
@@ -23671,7 +23663,7 @@ function renderTurnoverProjects(){
     } else {
       html+=`<div style="font-size:11px;color:var(--muted2);padding:8px 0">No items added yet — click "+ Add Items" to list what needs fixing</div>`;
     }
-    html+=`</div>`;
+    html+=`</div></div>`;
 
     // Timeline section (hidden by default)
     const snaps = proj.snapshots || [];
