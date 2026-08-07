@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-17';
+const APP_VERSION='2026-08-06-18';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22674,6 +22674,9 @@ function startConstProjectsListener(){
 // and rate on how it went. WhatsApp button generates a shareable
 // formatted list.
 let _weeklyConstAnchor = null; // Saturday-of-visible-week ISO date
+// Tracks which (week, section) combos we've already auto-seeded
+// with 3 blank rows this session — prevents re-seeding on re-render.
+const _weeklyConstSeeded = new Set();
 
 // Return the ISO date (YYYY-MM-DD) for the Saturday of the week
 // that contains `d` (defaults to today). Week is Saturday-based
@@ -22734,6 +22737,41 @@ async function renderWeeklyConstList(){
       .map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
   }catch(e){ console.warn('renderWeeklyConstList', e?.message); }
+
+  // Auto-seed 3 blank rows per section on the current week when
+  // it's still empty — so users always land on a ready-to-type
+  // table. Guarded by an in-memory set to avoid re-seeding on
+  // re-render, and limited to the CURRENT week so browsing old
+  // weeks doesn't create stray rows.
+  if(editable && weekStart === _weekStartSaturday()){
+    const seedTargets = WEEKLY_CONST_SECTIONS.filter(sec => {
+      const key = `${weekStart}:${sec.key}`;
+      if(_weeklyConstSeeded.has(key)) return false;
+      const secRows = allRows.filter(r => (r.section || 'construction') === sec.key);
+      return secRows.length === 0;
+    });
+    if(seedTargets.length){
+      seedTargets.forEach(sec => _weeklyConstSeeded.add(`${weekStart}:${sec.key}`));
+      try{
+        const batch = db.batch();
+        seedTargets.forEach(sec => {
+          for(let i = 0; i < 3; i++){
+            const ref = db.collection('weeklyConstructionList').doc();
+            batch.set(ref, {
+              weekStart,
+              section: sec.key,
+              text:'', targetDate:'', update:'', result:'', rate:'',
+              createdAt: new Date(Date.now() + i),
+              createdBy: currentUser?.name || currentUser?.email || '',
+              autoSeeded: true
+            });
+          }
+        });
+        await batch.commit();
+        return renderWeeklyConstList();
+      }catch(e){ console.warn('auto-seed weekly rows failed:', e?.message); }
+    }
+  }
 
   const sectionsHtml = WEEKLY_CONST_SECTIONS.map(sec => {
     const rows = allRows.filter(r => (r.section || 'construction') === sec.key);
