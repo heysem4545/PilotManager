@@ -7837,8 +7837,8 @@ function openPilotDay(day){
         <div style="display:flex;gap:4px"><input type="text" id="pjNewExcNotes" placeholder="Notes" style="flex:1;font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none" onkeydown="if(event.key==='Enter')addPilotJob(${day},'excuse')"><button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:10px;color:var(--red);border-color:rgba(245,112,106,0.3)" onclick="addPilotJob(${day},'excuse')">Add</button></div>
       </div>
       <div class="modal-foot">
-        <button class="btn btn-ghost btn-sm" onclick="savePilotDayEdits(${day})">Save Changes</button>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('pilotDayModal').remove()">Done</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pilotDayModal').remove()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="savePilotDayEdits(${day})">Done</button>
       </div>
     </div>`;
     document.body.appendChild(modal);
@@ -12732,7 +12732,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-04';
+const APP_VERSION='2026-08-07-05';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
