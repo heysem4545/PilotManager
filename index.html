@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-18';
+const APP_VERSION='2026-08-06-19';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22760,7 +22760,7 @@ async function renderWeeklyConstList(){
             batch.set(ref, {
               weekStart,
               section: sec.key,
-              text:'', targetDate:'', update:'', result:'', rate:'',
+              text:'', targetDate:'', update:'', notes:'', result:'',
               createdAt: new Date(Date.now() + i),
               createdBy: currentUser?.name || currentUser?.email || '',
               autoSeeded: true
@@ -22809,13 +22809,23 @@ function _renderWeeklyConstSection(sec, rows, editable){
         const delBtn = editable
           ? `<button title="Delete row" onclick="deleteWeeklyConstRow('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button>`
           : '';
+        const resultStyleMap = {
+          'Done':        'background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e',
+          'Almost Done': 'background:rgba(59,130,246,.15);color:#3b82f6;border-color:#3b82f6',
+          'Pending':     'background:rgba(245,158,11,.15);color:#f59e0b;border-color:#f59e0b',
+          'Not Started': 'background:rgba(148,163,184,.12);color:var(--muted)'
+        };
+        const resultVal = r.result || '';
+        const resultStyle = resultStyleMap[resultVal] || '';
+        const RESULT_OPTS = ['', 'Done', 'Almost Done', 'Not Started', 'Pending'];
+        const resultOptsHtml = RESULT_OPTS.map(v => `<option value="${escapeAttr(v)}" ${v===resultVal?'selected':''}>${v || '—'}</option>`).join('');
         return `<tr style="${rowBg}">
           <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
           <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
           <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
           <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
-          <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(r.result||'')}" placeholder="Result…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','result',this.value)" style="${inputCss}"></td>
-          <td style="padding:4px;width:120px"><input type="text" value="${escapeAttr(r.rate||'')}" placeholder="Rate…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','rate',this.value)" style="${inputCss}"></td>
+          <td style="padding:4px;width:200px"><input type="text" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','notes',this.value)" style="${inputCss}"></td>
+          <td style="padding:4px;width:140px"><select ${editable?'':'disabled'} onchange="saveWeeklyConstField('${r.id}','result',this.value);renderWeeklyConstList()" style="${inputCss};font-weight:600;${resultStyle}">${resultOptsHtml}</select></td>
           <td style="padding:4px;width:28px;text-align:center">${pushBtn}</td>
           <td style="padding:4px;width:28px;text-align:center">${delBtn}</td>
         </tr>`;
@@ -22837,8 +22847,8 @@ function _renderWeeklyConstSection(sec, rows, editable){
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:160px">📝 Update</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:130px">📊 Result</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100px">⭐ Rate</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:200px">🗒️ Notes</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:140px">📊 Result</th>
             <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
             <th style="width:28px"></th>
           </tr></thead>
@@ -22859,7 +22869,7 @@ async function addWeeklyConstRow(section){
     await db.collection('weeklyConstructionList').add({
       weekStart: _weeklyConstAnchor || _weekStartSaturday(),
       section: sec,
-      text:'', targetDate:'', update:'', result:'', rate:'',
+      text:'', targetDate:'', update:'', notes:'', result:'',
       createdAt: new Date(),
       createdBy: currentUser?.name || currentUser?.email || ''
     });
@@ -22931,8 +22941,9 @@ async function pushWeeklyConstRowNextWeek(id){
       section: source.section || 'construction',
       text,
       targetDate: nextTarget,
+      update: '',
+      notes: '',
       result: '',
-      rate: '',
       carriedOver: true,
       carriedFromWeek: curStart,
       carriedFromId: id,
