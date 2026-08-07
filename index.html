@@ -4211,6 +4211,221 @@ function _render24HourNoticeWindow({addr, tenantName, inspDate, inspTime, inspTy
   win.document.close();
 }
 
+// VAWA Notice of Occupancy Rights (HUD-5380) — a 5-page federal
+// notice that must be given to tenants at admission, upon receipt
+// of an eviction/termination notice, and prior to termination.
+// Content is the HUD model text with Pilot's contact info filled
+// in for the "insert covered housing provider" placeholders.
+function generateVawaNoticePdf(propertyId){
+  const p = properties.find(x => x.id === propertyId);
+  if(!p){ toast('Property not found'); return; }
+  const tenantName = ((p.tenantName2 || p.tenant || '').trim()) || '';
+  const fullAddr = (p.addr || '').trim() || '';
+  const today = new Date();
+  const MNAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateStr = `${MNAMES_FULL[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ toast('Please allow popups so the notice can open'); return; }
+  const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  const provider = `Pilot Property Investment LLC — Quentin Ousley, 815 Superior Ave, Suite #1825, Cleveland OH 44114 — (818) 941-4770`;
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<title>VAWA Notice HUD-5380${fullAddr?' — '+esc(fullAddr):''}</title>
+<style>
+  @page { size: Letter; margin: 0.5in 0.75in; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 10.5pt; line-height: 1.32; color:#000; margin:0; padding:0; }
+  .page-header { display:flex; justify-content:space-between; font-size:9.5pt; margin-bottom:14px; padding-bottom:6px; border-bottom:1px solid #999 }
+  .page-header .l { max-width:52% }
+  .page-header .r { text-align:right }
+  .page-title { text-align:center; font-weight:bold; text-decoration:underline; font-size:11pt; margin:14px 0 12px }
+  h2 { font-size:10.5pt; font-weight:bold; margin:14px 0 4px }
+  p { margin:0 0 8px }
+  .provider-box { border:1px solid #000; padding:6px 10px; margin:8px 0 10px; background:#f7f7f0; font-size:10pt }
+  ul { margin:4px 0 10px 22px; padding:0 }
+  ul li { margin-bottom:2px }
+  table.vawa { width:100%; border-collapse:collapse; font-size:9.5pt; margin:8px 0 }
+  table.vawa th, table.vawa td { border:1px solid #000; padding:4px 6px; vertical-align:top; text-align:left }
+  table.vawa th { background:#eeeeee; font-weight:bold; text-align:center }
+  .footnote { font-size:8.5pt; color:#333; border-top:1px solid #999; margin-top:12px; padding-top:6px }
+  .page-footer { display:flex; justify-content:space-between; font-size:9pt; margin-top:14px; padding-top:6px; border-top:1px solid #999 }
+  .pagebreak { page-break-before:always }
+  @media print { .no-print { display:none } }
+  .no-print { position: fixed; top: 12px; right: 12px; z-index:99 }
+  .no-print button { font: 500 13px/1.2 -apple-system,sans-serif; padding:8px 14px; background:#c9f563; color:#0d0d10; border:0; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.2) }
+  .to-line { border:1px dashed #666; padding:6px 10px; margin-bottom:14px; background:#fffbe8; font-size:10pt }
+</style>
+</head>
+<body>
+  <div class="no-print"><button onclick="window.print()">🖨 Save as PDF</button></div>
+
+  <div class="page-header">
+    <div class="l"><strong>NOTICE OF OCCUPANCY RIGHTS UNDER THE VIOLENCE AGAINST WOMEN ACT</strong><br>HUD-5380: Housing Rights for Victims</div>
+    <div class="r">U.S. Department of Housing and Urban Development<br>OMB Approval No. 2577-0286<br>Expires 1/31/2028</div>
+  </div>
+
+  ${(tenantName || fullAddr) ? `<div class="to-line"><strong>Delivered to:</strong> ${esc(tenantName || '(tenant)')}${fullAddr?' — '+esc(fullAddr):''} &nbsp; <span style="float:right"><strong>Date:</strong> ${esc(dateStr)}</span></div>` : ''}
+
+  <div class="page-title">Protections for Victims of Domestic Violence, Dating Violence, Sexual Assault or Stalking</div>
+
+  <p><strong>When should I receive this form?</strong> A covered housing provider must provide a copy of the Notice of Occupancy Rights Under The Violence Against Women Act (Form HUD-5380) and the Certification of Domestic Violence, Dating Violence, Sexual Assault, or Stalking (Form HUD-5382) when you are admitted as a tenant, when you receive an eviction or termination notice and prior to termination of tenancy, or when you are denied as an applicant. A covered housing provider may provide these forms at additional times.</p>
+
+  <p><strong>What is the Violence Against Women Act ("VAWA")?</strong> This notice describes protections that may apply to you as an applicant or a tenant under a housing program covered by a federal law called the Violence Against Women Act ("VAWA"). VAWA provides housing protections for victims of domestic violence, dating violence, sexual assault or stalking. VAWA protections must be in leases and other program documents, as applicable. VAWA protections may be raised at any time. You do not need to know the type or name of the program you are participating in or applying to in order to seek VAWA protections.</p>
+
+  <p><strong>What if I require this information in a language other than English?</strong> To read this information in Spanish or another language, please contact the covered housing provider listed below. You can read translated VAWA forms at <em>https://www.hud.gov/program_offices/administration/hudclips/forms/hud5a#4</em>. If you speak or read in a language other than English, your covered housing provider must give you language assistance regarding your VAWA protections (for example, oral interpretation and/or written translation).</p>
+  <div class="provider-box"><strong>Covered housing provider:</strong> ${esc(provider)}</div>
+
+  <p><strong>What do the words in this notice mean?</strong></p>
+  <ul>
+    <li><em>VAWA violence/abuse</em> means one or more incidents of domestic violence, dating violence, sexual assault, or stalking.</li>
+    <li><em>Victim</em> means any victim of VAWA violence/abuse.</li>
+    <li><em>Affiliated person</em> means the tenant's spouse, parent, sibling, or child; or any individual, tenant, or lawful occupant living in the tenant's household; or anyone for whom the tenant acts as parent/guardian.</li>
+    <li><em>Covered housing program</em> includes the following HUD programs:
+      <ul>
+        <li>Public Housing</li>
+        <li>Tenant-based vouchers (TBV, a.k.a. Housing Choice Vouchers or HCV) and Project-based Vouchers (PBV) Section 8 programs</li>
+        <li>Section 8 Project-Based Rental Assistance (PBRA)</li>
+        <li>Section 8 Moderate Rehabilitation Single Room Occupancy</li>
+        <li>Section 202 Supportive Housing for the Elderly</li>
+        <li>Section 811 Supportive Housing for Persons with Disabilities</li>
+        <li>Section 221(d)(3)/(d)(5) Multifamily Rental Housing</li>
+        <li>Section 236 Multifamily Rental Housing</li>
+        <li>Housing Opportunities for Persons With AIDS (HOPWA) program</li>
+        <li>HOME Investment Partnerships (HOME) program</li>
+        <li>The Housing Trust Fund</li>
+        <li>Emergency Solutions Grants (ESG) program</li>
+        <li>Continuum of Care program</li>
+        <li>Rural Housing Stability Assistance program</li>
+      </ul>
+    </li>
+    <li><em>Covered housing provider</em> means the individual or entity under a covered housing program that is responsible for providing or overseeing the VAWA protection in a specific situation. The covered housing provider may be a public housing agency, project sponsor, housing owner, mortgagor, housing manager, State or local government, public agency, or a nonprofit or for-profit organization as the lessor.</li>
+  </ul>
+
+  <div class="page-footer"><div>Page 1 of 5</div><div>Form HUD-5380</div></div>
+
+  <div class="pagebreak"></div>
+  <div class="page-header">
+    <div class="l"><strong>NOTICE OF OCCUPANCY RIGHTS UNDER THE VIOLENCE AGAINST WOMEN ACT</strong><br>HUD-5380: Rights for Survivors</div>
+    <div class="r">U.S. Department of Housing and Urban Development<br>OMB Approval No. 2577-0286<br>Expires 1/31/2028</div>
+  </div>
+
+  <p><strong>What if I am an applicant under a program covered by VAWA?</strong> You can't be denied housing, housing assistance, or homeless assistance covered by VAWA just because you (or a household member) are or were a victim or just because of problems you (or a household member) had as a direct result of being or having been a victim. For example, if you have a poor rental or credit history or a criminal record, and that history or record is the direct result of you being a victim of VAWA abuse/violence, that history or record cannot be used as a reason to deny you housing or homeless assistance covered by VAWA.</p>
+
+  <p><strong>What if I am a tenant under a program covered by VAWA?</strong> You cannot lose housing, housing assistance, or homeless assistance covered by VAWA or be evicted just because you (or a household member) are or were a victim of VAWA violence/abuse. You also cannot lose housing, housing assistance, or homeless assistance covered by VAWA or be evicted just because of problems that you (or a household member) have as a direct result of being or having been a victim. For example, if you are a victim of VAWA abuse/violence that directly results in repeated noise complaints and damage to the property, neither the noise complaints nor property damage can be used as a reason for evicting you from housing covered by VAWA. You also cannot be evicted or removed from housing, housing assistance, or homeless assistance covered by VAWA because of someone else's criminal actions that are directly related to VAWA abuse/violence against you, a household member, or another affiliated person.</p>
+
+  <p><strong>How can tenants request an emergency transfer?</strong> Victims of VAWA violence/abuse have the right to request an emergency transfer from their current unit to another unit for safety reasons related to the VAWA violence/abuse. An emergency transfer cannot be guaranteed, but you can request an emergency transfer when:</p>
+  <ol style="margin:2px 0 8px 26px">
+    <li>You (or a household member) are a victim of VAWA violence/abuse;</li>
+    <li>You expressly request the emergency transfer; <strong>AND</strong></li>
+    <li><strong>EITHER</strong>
+      <ol type="a">
+        <li>you reasonably believe that there is a threat of imminent harm from further violence, including trauma, if you (or a household member) stay in the same dwelling unit; <strong>OR</strong></li>
+        <li>if you (or a household member) are a victim of sexual assault, either you reasonably believe that there is a threat of imminent harm from further violence, including trauma, if you (or a household member) were to stay in the unit, or the sexual assault occurred on the premises and you request an emergency transfer within 90 days (including holidays and weekend days) of when that assault occurred.</li>
+      </ol>
+    </li>
+  </ol>
+
+  <p>You can request an emergency transfer even if you are not lease compliant, for example if you owe rent. If you request an emergency transfer, your request, the information you provided to make the request, and your new unit's location must be kept strictly confidential by the covered housing provider. The covered housing provider is required to maintain a VAWA emergency transfer plan and make it available to you upon request. To request an emergency transfer or to read the covered housing provider's VAWA emergency transfer plan, contact the covered housing provider listed above. The VAWA emergency transfer plan includes information about what the covered housing provider does to make sure your address and other relevant information are not disclosed to your perpetrator.</p>
+
+  <p><strong>Can the perpetrator be evicted or removed from my lease?</strong> Depending on your specific situation, your covered housing provider may be able to divide the lease to evict just the perpetrator. This is called "lease bifurcation."</p>
+
+  <p><strong>What happens if the lease bifurcation ends up removing the perpetrator who was the only tenant who qualified for the housing or assistance?</strong> In this situation, the covered housing provider must provide you and other remaining household members an opportunity to establish eligibility or to find other housing. If you cannot or don't want to establish eligibility, then the covered housing provider must give you a reasonable time to move or establish eligibility for another covered housing program. This amount of time varies, depending on the covered housing program involved. The table below shows the reasonable time provided under each covered housing programs with HUD. Timeframes for covered housing programs operated by other agencies are determined by those agencies.</p>
+
+  <div class="page-footer"><div>Page 2 of 5</div><div>Form HUD-5380</div></div>
+
+  <div class="pagebreak"></div>
+  <div class="page-header">
+    <div class="l"><strong>NOTICE OF OCCUPANCY RIGHTS UNDER THE VIOLENCE AGAINST WOMEN ACT</strong><br>HUD-5380: Rights for Survivors</div>
+    <div class="r">U.S. Department of Housing and Urban Development<br>OMB Approval No. 2577-0286<br>Expires 1/31/2028</div>
+  </div>
+
+  <table class="vawa">
+    <thead><tr>
+      <th style="width:32%">Covered Housing Program(s)</th>
+      <th>Reasonable Time for Remaining Household Members to Continue to Receive Assistance, Establish Eligibility, or Move.</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>HOME and Housing Trust Fund, Continuum of Care Program (except for permanent supportive housing), ESG program, Section 221(d)(3) Program, Section 221(d)(5) Program, Rural Housing Stability Assistance Program</td>
+        <td>Because these programs do not provide housing or assistance based on just one person's status or characteristics, the remaining tenant(s), or family member(s) in the CoC program, can keep receiving assistance or living in the assisted housing as applicable.</td></tr>
+      <tr><td>Permanent supportive housing funded by the Continuum of Care Program</td>
+        <td>The remaining household member(s) can receive rental assistance until expiration of the lease that is in effect when the qualifying member is evicted.</td></tr>
+      <tr><td>Housing Choice Voucher, Project-based Voucher, and Public Housing programs (for Special Purpose Vouchers e.g. HUD-VASH, FUP, FYI, etc., see also program specific guidance)</td>
+        <td>If the person removed was the only tenant who established eligible citizenship/immigration status, the remaining household member(s) must be given 30 calendar days from the date of the lease bifurcation to establish program eligibility or find alternative housing.<br><br>For HUD-VASH, if the veteran is removed, the remaining family member(s) can keep receiving assistance or living in the assisted housing as applicable. If the veteran was the only tenant who established eligible citizenship/immigration status, the remaining household member(s) must be given 30 calendar days to establish program eligibility or find alternative housing.</td></tr>
+      <tr><td>Section 202/811 PRAC and SPRAC</td>
+        <td>The remaining household member(s) must be given 90 calendar days from the date of the lease bifurcation or until the lease expires, whichever is first, to establish program eligibility or find alternative housing.</td></tr>
+      <tr><td>Section 202/8</td>
+        <td>The remaining household member(s) must be given 90 calendar days from the date of the lease bifurcation or when the lease expires, whichever is first, to establish program eligibility or find alternative housing.<br><br>If the person removed was the only tenant who established eligible citizenship/immigration status, the remaining household member(s) must be given 30 calendar days from the date of the lease bifurcation to establish program eligibility or find alternative housing.</td></tr>
+      <tr><td>Section 236 (including RAP); Project-based Section 8 and Mod Rehab/SRO</td>
+        <td>The remaining household member(s) must be given 30 calendar days from the date of the lease bifurcation to establish program eligibility or find alternative housing.</td></tr>
+      <tr><td>HOPWA</td>
+        <td>The remaining household member(s) must be given no less than 90 calendar days, and not more than one year, from the date of the lease bifurcation to establish program eligibility or find alternative housing. The date is set by the HOPWA Grantee or Project Sponsor.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer"><div>Page 3 of 5</div><div>Form HUD-5380</div></div>
+
+  <div class="pagebreak"></div>
+  <div class="page-header">
+    <div class="l"><strong>NOTICE OF OCCUPANCY RIGHTS UNDER THE VIOLENCE AGAINST WOMEN ACT</strong><br>HUD-5380: Rights for Survivors</div>
+    <div class="r">U.S. Department of Housing and Urban Development<br>OMB Approval No. 2577-0286<br>Expires 1/31/2028</div>
+  </div>
+
+  <p><strong>Are there any reasons that I can be evicted or lose assistance?</strong> VAWA does not prevent you from being evicted or losing assistance for a lease violation, program violation, or violation of other requirements that are not due to the VAWA violence/abuse committed against you or an affiliated person. However, a covered housing provider cannot be stricter with you than with other tenants, just because you or an affiliated person experienced VAWA abuse/violence. VAWA also will not prevent eviction, termination, or removal if other tenants or housing staff are shown to be in immediate, physical danger that could lead to serious bodily harm or death if you are not evicted or removed from assistance. <strong>But only if no other action can be taken to reduce or eliminate the threat</strong> should a covered housing provider evict you or end your assistance, if the VAWA abuse/violence happens to you or an affiliated person. A covered housing provider must provide a copy of the Notice of Occupancy Rights Under The Violence Against Women Act (Form HUD-5380) and the Certification of Domestic Violence, Dating Violence, Sexual Assault, or Stalking (Form HUD-5382) when you receive an eviction or termination notice and prior to termination of tenancy.</p>
+
+  <p><strong>What do I need to document that I am a victim of VAWA abuse/violence?</strong> If you ask for VAWA protection, the covered housing provider may request documentation showing that you (or a household member) are a victim. BUT the covered housing provider must make this request in writing and must give you at least 14 business days (weekends and holidays do not count) to respond, and you are free to choose any <u>one</u> of the following:</p>
+  <ol style="margin:2px 0 8px 26px">
+    <li><u>A self-certification form (for example, Form HUD-5382)</u>, which the covered housing provider must give you along with this notice. Either you can fill out the form or someone else can complete it for you;</li>
+    <li><u>A statement from a victim/survivor service provider, attorney, mental health professional or medical professional</u> who has helped you address incidents of VAWA violence/abuse. The professional must state "under penalty of perjury" that he/she/they believes that the incidents of VAWA violence/abuse are real and covered by VAWA. Both you and the professional must sign the statement;</li>
+    <li><u>A police, administrative, or court record</u> (such as a protective order) that shows you (or a household member) were a victim of VAWA violence/abuse; <strong>OR</strong></li>
+    <li><u>If allowed by your covered housing provider, any other statement or evidence provided by you.</u></li>
+  </ol>
+  <p>It is your choice which documentation to provide and the covered housing provider must accept any one of the above as documentation. The covered housing provider is prohibited from seeking additional documentation of victim status or requiring more than one of these types of documentation, unless the covered housing provider receives conflicting information about the VAWA violence/abuse.</p>
+  <p>If you do not provide one of these types of documentation by the deadline, the covered housing provider does not have to provide the VAWA protections you requested. If the documentation received by the covered housing provider contains conflicting information about the VAWA violence/abuse, the covered housing provider may require you to provide additional documentation from the list above, but the covered housing provider must give you another 30 calendar days to do so.</p>
+
+  <p><strong>Will my information be kept confidential?</strong> If you share information with a covered housing provider about why you need VAWA protections, the covered housing provider must keep the information you share strictly confidential. This information should be securely and separately kept from your other tenant files. No one who works for your covered housing provider will have access to this information, unless there is a reason that specifically calls for them to access this information, your covered housing provider explicitly authorizes their access for that reason, and that authorization is consistent with applicable law.</p>
+  <p>Your information <u>will not be disclosed</u> to anyone else or put in a database shared with anyone else, except in the following situations:</p>
+  <ol style="margin:2px 0 8px 26px">
+    <li>If you give the covered housing provider written permission to share the information for a limited time;</li>
+    <li>If the covered housing provider needs to use that information in an eviction proceeding or hearing; or</li>
+    <li>If other applicable law requires the covered housing provider to share the information.</li>
+  </ol>
+
+  <div class="page-footer"><div>Page 4 of 5</div><div>Form HUD-5380</div></div>
+
+  <div class="pagebreak"></div>
+  <div class="page-header">
+    <div class="l"><strong>NOTICE OF OCCUPANCY RIGHTS UNDER THE VIOLENCE AGAINST WOMEN ACT</strong><br>HUD-5380: Rights for Survivors</div>
+    <div class="r">U.S. Department of Housing and Urban Development<br>OMB Approval No. 2577-0286<br>Expires 1/31/2028</div>
+  </div>
+
+  <p><strong>How do other laws apply?</strong> VAWA does not limit the covered housing provider's duty to honor court orders about access to or control of the property, or civil protection orders issued to protect a victim of VAWA abuse/violence. Additionally, VAWA does not limit the covered housing provider's duty to comply with a court order with respect to the distribution or possession of property among household members during a family break up. The covered housing provider must follow all applicable fair housing and civil rights requirements.</p>
+
+  <p><strong>Can I request a reasonable accommodation?</strong> If you have a disability, your covered housing provider must provide reasonable accommodations to rules, policies, practices, or services that may be necessary to allow you to equally benefit from VAWA protections (for example, giving you more time to submit documents or assistance with filling out forms). You may request a reasonable accommodation at any time, even for the first time during an eviction. If a provider is denying a specific reasonable accommodation because it is not reasonable, your covered housing provider must first engage in the interactive process with you to identify possible alternative accommodations. To request a reasonable accommodation, please contact the covered housing provider listed above. Your covered housing provider must also ensure effective communication with individuals with disabilities.</p>
+
+  <p><strong>Have your protections under VAWA been denied?</strong> If you believe that the covered housing provider has violated these rights, you may seek help by contacting your local HUD FHEO field office. You can also find additional information on filing VAWA complaints at <em>https://www.hud.gov/VAWA</em> and <em>https://www.hud.gov/program_offices/fair_housing_equal_opp/VAWA</em>. To file a VAWA complaint, visit <em>https://www.hud.gov/fairhousing/fileacomplaint</em>.</p>
+
+  <p><strong>Need further help?</strong></p>
+  <ul>
+    <li>For additional information on VAWA and to find help in your area, visit <em>https://www.hud.gov/vawa</em>.</li>
+    <li>To talk with a housing advocate, contact your local legal aid organization or dial 2-1-1 for referrals.</li>
+  </ul>
+
+  <p class="footnote"><strong>Public reporting burden</strong> for this collection of information is estimated to range from 45 to 90 minutes per each covered housing provider's response, depending on the program. This includes time to print and distribute the form. This notice is required for covered housing programs under section 41411 of VAWA and 24 CFR 5.2003. Covered housing providers must give this notice to applicants and tenants to inform them of the VAWA protections as specified in section 41411(d)(2). This is a model notice, and no information is being collected.</p>
+
+  <div class="page-footer"><div>Page 5 of 5</div><div>Form HUD-5380</div></div>
+
+  <script>
+    window.addEventListener('load', () => setTimeout(() => window.print(), 350));
+  <\/script>
+</body>
+</html>`);
+  win.document.close();
+}
+
 function generateNoticePdf(propertyId, days){
   const p = properties.find(x => x.id === propertyId);
   if(!p){ toast('Property not found'); return; }
@@ -7346,7 +7561,8 @@ function renderPropertiesList(){
       ${editable?`<td style="text-align:center;white-space:nowrap">
         <button title="Generate 30-Day Notice PDF for ${escapeAttr(addr)}" onclick="generateThirtyDayNoticePdf('${p.id}')" style="background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid #3b82f6;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">+30d</button>
         <button title="Generate 3-Day Notice PDF for ${escapeAttr(addr)}" onclick="generateThreeDayNoticePdf('${p.id}')" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">+3d</button>
-        <button title="Generate 24-Hour Entry Notice PDF for ${escapeAttr(addr)} (date/time blank — fill in at the door)" onclick="generate24HourNoticeFromProperty('${p.id}')" style="background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid #8b5cf6;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer">+24h</button>
+        <button title="Generate 24-Hour Entry Notice PDF for ${escapeAttr(addr)} (date/time blank — fill in at the door)" onclick="generate24HourNoticeFromProperty('${p.id}')" style="background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid #8b5cf6;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;margin-right:3px">+24h</button>
+        <button title="Generate VAWA Notice (HUD-5380) — 5-page federal notice of occupancy rights for victims of domestic violence, dating violence, sexual assault or stalking" onclick="generateVawaNoticePdf('${p.id}')" style="background:rgba(236,72,153,.15);color:#ec4899;border:1px solid #ec4899;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer">+VAWA</button>
       </td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" onclick="openEdit('${p.id}')">Edit</button>
@@ -12732,7 +12948,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-06';
+const APP_VERSION='2026-08-07-07';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
