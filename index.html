@@ -12722,7 +12722,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-02';
+const APP_VERSION='2026-08-07-03';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21326,9 +21326,12 @@ async function renderInspectionsContent(users){
   if(!el) return;
 
   const activeData = inspectionsData.filter(d => !d.archived).sort((a,b) => {
-    if(!a.dueDate) return 1;
-    if(!b.dueDate) return -1;
-    return a.dueDate.localeCompare(b.dueDate);
+    // Sort by scheduled inspection date (earliest first).
+    // Rows without an inspection date sink to the bottom.
+    if(!a.inspectionDate && !b.inspectionDate) return 0;
+    if(!a.inspectionDate) return 1;
+    if(!b.inspectionDate) return -1;
+    return a.inspectionDate.localeCompare(b.inspectionDate);
   });
   const historyData = inspectionsData.filter(d => d.archived).sort((a,b) => {
     if(!a.inspectionDate) return 1;
