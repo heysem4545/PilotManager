@@ -4215,6 +4215,10 @@ function generateNoticePdf(propertyId, days){
   const dayNum = today.getDate();
   const monthName = MNAMES_FULL[today.getMonth()];
   const yearNum = today.getFullYear();
+  // Vacate-by date used in the CARES Act paragraph (30-day notice only).
+  const vacate = new Date(today);
+  vacate.setDate(vacate.getDate() + days);
+  const vacateStr = `${MNAMES_FULL[vacate.getMonth()]} ${vacate.getDate()}, ${vacate.getFullYear()}`;
 
   const win = window.open('', '_blank', 'width=850,height=1100');
   if(!win){ toast('Please allow popups so the notice can open'); return; }
@@ -4269,6 +4273,11 @@ function generateNoticePdf(propertyId, days){
 
   <p class="indent">Your compliance with this notice within [${filled(String(days))}] days after its service will prevent any
   further eviction action against you.</p>
+
+  ${days === 30 ? `
+  <p style="font-weight:bold;text-decoration:underline;margin-top:20px;margin-bottom:8px">CARES Act, Section 4024(b)</p>
+  <p class="indent">Pursuant to Section 4024(b) of the Coronavirus Aid, Relief and Economic Security Act (CARES), this letter serves as a formal notice to vacate the premises due to your failure to fulfill rent obligations and other financial commitments as stipulated in the Lease Agreement. You are hereby requested to vacate the premises within 30 days from the date of this notice, specifically on ${filled(vacateStr)}.</p>
+  ` : ''}
 
   <p class="caps">You are being asked to leave the premises. If you do not leave, an eviction action may be initiated against you. If you are in doubt regarding your legal rights and obligations as a tenant, it is recommended that you seek legal assistance.</p>
 
@@ -12713,7 +12722,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-01';
+const APP_VERSION='2026-08-07-02';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
