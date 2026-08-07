@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-25';
+const APP_VERSION='2026-08-06-26';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22789,6 +22789,39 @@ async function renderWeeklyConstList(){
   `;
 }
 
+// Compact status summary for a section header: counts only rows
+// that actually have task text (empty seed rows don't inflate the
+// total). Only non-zero buckets are shown as color-coded pills.
+function _weeklyConstSummaryHtml(rows){
+  const filled = rows.filter(r => (r.text || '').trim());
+  const total = filled.length;
+  if(total === 0){
+    return `<div style="font-size:11px;color:var(--muted)">no tasks yet</div>`;
+  }
+  const buckets = {
+    'Done':        {c:0, style:'background:rgba(34,197,94,.15);color:#22c55e'},
+    'Almost Done': {c:0, style:'background:rgba(59,130,246,.15);color:#3b82f6'},
+    'Pending':     {c:0, style:'background:rgba(245,158,11,.15);color:#f59e0b'},
+    'Not Started': {c:0, style:'background:rgba(148,163,184,.15);color:var(--muted)'},
+    'Blank':       {c:0, style:'background:rgba(148,163,184,.12);color:var(--muted)'}
+  };
+  filled.forEach(r => {
+    const k = (r.result || '').trim();
+    if(k && buckets[k]) buckets[k].c++;
+    else buckets['Blank'].c++;
+  });
+  const pills = Object.entries(buckets)
+    .filter(([_,v]) => v.c > 0)
+    .map(([label, v]) => {
+      const lbl = label === 'Blank' ? 'No status' : label;
+      return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;${v.style}">${v.c} ${lbl}</span>`;
+    }).join('');
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:var(--text);padding:2px 8px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2)">Total ${total}</span>
+    ${pills}
+  </div>`;
+}
+
 function _renderWeeklyConstSection(sec, rows, editable){
   const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
 
@@ -22834,7 +22867,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
     <div style="margin-bottom:22px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;border-left:3px solid ${sec.accent};padding-left:10px">
         <div style="font-size:14px;font-weight:700;color:var(--text)">${sec.label}</div>
-        <div style="font-size:11px;color:var(--muted)">${rows.length} row${rows.length===1?'':'s'}</div>
+        ${_weeklyConstSummaryHtml(rows)}
         <div style="flex:1"></div>
         ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow('${sec.key}')">+ Add Row</button>` : ''}
         <button class="btn btn-ghost btn-sm" style="background:rgba(37,211,102,.15);color:#25d366;border-color:#25d366" onclick="shareWeeklyConstListWhatsApp('${sec.key}')" title="Copy or share this list via WhatsApp">📱 Share on WhatsApp</button>
