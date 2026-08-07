@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-26';
+const APP_VERSION='2026-08-06-27';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22789,6 +22789,39 @@ async function renderWeeklyConstList(){
   `;
 }
 
+// Target-date cell: MM/DD/YYYY text input paired with a 📅 icon
+// that opens the native picker (works across browsers/locales).
+// Mirrors the Inspection Tracker pattern.
+function _renderWclTargetDateCell(id, iso, editable){
+  const mdy = fmtMDY(iso || '') || '';
+  const uid = `wclDp_${id}`;
+  const dis = editable ? '' : 'disabled';
+  return `<div style="display:inline-flex;align-items:center;gap:2px;position:relative;width:100%">
+    <input type="text" value="${escapeAttr(mdy)}" placeholder="MM/DD/YYYY" ${dis}
+      style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--mono);outline:none;box-sizing:border-box;min-width:0"
+      onblur="saveWeeklyConstTargetDate('${id}',this)"
+      onkeydown="if(event.key==='Enter')this.blur()">
+    <button type="button" title="Open calendar" ${dis} onclick="_wclOpenPicker('${uid}')" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted);border-radius:5px;width:28px;height:28px;cursor:pointer;font-size:13px;padding:0;line-height:1;flex-shrink:0" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">📅</button>
+    <input type="date" id="${uid}" value="${escapeAttr(iso||'')}" ${dis}
+      style="position:absolute;right:0;bottom:0;width:28px;height:28px;opacity:0;pointer-events:none"
+      onchange="_wclDateFromPicker(this,'${id}')">
+  </div>`;
+}
+
+function _wclOpenPicker(uid){
+  const el = document.getElementById(uid);
+  if(!el) return;
+  try{ el.showPicker(); }
+  catch(_){ el.focus(); el.click(); }
+}
+
+function _wclDateFromPicker(picker, id){
+  const iso = picker.value || '';
+  const txt = picker.parentElement?.querySelector('input[type="text"]');
+  if(txt) txt.value = iso ? (fmtMDY(iso) || '') : '';
+  saveWeeklyConstField(id, 'targetDate', iso);
+}
+
 // Compact status summary for a section header: counts only rows
 // that actually have task text (empty seed rows don't inflate the
 // total). Only non-zero buckets are shown as color-coded pills.
@@ -22854,7 +22887,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
         return `<tr style="${rowBg}">
           <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
           <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
-          <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
+          <td style="padding:4px;width:170px">${_renderWclTargetDateCell(r.id, r.targetDate, editable)}</td>
           <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:200px"><input type="text" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','notes',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:140px"><select ${editable?'':'disabled'} onchange="saveWeeklyConstField('${r.id}','result',this.value);renderWeeklyConstList()" style="${inputCss};font-weight:600;${resultStyle}">${resultOptsHtml}</select></td>
@@ -22877,7 +22910,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
           <thead><tr>
             <th style="width:30px;padding:8px 4px"></th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:150px">🎯 Target Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:170px">🎯 Target Date</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:160px">📝 Update</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:200px">🗒️ Notes</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:140px">📊 Result</th>
