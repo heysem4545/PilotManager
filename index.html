@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-27';
+const APP_VERSION='2026-08-06-28';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22888,7 +22888,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
           <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
           <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
           <td style="padding:4px;width:170px">${_renderWclTargetDateCell(r.id, r.targetDate, editable)}</td>
-          <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
+          <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Mid update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:200px"><input type="text" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','notes',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:140px"><select ${editable?'':'disabled'} onchange="saveWeeklyConstField('${r.id}','result',this.value);renderWeeklyConstList()" style="${inputCss};font-weight:600;${resultStyle}">${resultOptsHtml}</select></td>
           <td style="padding:4px;width:28px;text-align:center">${pushBtn}</td>
@@ -22911,7 +22911,7 @@ function _renderWeeklyConstSection(sec, rows, editable){
             <th style="width:30px;padding:8px 4px"></th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📝 Task / To-Do</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:170px">🎯 Target Date</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:160px">📝 Update</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:160px">📝 Mid Update</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:200px">🗒️ Notes</th>
             <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:140px">📊 Result</th>
             <th style="width:28px" title="Push this task to next week (carries over as amber-highlighted)">→</th>
