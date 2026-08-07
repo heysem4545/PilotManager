@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-12';
+const APP_VERSION='2026-08-06-13';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22673,41 +22673,43 @@ function startConstProjectsListener(){
 // Users add tasks Monday, review the following week, mark result
 // and rate on how it went. WhatsApp button generates a shareable
 // formatted list.
-let _weeklyConstAnchor = null; // Monday-of-visible-week ISO date
+let _weeklyConstAnchor = null; // Saturday-of-visible-week ISO date
 
-// Return the ISO date (YYYY-MM-DD) for the Monday of the week that
-// contains `d` (defaults to today). Uses local time so the boundary
-// matches what the user sees on the calendar.
-function _weekStartMonday(d){
+// Return the ISO date (YYYY-MM-DD) for the Saturday of the week
+// that contains `d` (defaults to today). Week is Saturday-based
+// per user request — a construction week runs Sat → Fri.
+function _weekStartSaturday(d){
   const dt = d ? new Date(d) : new Date();
   dt.setHours(0,0,0,0);
-  const day = dt.getDay(); // 0 = Sun, 1 = Mon, …
-  const diff = day === 0 ? -6 : 1 - day; // shift back to Monday
-  dt.setDate(dt.getDate() + diff);
+  const day = dt.getDay(); // 0 = Sun, 6 = Sat
+  // Days back to the previous (or same-day) Saturday:
+  //   Sat(6) → 0, Sun(0) → 1, Mon(1) → 2, …, Fri(5) → 6
+  const diff = day === 6 ? 0 : day + 1;
+  dt.setDate(dt.getDate() - diff);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 
-function _shiftWeek(mondayIso, weeks){
-  const d = new Date(mondayIso + 'T00:00:00');
+function _shiftWeek(satIso, weeks){
+  const d = new Date(satIso + 'T00:00:00');
   d.setDate(d.getDate() + weeks*7);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function _weekLabel(mondayIso){
-  const start = new Date(mondayIso + 'T00:00:00');
-  const end = new Date(start); end.setDate(end.getDate()+6);
+function _weekLabel(satIso){
+  const start = new Date(satIso + 'T00:00:00');
+  const end = new Date(start); end.setDate(end.getDate()+6); // following Friday
   const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const sm = MNAMES[start.getMonth()], em = MNAMES[end.getMonth()];
   if(start.getMonth() === end.getMonth()){
-    return `${sm} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`;
+    return `Sat ${sm} ${start.getDate()} – Fri ${end.getDate()}, ${end.getFullYear()}`;
   }
-  return `${sm} ${start.getDate()} – ${em} ${end.getDate()}, ${end.getFullYear()}`;
+  return `Sat ${sm} ${start.getDate()} – Fri ${em} ${end.getDate()}, ${end.getFullYear()}`;
 }
 
 async function renderWeeklyConstList(){
   const el = document.getElementById('weeklyConstListRoot');
   if(!el) return;
-  if(!_weeklyConstAnchor) _weeklyConstAnchor = _weekStartMonday();
+  if(!_weeklyConstAnchor) _weeklyConstAnchor = _weekStartSaturday();
   const weekStart = _weeklyConstAnchor;
   const editable = canEdit();
 
@@ -22722,27 +22724,19 @@ async function renderWeeklyConstList(){
       .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
   }catch(e){ console.warn('renderWeeklyConstList', e?.message); }
 
-  const rateOpts = (cur) => {
-    const opts = ['','1','2','3','4','5'].map(v => `<option value="${v}" ${String(cur||'')===v?'selected':''}>${v?('★'.repeat(Number(v))):'—'}</option>`).join('');
-    return opts;
-  };
-  const resultOpts = (cur) => {
-    const list = ['','Done','Pending','Missed','Rescheduled'];
-    return list.map(v => `<option value="${v}" ${(cur||'')===v?'selected':''}>${v||'—'}</option>`).join('');
-  };
   const inputCss = 'width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none;box-sizing:border-box';
 
   const rowsHtml = rows.length === 0
     ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">
         <div style="font-weight:600;color:var(--text);margin-bottom:4px">No tasks yet for this week</div>
-        Click <strong>+ Add Task</strong> to start planning.
+        Click <strong>+ Add Row</strong> to start planning.
       </td></tr>`
     : rows.map((r, i) => `<tr>
         <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
         <td style="padding:4px"><input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}"></td>
         <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(fmtMDY(r.targetDate)||'')}" placeholder="MM/DD/YYYY" ${editable?'':'disabled'} onblur="saveWeeklyConstTargetDate('${r.id}',this)" style="${inputCss};font-family:var(--mono)"></td>
-        <td style="padding:4px;width:130px"><select onchange="saveWeeklyConstField('${r.id}','result',this.value)" ${editable?'':'disabled'} style="${inputCss};cursor:pointer">${resultOpts(r.result)}</select></td>
-        <td style="padding:4px;width:100px"><select onchange="saveWeeklyConstField('${r.id}','rate',this.value)" ${editable?'':'disabled'} style="${inputCss};cursor:pointer;color:#f59e0b">${rateOpts(r.rate)}</select></td>
+        <td style="padding:4px;width:150px"><input type="text" value="${escapeAttr(r.result||'')}" placeholder="Result…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','result',this.value)" style="${inputCss}"></td>
+        <td style="padding:4px;width:120px"><input type="text" value="${escapeAttr(r.rate||'')}" placeholder="Rate…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','rate',this.value)" style="${inputCss}"></td>
         <td style="padding:4px;width:28px;text-align:center">${editable ? `<button title="Delete row" onclick="deleteWeeklyConstRow('${r.id}')" style="background:none;border:1px solid var(--border2);color:var(--muted);border-radius:4px;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">×</button>` : ''}</td>
       </tr>`).join('');
 
@@ -22751,9 +22745,9 @@ async function renderWeeklyConstList(){
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
       <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}</div>
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
-      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartMonday();renderWeeklyConstList()">This Week</button>
+      <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartSaturday();renderWeeklyConstList()">This Week</button>
       <div style="flex:1"></div>
-      ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow()">+ Add Task</button>` : ''}
+      ${editable ? `<button class="btn btn-primary btn-sm" onclick="addWeeklyConstRow()">+ Add Row</button>` : ''}
       <button class="btn btn-ghost btn-sm" style="background:rgba(37,211,102,.15);color:#25d366;border-color:#25d366" onclick="shareWeeklyConstListWhatsApp()" title="Copy or share the list via WhatsApp">📱 Share on WhatsApp</button>
     </div>
     <div class="table-card">
@@ -22768,8 +22762,11 @@ async function renderWeeklyConstList(){
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table></div>
+      ${editable ? `<div style="padding:10px;text-align:center;border-top:1px dashed var(--border2)">
+        <button onclick="addWeeklyConstRow()" style="background:none;border:1px dashed var(--border2);color:var(--muted);border-radius:5px;padding:6px 16px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">+ Add another row</button>
+      </div>` : ''}
     </div>
-    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Monday, come back next week and fill in Result + Rate to grade how the week went.</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, come back the next Saturday and fill in Result + Rate to grade how the week went.</div>
   `;
 }
 
@@ -22777,7 +22774,7 @@ async function addWeeklyConstRow(){
   if(!canEdit()) return;
   try{
     await db.collection('weeklyConstructionList').add({
-      weekStart: _weeklyConstAnchor || _weekStartMonday(),
+      weekStart: _weeklyConstAnchor || _weekStartSaturday(),
       text:'', targetDate:'', result:'', rate:'',
       createdAt: new Date(),
       createdBy: currentUser?.name || currentUser?.email || ''
@@ -22813,7 +22810,7 @@ async function deleteWeeklyConstRow(id){
 }
 
 async function shareWeeklyConstListWhatsApp(){
-  const weekStart = _weeklyConstAnchor || _weekStartMonday();
+  const weekStart = _weeklyConstAnchor || _weekStartSaturday();
   let rows = [];
   try{
     const snap = await db.collection('weeklyConstructionList')
@@ -22827,20 +22824,23 @@ async function shareWeeklyConstListWhatsApp(){
 
   if(rows.length === 0){ toast('No tasks in this week to share.'); return; }
 
-  const icon = r => {
-    const res = (r.result||'').toLowerCase();
-    if(res === 'done') return '✅';
-    if(res === 'missed') return '❌';
-    if(res === 'rescheduled') return '🔁';
-    if(res === 'pending') return '⏳';
+  // Result / Rate are free-text now, so no fixed icons or star
+  // mapping — just include whatever the user typed. Detect a few
+  // common words in Result and prefix a matching emoji so the
+  // shared message still reads at a glance.
+  const iconFor = r => {
+    const res = (r.result || '').toLowerCase();
+    if(/\bdone\b|✅|complete|finish/.test(res)) return '✅';
+    if(/\bmiss/.test(res) || /❌/.test(res)) return '❌';
+    if(/reschedul|postpone|delay/.test(res)) return '🔁';
+    if(/pending|wip|in progress|working/.test(res)) return '⏳';
     return '•';
   };
-  const stars = n => n ? '⭐'.repeat(Number(n)) : '';
   const lines = rows.map((r,i) => {
-    const parts = [`${icon(r)} ${i+1}. ${r.text}`];
+    const parts = [`${iconFor(r)} ${i+1}. ${r.text}`];
     if(r.targetDate) parts.push(`🎯 ${fmtMDY(r.targetDate)}`);
-    if(r.result) parts.push(`${r.result}`);
-    if(r.rate) parts.push(stars(r.rate));
+    if(r.result) parts.push(r.result);
+    if(r.rate) parts.push(`⭐ ${r.rate}`);
     return parts.join(' — ');
   });
   const header = `📅 *Weekly Construction List — ${_weekLabel(weekStart)}*`;
