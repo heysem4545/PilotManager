@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-29';
+const APP_VERSION='2026-08-06-30';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22698,6 +22698,17 @@ function _shiftWeek(satIso, weeks){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// Human phrase for how much of the grace window is left on a
+// past week — used in the grace-window banner.
+function _weeksUntilLock(satIso, graceWeeks){
+  const cur = new Date(_weekStartSaturday() + 'T00:00:00');
+  const wk = new Date(satIso + 'T00:00:00');
+  const weeksBack = Math.round((cur - wk) / (7*24*60*60*1000));
+  const weeksLeft = graceWeeks - weeksBack + 1; // +1 because current week rolls it forward
+  if(weeksLeft <= 1) return 'in less than a week';
+  return `in ${weeksLeft} weeks`;
+}
+
 function _weekLabel(satIso){
   const start = new Date(satIso + 'T00:00:00');
   const end = new Date(start); end.setDate(end.getDate()+6); // following Friday
@@ -22727,10 +22738,15 @@ async function renderWeeklyConstList(){
   const weekStart = _weeklyConstAnchor;
   const editable = canEdit();
 
-  // Lock past weeks for non-admins so nobody can quietly upgrade
-  // last week's "Not Started" to "Done". Admins can still edit
-  // (with a visible warning banner) so they can fix mistakes.
-  const isPastWeek = weekStart < _weekStartSaturday();
+  // Lock OLD weeks (older than the grace window) for non-admins so
+  // nobody can quietly upgrade a distant "Not Started" to "Done".
+  // The current week + the 2 prior weeks stay editable so late
+  // Friday updates and typical follow-ups still work fine. Admins
+  // can always edit (with a visible warning banner).
+  const WEEKLY_LOCK_GRACE_WEEKS = 2; // 2 past weeks + current = 3 editable
+  const graceCutoff = _shiftWeek(_weekStartSaturday(), -WEEKLY_LOCK_GRACE_WEEKS);
+  const isPastWeek = weekStart < graceCutoff;
+  const inGrace = weekStart < _weekStartSaturday() && !isPastWeek;
   const admin = isAdmin();
   const effectiveEditable = editable && (!isPastWeek || admin);
 
@@ -22788,18 +22804,22 @@ async function renderWeeklyConstList(){
   let banner = '';
   if(isPastWeek && !admin){
     banner = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(148,163,184,.15);border:1px solid var(--border2);border-left:3px solid var(--muted);border-radius:6px;font-size:12px;color:var(--muted)">
-      🔒 <strong style="color:var(--text)">Past week — read only.</strong> Results are locked once the week ends so history stays accurate. Contact an admin if a genuine correction is needed.
+      🔒 <strong style="color:var(--text)">Locked — older than ${WEEKLY_LOCK_GRACE_WEEKS+1} weeks.</strong> The current week and the last ${WEEKLY_LOCK_GRACE_WEEKS} stay editable so you can wrap up late updates. Anything older is read-only to keep history honest — ask an admin for a correction.
     </div>`;
   } else if(isPastWeek && admin){
     banner = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-left:3px solid #f59e0b;border-radius:6px;font-size:12px;color:var(--text)">
-      ⚠️ <strong>Admin edit — past week.</strong> Changes here rewrite history. Every Result change is stamped with your name + date.
+      ⚠️ <strong>Admin edit — locked week.</strong> This week is past the ${WEEKLY_LOCK_GRACE_WEEKS+1}-week grace window. Changes rewrite history — every Result change is stamped with your name + date.
+    </div>`;
+  } else if(inGrace){
+    banner = `<div style="margin-bottom:14px;padding:8px 12px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-left:3px solid #3b82f6;border-radius:6px;font-size:11px;color:var(--text)">
+      📝 <strong>Grace window.</strong> This past week is still editable so you can wrap up late results. It'll lock in ${_weeksUntilLock(weekStart, WEEKLY_LOCK_GRACE_WEEKS)}.
     </div>`;
   }
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
-      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}${isPastWeek?' <span style="font-size:10px;padding:1px 6px;background:var(--surface2);color:var(--muted);border-radius:8px;font-weight:600;letter-spacing:.05em">PAST</span>':''}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}${isPastWeek?' <span style="font-size:10px;padding:1px 6px;background:var(--surface2);color:var(--muted);border-radius:8px;font-weight:600;letter-spacing:.05em">🔒 LOCKED</span>':(inGrace?' <span style="font-size:10px;padding:1px 6px;background:rgba(59,130,246,.15);color:#3b82f6;border-radius:8px;font-weight:600;letter-spacing:.05em">GRACE</span>':'')}</div>
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartSaturday();renderWeeklyConstList()">This Week</button>
     </div>
