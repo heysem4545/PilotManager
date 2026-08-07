@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-20';
+const APP_VERSION='2026-08-06-21';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -23058,7 +23058,7 @@ async function renderConstProjectsView(){
   await loadConstProjects();
   await loadConstructionData(); // load expenses for budget comparison
 
-  if(typeof window._cpTab==='undefined') window._cpTab='active';
+  if(typeof window._cpTab==='undefined') window._cpTab='weekly';
 
   const activeProjects = constProjectsData.filter(p=>!p.archived);
   const archivedProjects = constProjectsData.filter(p=>p.archived);
