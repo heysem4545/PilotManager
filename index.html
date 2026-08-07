@@ -2921,7 +2921,8 @@ function getMonthProp(p){
   const balance = Math.max(0, cmha - cmhaPaid) + Math.max(0, tenantPortion - tenantPaid);
   const monthNote = md.monthNote || '';
   const collActionNote = md.collActionNote || '';
-  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status, monthNote, collActionNote};
+  const collActionStatus = !!md.collActionStatus;
+  return {...p, cmha, tenantPortion, cmhaPaid, tenantPaid, collected, balance, status, monthNote, collActionNote, collActionStatus};
 }
 
 // ─────────────────────────────────────────────
@@ -3806,6 +3807,7 @@ function renderCollectionMonthlyView(){
       <td>${canEdit()
         ? `<span class="editable" onclick="inlineEditCollActionNote('${p.id}',this)" style="cursor:pointer;font-size:11px;color:${mp.collActionNote?'var(--text)':'var(--muted2)'};display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom" title="${escapeAttr(mp.collActionNote||'')}">${mp.collActionNote?escapeHtml(mp.collActionNote):'📝 click to add…'}</span>`
         : `<span style="font-size:11px;color:var(--muted)" title="${escapeAttr(mp.collActionNote||'')}">${mp.collActionNote?escapeHtml(mp.collActionNote):'—'}</span>`}</td>
+      <td style="text-align:center;padding:4px 2px"><input type="checkbox" ${mp.collActionStatus?'checked':''} ${canEdit()?'':'disabled'} style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer" onchange="toggleCollActionStatus('${p.id}',this.checked)" title="Mark this month's action as completed"></td>
     </tr>`;
   }).join('');
 
@@ -3820,7 +3822,7 @@ function renderCollectionMonthlyView(){
         <table>
           <thead><tr>
             <th style="text-align:center;width:16px;padding:4px 2px">Send Collection</th><th>Address</th><th>Status</th><th>CMHA Rent</th><th>Tenant Rent</th>
-            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th style="color:var(--muted)">Notes from Rent Tracking</th><th style="color:var(--accent)">📝 Action Notes</th>
+            <th>CMHA Paid</th><th>Tenant Paid</th><th>Collected</th><th>Balance (CMHA/Tenant)</th><th style="color:var(--muted)">Notes from Rent Tracking</th><th style="color:var(--accent)">📝 Action Notes</th><th style="text-align:center;color:var(--accent);width:36px;padding:4px 2px" title="Check when the action for this month is completed">✅ Action Status</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -10328,6 +10330,15 @@ function inlineEditNote(propId, cell){
   inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=cur;inp.blur();}};
 }
 
+// Per-month "action completed" flag — lives on monthlyData next to
+// the action note so both share the same per-property + per-month
+// scope. Optimistic UI: flip locally, save, re-render.
+async function toggleCollActionStatus(propId, checked){
+  if(!canEdit()) return;
+  await saveMonthField(propId, 'collActionStatus', !!checked);
+  if(typeof renderCollectionMonthlyView === 'function') renderCollectionMonthlyView();
+}
+
 // Collection-side action note. Stored per-month on monthlyData in a
 // separate field (collActionNote) so it never overwrites what the
 // user types in Rent Tracking's Notes column.
@@ -12702,7 +12713,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-33';
+const APP_VERSION='2026-08-07-01';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
