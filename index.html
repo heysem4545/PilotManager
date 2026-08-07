@@ -12732,7 +12732,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-07-05';
+const APP_VERSION='2026-08-07-06';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -19756,8 +19756,9 @@ function renderMtgLogAttendees(){
 
 function renderMtgLogAgenda(){
   const container = document.getElementById('mtgLogAgenda');
-  // Filter out empty items
-  meetingAgendaDraft=meetingAgendaDraft.filter(a=>a.text||a.checked);
+  // Don't filter empty items here — a freshly-added blank row is
+  // valid while the user is typing. saveMeetingLog trims empties on
+  // save. Filtering here caused '+ Add' to visibly do nothing.
   let html = '';
   if(!meetingAgendaDraft.length){
     html='<div style="font-size:11px;color:var(--muted);padding:8px 0">No agenda items. Click "+ Add" to add.</div>';
