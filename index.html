@@ -12702,7 +12702,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-32';
+const APP_VERSION='2026-08-06-33';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -21399,15 +21399,6 @@ async function renderInspectionsContent(users){
         const name = (prop && (prop.tenantName2 || prop.tenant) || '').trim();
         return name ? escapeHtml(name) : '<span style="color:var(--muted2)">—</span>';
       })()}</td>
-      <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Note', editable)}</td>
-      <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
-      <td>${renderInspDateCell(r.id, 'dueDate', r.dueDate)}</td>
-      <td>${renderInspDateCell(r.id, 'inspectionDate', r.inspectionDate)}</td>
-      <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
-      <td style="text-align:center"><button title="Generate a 24-hour Entry Notification Letter pre-filled with address + tenant name + inspection date/time" onclick="generate24HourEntryNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
-      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
-      <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
-      <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
       <td style="text-align:center"><input type="checkbox" ${r.pilotInspection?'checked':''} title="Pilot Inspection" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer" onchange="updateInspectionField('${r.id}','pilotInspection',this.checked)"></td>
       <td style="text-align:center">${(() => {
         // Pilot List — a per-inspection to-do list. Renders as either
@@ -21422,6 +21413,15 @@ async function renderInspectionsContent(users){
         const color = pct === 100 ? '#4ade80' : done > 0 ? '#60a5fa' : 'var(--muted)';
         return `<button onclick="openPilotListModal('${r.id}')" title="${done}/${total} done — click to view / edit" style="background:${color}22;color:${color};border:1px solid ${color}66;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--mono)">${done}/${total}${pct===100?' ✓':''}</button>`;
       })()}</td>
+      <td>${renderInspPopupCell(r.id, r.additionalNote, 'additionalNote', 'Note', editable)}</td>
+      <td>${renderInspPopupCell(r.id, r.update1, 'update1', 'Update 1', editable)}</td>
+      <td>${renderInspDateCell(r.id, 'dueDate', r.dueDate)}</td>
+      <td>${renderInspDateCell(r.id, 'inspectionDate', r.inspectionDate)}</td>
+      <td><input type="time" value="${r.inspectionTime||''}" style="${is};width:95px" onchange="updateInspectionField('${r.id}','inspectionTime',this.value)"></td>
+      <td style="text-align:center"><button title="Generate a 24-hour Entry Notification Letter pre-filled with address + tenant name + inspection date/time" onclick="generate24HourEntryNoticePdf('${r.id}')" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ PDF</button></td>
+      <td><select style="${iss}" onchange="updateInspectionField('${r.id}','fixingBy',this.value)">${fixOpts}</select></td>
+      <td>${renderInspPopupCell(r.id, r.costNotes, 'costNotes', 'Cost Notes', editable)}</td>
+      <td><div style="display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:0 6px;width:80px"><span style="color:var(--muted);font-size:11px;font-family:var(--mono)">$</span><input type="number" value="${r.totalCost||''}" placeholder="0" style="background:none;border:none;font-size:11px;padding:3px 4px;color:var(--text);font-family:var(--mono);outline:none;width:100%" onblur="updateInspectionField('${r.id}','totalCost',parseFloat(this.value)||0)"></div></td>
       <td><select style="${iss}" class="${statusCls}" onchange="updateInspectionField('${r.id}','status',this.value).then(()=>renderInspectionsContent(null))">${statusOpts}</select></td>
       ${archiveCol}
     </tr>`;
@@ -21434,12 +21434,13 @@ async function renderInspectionsContent(users){
     <div class="table-card"><div class="tbl-wrap">
       <table class="call-log-tbl">
         <thead><tr>
-          <th>📋 Type</th><th>🏠 Address</th><th title="Auto-filled from Tenant & Lease based on the address">👥 Tenant Name</th><th>📎 Note</th><th>📝 Update</th>
+          <th>📋 Type</th><th>🏠 Address</th><th title="Auto-filled from Tenant & Lease based on the address">👥 Tenant Name</th>
+          <th title="Pilot Inspection">🛩 Pilot Inspection</th>
+          <th title="Pilot List">📃 Pilot List</th>
+          <th>📎 Note</th><th>📝 Update</th>
           <th>📅 Due Date</th><th>📅 Insp. Date</th><th>🕐 Time</th>
           <th title="Generate a 24-hour Entry Notification Letter pre-filled with tenant + address + inspection date/time">📄 24h Notice</th>
           <th>🔧 Fixing By</th><th>💬 Cost Notes</th><th>💰 Total Cost</th>
-          <th title="Pilot Inspection">🛩 Pilot Inspection</th>
-          <th title="Pilot List">📃 Pilot List</th>
           <th>📊 Status</th><th>${archiveHeader}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
