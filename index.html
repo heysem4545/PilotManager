@@ -7198,8 +7198,8 @@ function renderTable(){
       <td class="money" style="background:rgba(201,245,99,0.08);color:${(((p.deposit1Amount||0)+(p.deposit2Amount||0)+(p.deposit3Amount||0)+(p.deposit4Amount||0))>0)?'var(--accent)':'var(--muted2)'};font-weight:600" title="Total Deposit (from Deposit Tracking)">${(()=>{const t=(parseFloat(p.deposit1Amount)||0)+(parseFloat(p.deposit2Amount)||0)+(parseFloat(p.deposit3Amount)||0)+(parseFloat(p.deposit4Amount)||0);return t>0?fmt(t):'<span class="m-muted">—</span>';})()}</td>
       <td id="cell-cmha-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.18)'}">${cmhaRentCell}</td>
       <td id="cell-tenantPortion-${p.id}" class="money" style="${warnStyle||'background:rgba(245,158,11,0.18)'}">${tRentCell}</td>
-      <td id="cell-cmhaPaid-${p.id}" class="money" style="background:rgba(34,197,94,0.18)">${cmhaPaidCell}</td>
-      <td id="cell-tenantPaid-${p.id}" class="money" style="background:rgba(34,197,94,0.18)">${tPaidCell}</td>
+      <td id="cell-cmhaPaid-${p.id}" class="money" style="background:rgba(34,197,94,0.18);cursor:help" onmouseenter="showPaidHistTip(this,'${p.id}','cmhaPaid')" onmouseleave="hidePaidHistTip()">${cmhaPaidCell}</td>
+      <td id="cell-tenantPaid-${p.id}" class="money" style="background:rgba(34,197,94,0.18);cursor:help" onmouseenter="showPaidHistTip(this,'${p.id}','tenantPaid')" onmouseleave="hidePaidHistTip()">${tPaidCell}</td>
       <td class="money ${mp.collected>0?'m-pos':''}">${fmtD(mp.collected)}</td>
       <td>${balCell}</td>
       <td>${edit?`<span class="editable" onclick="inlineEditNote('${p.id}',this)" style="font-size:11px;color:${mp.monthNote?'var(--text)':'var(--muted2)'};max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="${escapeAttr(mp.monthNote||'')}">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`:`<span style="font-size:11px;color:var(--muted)">${mp.monthNote?escapeHtml(mp.monthNote):'—'}</span>`}</td>
@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-11';
+const APP_VERSION='2026-08-06-12';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -18283,6 +18283,108 @@ function hideRentAddrTip(){
   clearTimeout(_rentAddrTipTimer);
   _rentAddrTipTimer = null;
   if(_rentAddrTipEl){ _rentAddrTipEl.style.display = 'none'; }
+}
+
+// ─── CMHA Paid / Tenant Paid cell — edit history hover popup ───
+// After a 1s dwell on either payment cell, query propertyHistory
+// for that specific (property, field, activeMonth) trio and show a
+// small card listing every change with who/when/old→new.
+let _paidHistTipTimer = null;
+let _paidHistTipEl = null;
+
+function showPaidHistTip(cell, propId, field){
+  clearTimeout(_paidHistTipTimer);
+  _paidHistTipTimer = setTimeout(() => _buildPaidHistTip(cell, propId, field), 1000);
+}
+function hidePaidHistTip(){
+  clearTimeout(_paidHistTipTimer);
+  _paidHistTipTimer = null;
+  if(_paidHistTipEl){ _paidHistTipEl.style.display = 'none'; }
+}
+
+async function _buildPaidHistTip(cell, propId, field){
+  const p = properties.find(x => x.id === propId);
+  const key = (typeof activeKey === 'function') ? activeKey() : null;
+  if(!p || !key) return;
+  // saveMonthField logs the field name as e.g. 'cmhaPaid (2026-08)'.
+  const fieldLabel = `${field} (${key})`;
+  // Build (or reuse) the tooltip shell up-front so we can show
+  // 'Loading…' while the Firestore query runs.
+  let tip = _paidHistTipEl;
+  if(!tip){
+    tip = document.createElement('div');
+    tip.id = 'paidHistTip';
+    document.body.appendChild(tip);
+    _paidHistTipEl = tip;
+  }
+  tip.style.cssText = 'position:fixed;z-index:10000;max-width:340px;min-width:260px;padding:12px 14px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12px;color:var(--text);pointer-events:none;font-family:var(--font);line-height:1.5';
+  const fieldTitle = field === 'cmhaPaid' ? 'CMHA Paid' : 'Tenant Paid';
+  tip.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px">📜 ${fieldTitle} — Edit History</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${escapeHtml(p.addr||'')} · ${escapeHtml(key)}</div>
+    <div style="color:var(--muted);font-style:italic">Loading…</div>`;
+  tip.style.display = 'block';
+  _positionPaidHistTip(tip, cell);
+
+  let logs = [];
+  try{
+    const snap = await db.collection('propertyHistory')
+      .where('propertyId','==',propId)
+      .where('field','==',fieldLabel)
+      .get();
+    logs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    logs.sort((a,b) => {
+      const ta = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+      const tb = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+      return tb - ta; // newest first
+    });
+  }catch(e){
+    tip.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--red)">📜 History error</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${escapeHtml(e.message||'unknown')}</div>`;
+    return;
+  }
+  // Only re-render if the popup is still active for this cell.
+  if(tip.style.display === 'none') return;
+
+  const fmtMoney = v => {
+    if(v === '' || v === null || v === undefined) return '—';
+    const n = parseFloat(v);
+    return isFinite(n) ? (typeof fmt === 'function' ? fmt(n) : ('$' + n)) : String(v);
+  };
+  const rowsHtml = logs.length
+    ? logs.map(l => {
+        const ts = l.timestamp?.toDate ? l.timestamp.toDate() : new Date(l.timestamp || 0);
+        const when = isNaN(ts) ? '—' : ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' · ' + ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+        const oldV = fmtMoney(l.oldValue);
+        const newV = fmtMoney(l.newValue);
+        const rose = parseFloat(l.newValue||0) > parseFloat(l.oldValue||0);
+        const arrowColor = rose ? '#4ade80' : parseFloat(l.newValue||0) < parseFloat(l.oldValue||0) ? '#f5706a' : 'var(--muted)';
+        return `<div style="padding:6px 0;border-top:1px solid var(--border2)">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${escapeHtml(when)}</div>
+          <div style="font-size:11px">
+            <span style="color:var(--text);font-weight:600">${escapeHtml(l.changedBy||'—')}</span>
+            <span style="color:var(--muted);margin:0 6px">·</span>
+            <span style="font-family:var(--mono);color:var(--muted)">${oldV}</span>
+            <span style="color:${arrowColor};margin:0 4px;font-weight:700">→</span>
+            <span style="font-family:var(--mono);color:${arrowColor};font-weight:700">${newV}</span>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-style:italic;padding:6px 0">No edits recorded yet for this cell.</div>';
+
+  tip.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px">📜 ${fieldTitle} — Edit History</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${escapeHtml(p.addr||'')} · ${escapeHtml(key)}</div>
+    <div style="max-height:260px;overflow-y:auto;pointer-events:auto">${rowsHtml}</div>
+    ${logs.length ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic">${logs.length} edit${logs.length===1?'':'s'} · newest first</div>` : ''}`;
+  _positionPaidHistTip(tip, cell);
+}
+
+function _positionPaidHistTip(tip, cell){
+  const r = cell.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(window.innerWidth - 360, r.left)) + 'px';
+  const belowTop = r.bottom + 6;
+  const spaceBelow = window.innerHeight - belowTop;
+  const h = tip.offsetHeight;
+  tip.style.top = (spaceBelow > h + 10 || r.top < h) ? belowTop + 'px' : (r.top - h - 6) + 'px';
 }
 
 function _buildRentAddrTip(cell, propId){
