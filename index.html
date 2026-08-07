@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-22';
+const APP_VERSION='2026-08-06-23';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -15426,7 +15426,7 @@ function showView(v){
   if(v==='inspections') renderInspectionsView();
   if(v==='certificates') renderCertificatesView();
   if(v==='construction') renderConstructionView();
-  if(v==='constProjects') renderConstProjectsView();
+  if(v==='constProjects'){ _weeklyConstAnchor = _weekStartSaturday(); renderConstProjectsView(); }
   if(v==='turnover') renderTurnoverView();
   if(v==='salaryPool') renderSalaryPoolView();
   if(v==='activity') renderActivityView();
@@ -23065,7 +23065,7 @@ async function renderConstProjectsView(){
 
   let html=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border2)">
     <button onclick="window._cpTab='active';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='active'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='active'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">🔨 Active Projects (${activeProjects.length})</button>
-    <button onclick="window._cpTab='weekly';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='weekly'?'var(--blue)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='weekly'?'var(--blue)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📅 Weekly List</button>
+    <button onclick="window._cpTab='weekly';_weeklyConstAnchor=_weekStartSaturday();renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='weekly'?'var(--blue)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='weekly'?'var(--blue)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📅 Weekly List</button>
     <button onclick="window._cpTab='archived';renderConstProjectsView()" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:none;color:${window._cpTab==='archived'?'var(--accent)':'var(--muted)'};border-bottom:2px solid ${window._cpTab==='archived'?'var(--accent)':'transparent'};margin-bottom:-2px;font-family:var(--font)">📦 Projects Archived (${archivedProjects.length})</button>
   </div>`;
 
