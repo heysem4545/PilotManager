@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-19';
+const APP_VERSION='2026-08-06-20';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22738,12 +22738,11 @@ async function renderWeeklyConstList(){
       .sort((a,b) => (a.createdAt?.toMillis?a.createdAt.toMillis():0) - (b.createdAt?.toMillis?b.createdAt.toMillis():0));
   }catch(e){ console.warn('renderWeeklyConstList', e?.message); }
 
-  // Auto-seed 3 blank rows per section on the current week when
-  // it's still empty — so users always land on a ready-to-type
-  // table. Guarded by an in-memory set to avoid re-seeding on
-  // re-render, and limited to the CURRENT week so browsing old
-  // weeks doesn't create stray rows.
-  if(editable && weekStart === _weekStartSaturday()){
+  // Auto-seed 3 blank rows per section for ANY week that's still
+  // empty — so users always land on a ready-to-type table whether
+  // they're on this week, next week, or planning further ahead.
+  // Guarded by an in-memory set to avoid re-seeding on re-render.
+  if(editable){
     const seedTargets = WEEKLY_CONST_SECTIONS.filter(sec => {
       const key = `${weekStart}:${sec.key}`;
       if(_weeklyConstSeeded.has(key)) return false;
