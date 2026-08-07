@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-28';
+const APP_VERSION='2026-08-06-29';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22727,6 +22727,13 @@ async function renderWeeklyConstList(){
   const weekStart = _weeklyConstAnchor;
   const editable = canEdit();
 
+  // Lock past weeks for non-admins so nobody can quietly upgrade
+  // last week's "Not Started" to "Done". Admins can still edit
+  // (with a visible warning banner) so they can fix mistakes.
+  const isPastWeek = weekStart < _weekStartSaturday();
+  const admin = isAdmin();
+  const effectiveEditable = editable && (!isPastWeek || admin);
+
   // Fetch all rows for this week; partition by section below.
   let allRows = [];
   try{
@@ -22742,7 +22749,8 @@ async function renderWeeklyConstList(){
   // empty — so users always land on a ready-to-type table whether
   // they're on this week, next week, or planning further ahead.
   // Guarded by an in-memory set to avoid re-seeding on re-render.
-  if(editable){
+  // Skipped for past weeks so browsing history never pollutes it.
+  if(editable && !isPastWeek){
     const seedTargets = WEEKLY_CONST_SECTIONS.filter(sec => {
       const key = `${weekStart}:${sec.key}`;
       if(_weeklyConstSeeded.has(key)) return false;
@@ -22774,18 +22782,30 @@ async function renderWeeklyConstList(){
 
   const sectionsHtml = WEEKLY_CONST_SECTIONS.map(sec => {
     const rows = allRows.filter(r => (r.section || 'construction') === sec.key);
-    return _renderWeeklyConstSection(sec, rows, editable);
+    return _renderWeeklyConstSection(sec, rows, effectiveEditable);
   }).join('');
+
+  let banner = '';
+  if(isPastWeek && !admin){
+    banner = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(148,163,184,.15);border:1px solid var(--border2);border-left:3px solid var(--muted);border-radius:6px;font-size:12px;color:var(--muted)">
+      🔒 <strong style="color:var(--text)">Past week — read only.</strong> Results are locked once the week ends so history stays accurate. Contact an admin if a genuine correction is needed.
+    </div>`;
+  } else if(isPastWeek && admin){
+    banner = `<div style="margin-bottom:14px;padding:10px 14px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-left:3px solid #f59e0b;border-radius:6px;font-size:12px;color:var(--text)">
+      ⚠️ <strong>Admin edit — past week.</strong> Changes here rewrite history. Every Result change is stamped with your name + date.
+    </div>`;
+  }
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,-1);renderWeeklyConstList()">‹ Prev Week</button>
-      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);min-width:220px;text-align:center">📅 ${_weekLabel(weekStart)}${isPastWeek?' <span style="font-size:10px;padding:1px 6px;background:var(--surface2);color:var(--muted);border-radius:8px;font-weight:600;letter-spacing:.05em">PAST</span>':''}</div>
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_shiftWeek(_weeklyConstAnchor,1);renderWeeklyConstList()">Next Week ›</button>
       <button class="btn btn-ghost btn-sm" onclick="_weeklyConstAnchor=_weekStartSaturday();renderWeeklyConstList()">This Week</button>
     </div>
+    ${banner}
     ${sectionsHtml}
-    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, review the next Saturday and fill in Result + Rate. Click the <strong style="color:#f59e0b">→</strong> on any unfinished row to push it to next week — it'll show up there amber-highlighted so the PM knows to push hard.</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);font-style:italic">Tip: add tasks Saturday, review the next Saturday and fill in Result. Click the <strong style="color:#f59e0b">→</strong> on any unfinished row to push it to next week — it'll show up there amber-highlighted so the PM knows to push hard. Past weeks are locked once done to preserve history.</div>
   `;
 }
 
@@ -22884,13 +22904,26 @@ function _renderWeeklyConstSection(sec, rows, editable){
         const resultStyle = resultStyleMap[resultVal] || '';
         const RESULT_OPTS = ['', 'Done', 'Almost Done', 'Not Started', 'Pending'];
         const resultOptsHtml = RESULT_OPTS.map(v => `<option value="${escapeAttr(v)}" ${v===resultVal?'selected':''}>${v || '—'}</option>`).join('');
+        // Audit tooltip: shows the last person who changed the
+        // Result, when, and what it was before.
+        let resultTip = '';
+        if(r.resultChangedAt){
+          const raw = r.resultChangedAt.toDate ? r.resultChangedAt.toDate() : new Date(r.resultChangedAt);
+          const whenTxt = isNaN(raw) ? '' : raw.toLocaleString();
+          const whoTxt = r.resultChangedBy || 'unknown';
+          const prevTxt = r.resultPrev ? ` (was: ${r.resultPrev})` : '';
+          resultTip = `Last changed by ${whoTxt} on ${whenTxt}${prevTxt}`;
+        }
+        const auditBadge = r.resultChangedAt
+          ? `<div title="${escapeAttr(resultTip)}" style="font-size:9px;color:var(--muted2);margin-top:2px;text-align:center;cursor:help">✎ ${escapeHtml((r.resultChangedBy||'').split(/\s+/)[0] || 'edit')}</div>`
+          : '';
         return `<tr style="${rowBg}">
           <td style="width:30px;color:var(--muted2);text-align:right;font-family:var(--mono);font-size:11px;padding:6px 4px">${i+1}.</td>
           <td style="padding:4px">${carriedBadge}<input type="text" value="${escapeAttr(r.text||'')}" placeholder="Task…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','text',this.value)" style="${inputCss}${carried?';font-weight:600':''}"></td>
           <td style="padding:4px;width:170px">${_renderWclTargetDateCell(r.id, r.targetDate, editable)}</td>
           <td style="padding:4px;width:180px"><input type="text" value="${escapeAttr(r.update||'')}" placeholder="Mid update…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','update',this.value)" style="${inputCss}"></td>
           <td style="padding:4px;width:200px"><input type="text" value="${escapeAttr(r.notes||'')}" placeholder="Notes…" ${editable?'':'disabled'} onblur="saveWeeklyConstField('${r.id}','notes',this.value)" style="${inputCss}"></td>
-          <td style="padding:4px;width:140px"><select ${editable?'':'disabled'} onchange="saveWeeklyConstField('${r.id}','result',this.value);renderWeeklyConstList()" style="${inputCss};font-weight:600;${resultStyle}">${resultOptsHtml}</select></td>
+          <td style="padding:4px;width:140px"><select ${editable?'':'disabled'} title="${escapeAttr(resultTip)}" onchange="saveWeeklyConstResult('${r.id}','${escapeAttr(resultVal)}',this.value).then(()=>renderWeeklyConstList())" style="${inputCss};font-weight:600;${resultStyle}">${resultOptsHtml}</select>${auditBadge}</td>
           <td style="padding:4px;width:28px;text-align:center">${pushBtn}</td>
           <td style="padding:4px;width:28px;text-align:center">${delBtn}</td>
         </tr>`;
@@ -22946,6 +22979,25 @@ async function saveWeeklyConstField(id, field, value){
   if(!canEdit()) return;
   try{
     await db.collection('weeklyConstructionList').doc(id).update({[field]: value, updatedAt: new Date()});
+  }catch(e){ toast('Save failed: '+(e.message||'unknown')); }
+}
+
+// Result changes get their own writer so we can stamp who / when /
+// what-it-was-before. This surfaces silent edits ("Not Started" →
+// "Done" on a past week) via the tooltip + audit badge on the cell.
+async function saveWeeklyConstResult(id, prev, next){
+  if(!canEdit()) return;
+  if(prev === next) return;
+  const now = new Date();
+  const by = currentUser?.name || currentUser?.email || '';
+  try{
+    await db.collection('weeklyConstructionList').doc(id).update({
+      result: next,
+      resultPrev: prev || '',
+      resultChangedBy: by,
+      resultChangedAt: now,
+      updatedAt: now
+    });
   }catch(e){ toast('Save failed: '+(e.message||'unknown')); }
 }
 
