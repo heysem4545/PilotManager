@@ -6486,7 +6486,7 @@ async function loadTechnicianMonth(name, year, month){
   });
 }
 
-let techTabMode='technicians'; // 'technicians' or 'pilot'
+let techTabMode='pilot'; // 'technicians' or 'pilot' — default to Pilot Tech Daily Log per user request
 let pilotYear=new Date().getFullYear();
 let pilotMonth=new Date().getMonth();
 
@@ -6494,9 +6494,16 @@ async function renderTechnicianView(){
   const el = document.getElementById('technicianView');
   el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:40px"><div class="loader"></div></div>`;
 
-  const tabBar=`<div class="maint-view-tabs" style="margin-bottom:16px">
-    <button class="maint-vtab${techTabMode==='technicians'?' active':''}" onclick="techTabMode='technicians';renderTechnicianView()">Technicians</button>
-    <button class="maint-vtab${techTabMode==='pilot'?' active':''}" onclick="techTabMode='pilot';renderTechnicianView()">🔧 Pilot Technician Daily Log</button>
+  // 'Technicians' is now a regular ghost button that toggles the
+  // Technician-list view. When we're on Technicians view, the button
+  // flips label to 'Back to Pilot Daily Log' so it acts as a toggle.
+  const isPilot = techTabMode === 'pilot';
+  const toggleBtn = isPilot
+    ? `<button class="btn btn-ghost btn-sm" onclick="techTabMode='technicians';renderTechnicianView()" title="Manage the technician list">👥 Technicians</button>`
+    : `<button class="btn btn-ghost btn-sm" onclick="techTabMode='pilot';renderTechnicianView()" title="Back to the Pilot Technician Daily Log">← Back to 🔧 Pilot Daily Log</button>`;
+  const tabBar = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+    <div style="font-size:14px;font-weight:600;color:var(--text)">${isPilot?'🔧 Pilot Technician Daily Log':'👥 Technicians'}</div>
+    ${toggleBtn}
   </div>`;
 
   if(techTabMode==='pilot'){
@@ -12668,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-09';
+const APP_VERSION='2026-08-06-10';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
