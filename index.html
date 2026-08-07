@@ -12675,7 +12675,7 @@ async function tmNavMonth(dir){
 // ─────────────────────────────────────────────
 // Bump APP_VERSION on every deploy. Open tabs that subscribe below will
 // reload within seconds once a fresher value lands in system/appVersion.
-const APP_VERSION='2026-08-06-14';
+const APP_VERSION='2026-08-06-15';
 
 let _versionListenerUnsub=null;
 let _firstVersionEvent=true;
@@ -22900,36 +22900,61 @@ async function shareWeeklyConstListWhatsApp(){
 
   if(rows.length === 0){ toast('No tasks in this week to share.'); return; }
 
-  // Result / Rate are free-text now, so no fixed icons or star
-  // mapping — just include whatever the user typed. Detect a few
-  // common words in Result and prefix a matching emoji so the
-  // shared message still reads at a glance.
-  const iconFor = r => {
-    const res = (r.result || '').toLowerCase();
-    if(/\bdone\b|✅|complete|finish/.test(res)) return '✅';
-    if(/\bmiss/.test(res) || /❌/.test(res)) return '❌';
-    if(/reschedul|postpone|delay/.test(res)) return '🔁';
-    if(/pending|wip|in progress|working/.test(res)) return '⏳';
-    return '•';
-  };
+  // Simple format per user request: just the to-do text + target
+  // date. Carried-over rows keep their ** highlight so the team
+  // can see at a glance what's been pushed from last week.
   const lines = rows.map((r,i) => {
-    // Carried-over items get wrapped in ** so the team sees a
-    // clear visual highlight in the WhatsApp message (WhatsApp
-    // doesn't have a highlight, but ** brackets read at a glance).
     const carried = !!r.carriedOver;
     const taskText = carried ? `**${r.text}**` : r.text;
-    const prefix = carried ? '⚠️ ' : '';
-    const parts = [`${prefix}${iconFor(r)} ${i+1}. ${taskText}`];
-    if(r.targetDate) parts.push(`🎯 ${fmtMDY(r.targetDate)}`);
-    if(r.result) parts.push(r.result);
-    if(r.rate) parts.push(`⭐ ${r.rate}`);
-    if(carried) parts.push('CARRY-OVER');
-    return parts.join(' — ');
+    let line = `${i+1}. ${taskText}`;
+    if(r.targetDate) line += ` — 🎯 ${fmtMDY(r.targetDate)}`;
+    return line;
   });
   const header = `📅 *Weekly Construction List — ${_weekLabel(weekStart)}*`;
   const text = header + '\n\n' + lines.join('\n');
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank', 'noopener');
+
+  // Show in a preview modal (matches the Collection section's UX)
+  // so the user can copy → paste into whatever WhatsApp chat.
+  openWeeklyConstWhatsAppPreview(text, rows.length);
+}
+
+function openWeeklyConstWhatsAppPreview(text, count){
+  const existing = document.getElementById('weeklyConstWaModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.className = 'overlay open';
+  modal.id = 'weeklyConstWaModal';
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal" style="width:600px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-title"><span>📱 Weekly List → WhatsApp</span><button class="modal-close" onclick="document.getElementById('weeklyConstWaModal').remove()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${count} task${count===1?'':'s'} · click <strong>Copy</strong>, then paste into WhatsApp</div>
+    <textarea id="weeklyConstWaText" readonly style="flex:1;min-height:320px;font-family:var(--mono);font-size:12px;padding:12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);outline:none;resize:vertical;white-space:pre-wrap">${escapeHtml(text)}</textarea>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('weeklyConstWaModal').remove()">Close</button>
+      <button class="btn btn-primary btn-sm" style="background:#25d366;border-color:#25d366" onclick="copyWeeklyConstWaText()">📋 Copy to Clipboard</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  const ta = document.getElementById('weeklyConstWaText');
+  if(ta){ ta.focus(); ta.select(); }
+}
+
+async function copyWeeklyConstWaText(){
+  const ta = document.getElementById('weeklyConstWaText');
+  if(!ta) return;
+  const text = ta.value;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+    } else {
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+    }
+    toast('📋 Copied — now paste into WhatsApp');
+  }catch(e){
+    ta.focus(); ta.select();
+    toast('Select all and press ⌘/Ctrl+C');
+  }
 }
 
 async function loadConstProjects(){
